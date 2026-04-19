@@ -27,37 +27,43 @@ onLogin() {
   if (!this.email || !this.password) return;
   this.isLoading = true;
 
-  this.apiService.login(this.email, this.password).subscribe((res: any) => {
-    this.isLoading = false;
-    
-    if (res.success) {
-      // 1. Verificación de cambio de contraseña
-      if (res.user.mustChange === 1) {
-        localStorage.setItem('tempEmail', this.email);
-        localStorage.setItem('tempPass', this.password);
-        this.router.navigate(['/auth/change-password']);
-        return;
+  this.apiService.login(this.email, this.password).subscribe({
+    next: (res: any) => {
+      // ✅ CASO DE ÉXITO: El servidor respondió 200 OK
+      this.isLoading = false; 
+      
+      if (res.success) {
+        // 1. Verificación de cambio de contraseña
+        if (res.user.mustChange === 1) {
+          localStorage.setItem('tempEmail', this.email);
+          localStorage.setItem('tempPass', this.password);
+          this.router.navigate(['/auth/change-password']);
+          return;
+        }
+
+        // 2. Redirección por Rol
+        const roleRoutes: any = { 
+          1: 'admin', 
+          2: 'coordinator', 
+          3: 'director', 
+          4: 'operator' 
+        };
+
+        const targetRoute = roleRoutes[res.user.roleId];
+
+        if (targetRoute) {
+          this.router.navigate([`/dashboard/${targetRoute}/home`]);
+        } else {
+          console.error("ID de Rol no reconocido:", res.user.roleId);
+          Swal.fire('Error', 'Tu rol no tiene un panel asignado.', 'error');
+        }
       }
-
-      // 2. Redirección por Rol
-      // 🚀 CORRECCIÓN: 'operator' debe coincidir con el path del RoutingModule
-      const roleRoutes: any = { 
-        1: 'admin', 
-        2: 'coordinator', 
-        3: 'director', 
-        4: 'operator' // Cambiado de 'operario' a 'operator'
-      };
-
-      const targetRoute = roleRoutes[res.user.roleId];
-
-      if (targetRoute) {
-        this.router.navigate([`/dashboard/${targetRoute}/home`]);
-      } else {
-        console.error("ID de Rol no reconocido:", res.user.roleId);
-        Swal.fire('Error', 'Tu rol no tiene un panel asignado.', 'error');
-      }
-    } else {
-      Swal.fire({ icon: 'error', title: 'Acceso Denegado', text: 'Correo o contraseña incorrectos' });
+    },
+    error: (err) => {
+      // ❌ CASO DE ERROR: Aquí es donde "frenamos" el estado
+      // El SweetAlert ya sale desde el servicio (api.ts), así que aquí solo limpiamos el loader.
+      this.isLoading = false; 
+      console.log('Error en login detectado en el componente, liberando loader...');
     }
   });
 }
