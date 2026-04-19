@@ -1,0 +1,210 @@
+.auth-container {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+
+  .auth-banner {
+    flex: 1.4;
+    position: relative;
+    overflow: hidden;
+    display: none;
+    @media (min-width: 992px) { display: block; }
+
+    // El Mosaico de Imágenes (Efecto Imagen 1)
+    .mosaic-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 100%;
+      width: 100%;
+
+      .mosaic-item {
+        background-size: cover;
+        background-position: center;
+        filter: grayscale(100%); // Base gris para que el overlay de color resalte
+        border-right: 1px solid rgba(255,255,255,0.05);
+      }
+    }
+
+    // Overlay combinado: Gradiente de color + Oscurecimiento suave
+    .banner-overlay {
+      position: absolute;
+      inset: 0;
+      // Gradiente de marca con mix-blend-mode para teñir las fotos
+      background: linear-gradient(135deg, 
+        rgba(230, 225, 60, 0.7) 0%, 
+        rgba(0, 168, 89, 0.8) 100%);
+      mix-blend-mode: multiply; 
+      z-index: 1;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        // Capa oscura para legibilidad del texto
+        background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 60%);
+      }
+    }
+
+    .banner-content {
+      position: absolute;
+      bottom: 10%;
+      left: 8%;
+      z-index: 2;
+      
+      p {
+        font-family: var(--font-interface);
+        font-weight: 600;
+        letter-spacing: 5px;
+        color: var(--atomo-yellow);
+        margin: 0;
+        font-size: 0.9rem;
+      }
+
+      h1 {
+        font-family: var(--font-title);
+        font-size: 4.5rem;
+        margin: 0;
+        line-height: 1;
+        background: #fff;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-image: linear-gradient(to bottom, #fff, #888);
+      }
+    }
+  }
+
+  .auth-form-wrapper {
+    flex: 1;
+    background-color: #8fb3b3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    border-left: 1px solid var(--border-glass);
+  }
+}
+
+.login-card {
+  width: 100%;
+    max-width: 450px;
+    border: 1px solid rgb(127, 198, 30);
+    padding: 30px;
+    border-radius: 30px;
+    background-color: #f4f7f7;
+  
+  .logo-atomo {
+    height: 70px;
+    margin-bottom: 2rem;
+  }
+
+  h2 {
+    font-family: var(--font-title);
+    font-size: 1.8rem;
+    letter-spacing: 2px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+
+  .subtitle {
+    font-family: var(--font-interface);
+    color: var(--atomo-green-bright);
+    font-size: 0.7rem;
+    letter-spacing: 5px;
+    margin-bottom: 2.5rem;
+  }
+
+  .instruction-box {
+    background: rgba(141, 198, 63, 0.05);
+    border-left: 3px solid var(--atomo-green-bright);
+    padding: 15px;
+    margin-bottom: 2.5rem;
+
+    p {
+      font-family: var(--font-interface);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0;
+      line-height: 1.5;
+    }
+  }
+}
+
+.custom-input-group {
+  margin-bottom: 20px;
+
+  label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .input-wrapper {
+    background: white;
+    position: relative;
+    display: flex;
+    align-items: center;
+
+    i {
+      position: absolute;
+      left: 15px;
+      color: var(--atomo-green-bright);
+      font-size: 0.9rem;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 15px 14px 45px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: black;
+      font-family: var(--font-interface);
+      font-size: 0.85rem;
+      border-radius: 2px;
+      transition: all 0.3s ease;
+
+      &:focus {
+        outline: none;
+        border-color: var(--atomo-yellow);
+        background: rgba(255,255,255,0.07);
+      }
+    }
+  }
+}
+
+.btn-atomo {
+  width: 100%;
+  padding: 18px;
+  background: var(--atomo-gradient);
+  border: none;
+  font-family: var(--font-interface);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #000;
+  cursor: pointer;
+  transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+  &:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 30px rgba(0, 168, 89, 0.3);
+  }
+}
+
+.back-link {
+  font-family: var(--font-interface);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  letter-spacing: 2px;
+  transition: 0.3s;
+  
+  i { font-size: 0.6rem; }
+
+  &:hover {
+    color: var(--atomo-yellow);
+    letter-spacing: 3px;
+  }
+}

@@ -1,0 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&family=Montserrat:wght@300;400;600;700&display=swap');
+
+.app-footer {
+  // Estilo base del contenedor principal
+  background: linear-gradient(180deg, #0052cc 0%, #003d99 100%);
+  padding: 15px 40px;
+  color: white;
+  border-top: 3px solid var(--atomo-green-bright);
+  width: 100%;
+  position: relative;
+  z-index: 10;
+  box-sizing: border-box;
+
+  .footer-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; // Distribución profesional a los extremos
+    gap: 20px;
+    width: 100%;
+    max-width: 1600px; // Evita que se estire demasiado en monitores gigantes
+    margin: 0 auto;
+    flex-wrap: nowrap;
+  }
+
+  // --- SECCIÓN: BRANDING (Logo y Nombre) ---
+  .branding {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: fit-content;
+
+    .footer-logo {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 2px solid var(--atomo-green-bright);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+
+      .logo-icon {
+        font-size: 1.4rem;
+        color: white;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.25);
+        border-color: white;
+        transform: rotate(10deg);
+      }
+    }
+
+    .footer-info-text {
+      display: flex;
+      flex-direction: column;
+      
+      .footer-brand-name {
+        font-family: 'Audiowide', cursive;
+        font-size: 0.95rem;
+        font-weight: 400;
+        margin: 0;
+        letter-spacing: 0.5px;
+        color: white;
+      }
+
+      .footer-tagline {
+        font-size: 0.65rem;
+        color: rgba(255, 255, 255, 0.7);
+        margin: 0;
+        font-weight: 400;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+    }
+  }
+
+  // --- DIVISORES VISUALES ---
+  .footer-divider {
+    width: 1px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.15);
+    margin: 0 10px;
+
+    @media (max-width: 991px) {
+      display: none; // Se ocultan en móvil
+    }
+  }
+
+  // --- SECCIÓN: CONTACTO ---
+  .contact {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+
+    .contact-label {
+      font-size: 0.55rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin: 0;
+      color: var(--atomo-green-bright);
+      text-transform: uppercase;
+    }
+
+    .contact-email {
+      font-size: 0.8rem;
+      margin: 0;
+      color: white;
+      text-decoration: none;
+      font-weight: 500;
+      transition: 0.2s;
+
+      &:hover {
+        color: var(--atomo-green-bright);
+        text-decoration: underline;
+      }
+    }
+  }
+
+  // --- SECCIÓN: REDES SOCIALES ---
+  .social {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .social-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: white;
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      i { font-size: 0.85rem; }
+
+      &:hover {
+        background: var(--atomo-green-bright);
+        border-color: var(--atomo-green-bright);
+        color: #003d99;
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(141, 198, 63, 0.4);
+      }
+    }
+  }
+
+  // --- COPYRIGHT ---
+  .footer-copyright {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin: 0;
+    font-family: 'Bergen Mono', monospace;
+    text-align: right;
+    white-space: nowrap;
+    
+    strong { color: white; }
+  }
+
+  // --- RESPONSIVE TABLET / MÓVIL ---
+  @media (max-width: 991px) {
+    padding: 25px 20px;
+
+    .footer-content {
+      flex-direction: column; // Apilado vertical
+      text-align: center;
+      gap: 25px;
+    }
+
+    .branding, .contact, .social {
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .footer-copyright {
+      text-align: center;
+      width: 100%;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  }
+}

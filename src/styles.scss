@@ -1,1 +1,45 @@
-/* You can add global styles to this file, and also import other style files */
+@import url('https://fonts.googleapis.com/css2?family=Audiowide&display=swap');
+
+/* Bergen Mono - Definiciones Locales */
+@font-face {
+  font-family: 'Bergen Mono';
+  src: url('/assets/fonts/BergenMono-Regular.woff2') format('woff2');
+  font-weight: normal;
+}
+@font-face {
+  font-family: 'Bergen Mono';
+  src: url('/assets/fonts/BergenMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+}
+@font-face {
+  font-family: 'Bergen Mono';
+  src: url('/assets/fonts/BergenMono-Bold.woff2') format('woff2');
+  font-weight: bold;
+}
+
+:root {
+  --atomo-yellow: #E6E13C;
+  --atomo-green-bright: #8DC63F;
+  --atomo-green-dark: #00A859;
+  --atomo-gradient: linear-gradient(135deg, #E6E13C 0%, #8DC63F 100%);
+  
+  // Paleta Light Tech basada en tu login
+  --bg-main: #8fb3b3; 
+  --bg-card: #f4f7f7;
+  --bg-sidebar: #ffffff;
+  --text-dark: #1a1c1c;
+  --text-muted: #5e6b6b;
+  --border-accent: rgb(127 198 30);
+
+  --font-title: 'Audiowide', cursive;
+  --font-interface: 'Bergen Mono', monospace;
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--bg-main);
+  color: var(--text-dark);
+  font-family: var(--font-interface);
+}

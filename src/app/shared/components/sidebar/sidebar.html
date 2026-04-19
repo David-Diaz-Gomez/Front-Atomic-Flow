@@ -1,0 +1,41 @@
+<div class="sidebar-wrapper" [class.menu-open]="isMenuOpen">
+  <div class="sidebar-header">
+    <img src="assets/logo-atomo.svg" alt="Logo" class="sidebar-logo">
+    
+    <button class="hamburger-btn" (click)="toggleMenu()">
+      <i class="fa" [ngClass]="isMenuOpen ? 'fa-times' : 'fa-bars'"></i>
+    </button>
+
+    <div class="user-role-badge d-none-mobile">
+      <span class="dot"></span> {{ currentUser?.role }}
+    </div>
+  </div>
+
+  <div class="sidebar-movible-content" [class.active]="isMenuOpen">
+    <nav class="sidebar-nav">
+      <ul>
+        <li *ngFor="let item of menuItems">
+          <a [routerLink]="item.route" routerLinkActive="active" class="nav-link">
+            <div class="icon-box">
+              <i class="fa {{ item.icon }}"></i>
+            </div>
+            <span>{{ item.title }}</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="profile-card">
+        <div class="avatar"><i class="fa fa-user"></i></div>
+        <div class="info">
+          <strong>{{ currentUser?.name }}</strong>
+          <small>Conectado</small>
+        </div>
+      </div>
+      <button (click)="logout()" class="btn-logout">
+        <i class="fa fa-power-off"></i> SALIR
+      </button>
+    </div>
+  </div>
+</div>

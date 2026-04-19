@@ -1,0 +1,182 @@
+.sidebar-wrapper {
+  width: 280px;
+  height: 100vh;
+  background: var(--bg-sidebar);
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid var(--border-accent);
+  box-shadow: 10px 0 30px rgba(0,0,0,0.05);
+  .hamburger-btn { display: none; }
+
+  .nav-link {
+    &.active {
+      background: var(--atomo-gradient);
+      color: #000 !important;
+      font-weight: bold;
+      .icon-box { background: rgba(0,0,0,0.1); color: #000; }
+    }
+  }
+
+  .sidebar-header {
+    padding: 30px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+
+    .sidebar-logo { height: 45px; margin-bottom: 15px; }
+
+    .user-role-badge {
+      font-size: 0.7rem;
+      font-weight: bold;
+      letter-spacing: 2px;
+      color: var(--atomo-green-dark);
+      text-transform: uppercase;
+      background: rgba(141, 198, 63, 0.1);
+      padding: 6px 12px;
+      border-radius: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      .dot { width: 6px; height: 6px; background: var(--atomo-green-bright); border-radius: 50%; }
+    }
+  }
+
+  .sidebar-nav {
+    flex-grow: 1;
+    padding: 20px 15px;
+    ul { list-style: none; padding: 0; }
+    
+    .nav-link {
+      display: flex;
+      align-items: center;
+      padding: 12px 15px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-family: var(--font-interface);
+      font-weight: 600;
+      margin-bottom: 5px;
+      border-radius: 12px;
+      transition: 0.3s;
+
+      .icon-box {
+        width: 35px;
+        height: 35px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-right: 12px;
+        background: #f0f4f4;
+        color: var(--atomo-green-dark);
+        transition: 0.3s;
+      }
+
+      &:hover {
+        background: rgba(143, 179, 179, 0.1);
+        color: var(--atomo-green-dark);
+      }
+
+      &.active {
+        background: var(--atomo-gradient);
+        color: #000;
+        box-shadow: 0 4px 15px rgba(141, 198, 63, 0.3);
+        .icon-box { background: rgba(0,0,0,0.1); color: #000; }
+      }
+    }
+  }
+
+  .sidebar-footer {
+    padding: 20px;
+    border-top: 1px solid rgba(0,0,0,0.05);
+
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 15px;
+      .avatar {
+        width: 40px; height: 40px;
+        background: var(--bg-main);
+        border-radius: 10px;
+        display: flex; align-items: center; justify-content: center;
+        color: white;
+      }
+      .info {
+        display: flex; flex-direction: column;
+        strong { font-size: 0.9rem; color: var(--text-dark); }
+        small { font-size: 0.7rem; color: var(--atomo-green-dark); }
+      }
+    }
+
+    .btn-logout {
+      width: 100%;
+      padding: 12px;
+      background: #fff0f0;
+      border: 1px solid #ffe0e0;
+      color: #e53e3e;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: 0.3s;
+      &:hover { background: #fee2e2; }
+    }
+  }
+}
+/* Oculto por defecto en desktop */
+.menu-toggle { display: none; }
+
+/* RESPONSIVE MÓVIL: El Menú se vuelve un Overlay */
+@media (max-width: 991px) {
+  .sidebar-wrapper {
+    width: 100% !important;
+    height: 70px; // Altura fija del header móvil
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    border-right: none;
+    border-bottom: 2px solid var(--border-accent);
+
+    .sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px 20px;
+      height: 70px;
+      background: white;
+      z-index: 1001;
+      
+      .sidebar-logo { height: 35px; }
+      .hamburger-btn { 
+        display: block; 
+        background: none; border: none; 
+        font-size: 1.5rem; color: var(--atomo-green-dark); 
+      }
+      .d-none-mobile { display: none; }
+    }
+
+    /* EL MODAL / OVERLAY */
+    .sidebar-movible-content {
+      position: fixed;
+      top: 72px; // Justo debajo del header
+      left: -100%; // Escondido a la izquierda
+      width: 100%;
+      height: calc(100vh - 72px);
+      background: rgba(255, 255, 255, 0.98); // Fondo sólido con un toque de transparencia
+      backdrop-filter: blur(10px); // Efecto esmerilado moderno
+      display: flex;
+      flex-direction: column;
+      transition: left 0.4s cubic-bezier(0.77, 0, 0.175, 1);
+      z-index: 999;
+      box-shadow: 10px 0 30px rgba(0,0,0,0.1);
+
+      &.active {
+        left: 0; // Se desliza sobre el contenido
+      }
+
+      .sidebar-nav { padding: 30px 20px; }
+      .sidebar-footer { margin-top: auto; padding: 30px 20px; }
+    }
+  }
+}

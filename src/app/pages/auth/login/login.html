@@ -1,0 +1,50 @@
+<div class="auth-container">
+  <div class="auth-banner">
+    <div class="mosaic-grid">
+      <div class="mosaic-item" style="background-image: url('/assets/images/img1.jpg');"></div>
+      <div class="mosaic-item" style="background-image: url('/assets/images/img2.jpg');"></div>
+      <div class="mosaic-item" style="background-image: url('/assets/images/img3.jpg');"></div>
+      <div class="mosaic-item" style="background-image: url('/assets/images/img4.jpg');"></div>
+    </div>
+    
+    <div class="banner-overlay"></div>
+
+    <div class="banner-content">
+      <p>System Dynamics</p>
+      <h1>ATOMIC FLOW</h1>
+    </div>
+  </div>
+
+  <div class="auth-form-wrapper">
+    <div class="login-card">
+      <div class="text-center">
+        <img src="/assets/logo-atomo.svg" alt="Átomo Logo" class="logo-atomo">
+        <h2>BIENVENIDO</h2>
+        <p class="subtitle">Platform Management</p>
+      </div>
+
+      <form (ngSubmit)="onLogin()">
+        <div class="custom-input-group">
+          <label>Correo</label>
+          <div class="input-wrapper">
+            <i class="fa fa-envelope"></i>
+            <input type="email" [(ngModel)]="email" name="email" placeholder="E-MAIL ADDRESS" required>
+          </div>
+        </div>
+
+        <div class="custom-input-group">
+          <label>Contraseña</label>
+          <div class="input-wrapper">
+            <i class="fa fa-lock"></i>
+            <input type="password" [(ngModel)]="password" name="password" placeholder="PASSWORD" required>
+          </div>
+          <a routerLink="/auth/recover" class="recover-link">¿Olvidaste tu contraseña?</a>
+        </div>
+
+        <button type="submit" class="btn-atomo" [disabled]="isLoading">
+          {{ isLoading ? 'CONNECTING...' : 'SIGN IN' }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
