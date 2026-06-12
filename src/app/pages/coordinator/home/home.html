@@ -1,0 +1,118 @@
+<div class="coord-home">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1><i class="fa fa-home"></i> Bandeja del Coordinador</h1>
+      <span class="subtitle">Fases delegadas, tareas pendientes de asignación y evidencias</span>
+    </div>
+    <div class="header-actions">
+      <app-notif-bell></app-notif-bell>
+      <button class="btn-outline" (click)="goToGantt()"><i class="fa fa-bar-chart"></i> Ver Gantt</button>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card kpi-blue">
+      <div class="kpi-icon"><i class="fa fa-briefcase"></i></div>
+      <div class="kpi-body">
+        <span class="kpi-value">{{ kpi.proyectos_activos }}</span>
+        <span class="kpi-label">Proyectos activos</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-orange">
+      <div class="kpi-icon"><i class="fa fa-sitemap"></i></div>
+      <div class="kpi-body">
+        <span class="kpi-value">{{ kpi.fases_pendientes }}</span>
+        <span class="kpi-label">Fases sin asignar</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-red">
+      <div class="kpi-icon"><i class="fa fa-tasks"></i></div>
+      <div class="kpi-body">
+        <span class="kpi-value">{{ kpi.tareas_sin_asignar }}</span>
+        <span class="kpi-label">Tareas sin asignar</span>
+      </div>
+    </div>
+    <div class="kpi-card kpi-green" (click)="goToEvidences()" style="cursor:pointer">
+      <div class="kpi-icon"><i class="fa fa-camera"></i></div>
+      <div class="kpi-body">
+        <span class="kpi-value">{{ kpi.evidencias_por_revisar }}</span>
+        <span class="kpi-label">Evidencias por revisar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main grid: fases + evidencias -->
+  <div class="home-grid">
+
+    <!-- Fases delegadas -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <h2><i class="fa fa-sitemap"></i> Fases Delegadas</h2>
+        <div class="filter-row">
+          <select [(ngModel)]="filterEstado" class="select-filter">
+            <option value="">Todos los estados</option>
+            <option value="pendiente_asignar">Sin asignar</option>
+            <option value="en_progreso">En progreso</option>
+            <option value="completada">Completadas</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fase-list">
+        <div class="fase-item" *ngFor="let f of fasesFiltradas" (click)="goToProject(f.proyecto_id)">
+          <div class="fase-left">
+            <div class="fase-estado" [ngClass]="estadoClass(f.estado)"></div>
+            <div class="fase-info">
+              <span class="fase-name">{{ f.nombre }}</span>
+              <span class="fase-project">{{ f.proyecto_nombre }}</span>
+              <span class="fase-dates"><i class="fa fa-calendar-o"></i> {{ formatDate(f.fecha_inicio) }} — {{ formatDate(f.fecha_fin) }}</span>
+              <span class="fase-instruc" *ngIf="f.instrucciones"><i class="fa fa-comment-o"></i> {{ f.instrucciones }}</span>
+            </div>
+          </div>
+          <div class="fase-right">
+            <span class="st-badge" [ngClass]="estadoClass(f.estado)">{{ estadoLabel(f.estado) }}</span>
+            <div class="fase-progress-wrap">
+              <div class="mini-track"><div class="mini-fill" [style.width.%]="progressPct(f)"></div></div>
+              <span class="mini-label">{{ f.tareas_completadas }}/{{ f.total_tareas }} tareas</span>
+            </div>
+            <i class="fa fa-chevron-right fase-arrow"></i>
+          </div>
+        </div>
+
+        <div class="empty-list" *ngIf="!fasesFiltradas.length">
+          <i class="fa fa-check-circle"></i> No hay fases con ese filtro
+        </div>
+      </div>
+    </div>
+
+    <!-- Evidencias recientes -->
+    <div class="panel-card">
+      <div class="panel-header">
+        <h2><i class="fa fa-camera"></i> Evidencias recientes
+          <span class="badge-count" *ngIf="noLeidas > 0">{{ noLeidas }} nuevas</span>
+        </h2>
+        <button class="btn-link" (click)="goToEvidences()">Ver todas <i class="fa fa-arrow-right"></i></button>
+      </div>
+
+      <div class="ev-list">
+        <div class="ev-item" *ngFor="let e of evidencias" [class.ev-unread]="!e.leida" (click)="markRead(e); goToEvidences()">
+          <div class="ev-avatar"><i class="fa fa-user"></i></div>
+          <div class="ev-body">
+            <span class="ev-title"><strong>{{ e.operario }}</strong> subió evidencia</span>
+            <span class="ev-sub">{{ e.tarea }} — {{ e.proyecto }}</span>
+            <span class="ev-time">{{ e.hora }}</span>
+          </div>
+          <span class="ev-dot" *ngIf="!e.leida"></span>
+        </div>
+
+        <div class="empty-list" *ngIf="!evidencias.length">
+          <i class="fa fa-inbox"></i> Sin evidencias recientes
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

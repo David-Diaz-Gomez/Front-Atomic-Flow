@@ -1,0 +1,212 @@
+.op-projects {
+  padding: 16px 14px 24px;
+  background: #f0f4f0;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+// ── Page header ───────────────────────────────────────────────────────────────
+.op-page-header {
+  margin-bottom: 16px;
+
+  h1 {
+    font-family: var(--font-title);
+    font-size: 1.05rem;
+    color: var(--text-dark);
+    margin: 0 0 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    i { color: var(--atomo-green-dark); }
+  }
+
+  .op-subtitle { font-size: .72rem; color: var(--text-muted); }
+}
+
+// ── Project list ──────────────────────────────────────────────────────────────
+.project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-card {
+  background: #fff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 3px 12px rgba(0,0,0,.08);
+}
+
+// ── Card header ───────────────────────────────────────────────────────────────
+.proj-card-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.proj-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.proj-header-body {
+  flex: 1;
+  min-width: 0;
+
+  .proj-name {
+    display: block;
+    font-size: .9rem;
+    font-weight: bold;
+    color: var(--text-dark);
+    margin-bottom: 2px;
+  }
+
+  .proj-cliente {
+    font-size: .72rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+}
+
+.proj-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.proj-estado {
+  font-size: .62rem;
+  background: rgba(0,168,89,.1);
+  color: var(--atomo-green-dark);
+  padding: 3px 9px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.proj-coord {
+  font-size: .67rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  i { font-size: .6rem; }
+}
+
+.proj-chevron {
+  font-size: .78rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+.proj-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px 6px;
+}
+
+.proj-progress-bar {
+  flex: 1;
+  height: 7px;
+  background: #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.proj-progress-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width .4s ease;
+}
+
+.proj-progress-label {
+  font-size: .67rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+// ── Dates row ─────────────────────────────────────────────────────────────────
+.proj-dates {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 14px;
+  align-items: center;
+
+  span {
+    font-size: .67rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    i { font-size: .62rem; color: var(--atomo-green-dark); }
+  }
+}
+
+// ── Expanded: fases ───────────────────────────────────────────────────────────
+.proj-fases {
+  border-top: 1px solid #f0f4f0;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f8faf8;
+}
+
+.proj-fase {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fase-label {
+  font-size: .67rem;
+  font-weight: bold;
+  color: var(--atomo-green-dark);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 2px;
+
+  i { font-size: .6rem; }
+}
+
+.tarea-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: .8rem;
+  color: var(--text-dark);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  transition: transform .1s, box-shadow .1s;
+
+  i:first-child {
+    font-size: .58rem;
+    color: var(--atomo-green-dark);
+  }
+
+  &:active {
+    transform: scale(.98);
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+}

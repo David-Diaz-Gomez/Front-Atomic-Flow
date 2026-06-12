@@ -1,0 +1,49 @@
+<div class="op-shell">
+
+  <!-- ── Header permanente ──────────────────────────────────────────────── -->
+  <header class="op-header">
+    <div class="op-header-brand">
+      <div class="op-logo">
+        <span class="logo-atom">At</span><span class="logo-flow">omicFlow</span>
+      </div>
+      <span class="op-role-tag">Operario</span>
+    </div>
+    <div class="op-header-right">
+      <app-notif-bell></app-notif-bell>
+      <div class="op-user-info">
+        <span class="user-name">{{ firstName }}</span>
+        <div class="user-avatar">{{ firstName.charAt(0) }}</div>
+      </div>
+      <button class="op-logout-btn" (click)="logout()" title="Cerrar sesión">
+        <i class="fa fa-sign-out"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Contenido ─────────────────────────────────────────────────────── -->
+  <main class="op-content">
+    <router-outlet></router-outlet>
+  </main>
+
+  <!-- ── Bottom nav ────────────────────────────────────────────────────── -->
+  <nav class="op-bottom-nav">
+    <button class="nav-item" [class.nav-active]="isActive('/home')" (click)="go('home')">
+      <i class="fa fa-home"></i>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-item" [class.nav-active]="isActive('/calendar')" (click)="go('calendar')">
+      <i class="fa fa-calendar"></i>
+      <span>Calendario</span>
+    </button>
+    <button class="nav-item" [class.nav-active]="isActive('/projects')" (click)="go('projects')">
+      <i class="fa fa-briefcase"></i>
+      <span>Proyectos</span>
+    </button>
+    <button class="nav-item" [class.nav-active]="isActive('/notifications')" (click)="go('notifications')">
+      <i class="fa fa-bell"></i>
+      <span>Avisos</span>
+      <span class="nav-badge" *ngIf="unreadNotifs > 0">{{ unreadNotifs }}</span>
+    </button>
+  </nav>
+
+</div>

@@ -43,3 +43,59 @@ body, html {
   color: var(--text-dark);
   font-family: var(--font-interface);
 }
+.swal2-container {
+  z-index: 99999999999;
+}
+
+/* ── Overlay para móvil y orientación vertical ── */
+#mobile-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 999999;
+  background: #0d1a0d;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 20px; padding: 32px; text-align: center;
+  .mo-logo { font-size: 2.5rem; color: #8DC63F; }
+  .mo-title { font-family: 'Audiowide', sans-serif; color: #8DC63F; font-size: 1.2rem; margin: 0; }
+  .mo-msg { color: #aaa; font-size: 0.85rem; line-height: 1.6; margin: 0; }
+  .mo-icon { font-size: 3rem; color: #555; }
+}
+
+/* Mostrar overlay en móvil (< 768px) o en portrait (alto > ancho) */
+@media (max-width: 767px), (orientation: portrait) and (max-width: 1024px) {
+  #mobile-overlay { display: flex; }
+}
+
+/* ── Overlay solo-móvil (operario en desktop) ── */
+#mobile-only-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 999999;
+  background: #0d1a0d;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 20px; padding: 32px; text-align: center;
+  .mo-icon { font-size: 4rem; color: #8DC63F; }
+  .mo-title { font-family: 'Audiowide', sans-serif; color: #8DC63F; font-size: 1.2rem; margin: 0; }
+  .mo-msg { color: #aaa; font-size: 0.85rem; line-height: 1.6; margin: 0; }
+}
+
+/* ── Modo Operario: mobile-first, sin sidebar ── */
+body.operator-mode {
+  /* Bloquear en desktop/tablet (≥ 768px) */
+  @media (min-width: 768px) {
+    #mobile-only-overlay { display: flex; }
+  }
+
+  #mobile-overlay { display: none !important; }
+
+  .sidebar-column { display: none !important; }
+
+  .footer-global { display: none !important; }
+
+  .main-viewport { height: 100vh !important; }
+
+  .content-area {
+    padding: 0 !important;
+    background: var(--bg-main) !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

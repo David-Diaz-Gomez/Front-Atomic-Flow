@@ -5,9 +5,25 @@
   <title>AtomicFlow</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
 </head>
 <body>
+  <div id="mobile-only-overlay">
+    <i class="fa fa-mobile mo-icon"></i>
+    <p class="mo-title">Solo dispositivo móvil</p>
+    <p class="mo-msg">
+      El módulo de operario está diseñado exclusivamente para celular.<br>
+      Por favor, ingresa desde tu dispositivo móvil.
+    </p>
+  </div>
+  <div id="mobile-overlay">
+    <i class="mo-icon fa fa-desktop"></i>
+    <p class="mo-title">Vista de escritorio</p>
+    <p class="mo-msg">
+      AtomicFlow está diseñado para pantallas de escritorio.<br>
+      Por favor abre la aplicación en un computador o gira tu dispositivo a modo horizontal.
+    </p>
+  </div>
   <app-root></app-root>
 </body>
 </html>

@@ -1,0 +1,152 @@
+<div class="gg-wrap">
+
+  <!-- HEADER -->
+  <div class="gg-header">
+    <div class="gg-header__left">
+      <h1><i class="fa fa-bar-chart"></i> Vista General</h1>
+      <span class="gg-sub">Todos los proyectos — cronograma comprimido</span>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="gg-loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando proyectos...
+  </div>
+
+  <!-- ERROR -->
+  <div class="gg-error" *ngIf="!loading && error">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+  </div>
+
+  <!-- GANTT -->
+  <div class="gg-container" *ngIf="!loading && !error && projects.length">
+
+    <!-- Left pane (project names) -->
+    <div class="gg-left">
+      <div class="gg-left__header">Proyecto</div>
+
+      <ng-container *ngFor="let p of projects">
+        <!-- Project row -->
+        <div class="gg-row gg-row--project">
+          <button class="expand-btn"
+                  [class.expanded]="p.expanded"
+                  [disabled]="!p.tiene_fases"
+                  (click)="toggleExpand(p)">
+            <i class="fa" [ngClass]="p.tiene_fases ? (p.expanded ? 'fa-chevron-down' : 'fa-chevron-right') : 'fa-minus'"></i>
+          </button>
+          <div class="project-name-cell">
+            <div class="name-row">
+              <span class="estado-dot" [style.background]="getEstadoColor(p.estado)" [title]="getEstadoLabel(p.estado)"></span>
+              <span class="project-name">{{ p.nombre }}</span>
+            </div>
+            <span class="project-cliente">{{ p.cliente }}</span>
+          </div>
+        </div>
+
+        <!-- Loading fases -->
+        <div class="gg-row gg-row--loading" *ngIf="p.expanded && p.fasesLoading">
+          <i class="fa fa-spinner fa-spin"></i> Cargando fases...
+        </div>
+
+        <!-- Fase rows -->
+        <ng-container *ngIf="p.expanded && !p.fasesLoading">
+          <div class="gg-row gg-row--fase" *ngFor="let f of p.fases">
+            <div class="fase-indent">
+              <i class="fa fa-code-fork"></i>
+              <span>{{ f.nombre }}</span>
+            </div>
+          </div>
+        </ng-container>
+      </ng-container>
+    </div>
+
+    <!-- Right pane (scrollable Gantt) -->
+    <div class="gg-right" id="gg-scroll">
+
+      <!-- Month headers -->
+      <div class="gg-months" [style.width.px]="ganttWidth + 16">
+        <div class="gg-month-cell"
+             *ngFor="let m of ganttMonthHeaders"
+             [style.width.px]="m.width">
+          {{ m.label }}
+        </div>
+      </div>
+
+      <!-- Track area -->
+      <div class="gg-track-area" [style.width.px]="ganttWidth + 16">
+
+        <ng-container *ngFor="let p of projects">
+          <!-- Project bar row -->
+          <div class="gg-track-row gg-track-row--project">
+            <!-- Vertical month grid lines -->
+            <div class="gg-grid-line"
+                 *ngFor="let m of ganttMonthHeaders"
+                 [style.left.px]="m.left"></div>
+            <!-- Today marker -->
+            <div class="gg-today-marker"></div>
+            <!-- Project bar -->
+            <div class="gg-bar gg-bar--project"
+                 [style.left]="getBarStyle(p.fecha_inicio, p.fecha_fin)['left']"
+                 [style.width]="getBarStyle(p.fecha_inicio, p.fecha_fin)['width']"
+                 [style.background]="getEstadoColor(p.estado)"
+                 (click)="goToGantt(p.id)"
+                 title="{{ p.nombre }} · {{ p.fecha_inicio }} – {{ p.fecha_fin }}">
+              <span>{{ p.nombre }}</span>
+            </div>
+          </div>
+
+          <!-- Loading row -->
+          <div class="gg-track-row" *ngIf="p.expanded && p.fasesLoading">
+            <div class="gg-grid-line"
+                 *ngFor="let m of ganttMonthHeaders"
+                 [style.left.px]="m.left"></div>
+          </div>
+
+          <!-- Fase bar rows -->
+          <ng-container *ngIf="p.expanded && !p.fasesLoading">
+            <div class="gg-track-row gg-track-row--fase" *ngFor="let f of p.fases">
+              <div class="gg-grid-line"
+                   *ngFor="let m of ganttMonthHeaders"
+                   [style.left.px]="m.left"></div>
+              <!-- Fase bar -->
+              <div class="gg-bar gg-bar--fase"
+                   [style.left]="getBarStyle(f.fecha_inicio, f.fecha_fin)['left']"
+                   [style.width]="getBarStyle(f.fecha_inicio, f.fecha_fin)['width']"
+                   title="{{ f.nombre }} · {{ f.fecha_inicio }} – {{ f.fecha_fin }}">
+                <span>{{ f.nombre }}</span>
+              </div>
+              <!-- Task ticks inside fase row -->
+              <div class="gg-tarea-tick"
+                   *ngFor="let t of f.tareas"
+                   [class]="getTareaBarClass(t.estado)"
+                   [style.left]="getBarStyle(t.fecha_inicio, t.fecha_fin)['left']"
+                   [style.width]="getBarStyle(t.fecha_inicio, t.fecha_fin)['width']"
+                   (click)="goToGantt(p.id)"
+                   title="{{ t.nombre }} ({{ t.estado }})">
+              </div>
+            </div>
+          </ng-container>
+        </ng-container>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- LEGEND -->
+  <div class="gg-legend" *ngIf="!loading && projects.length">
+    <div class="legend-item" *ngFor="let item of [
+      {label:'En Producción', color:'#00A859'},
+      {label:'Aprobado',      color:'#3b82f6'},
+      {label:'En Revisión',   color:'#f59e0b'},
+      {label:'Borrador',      color:'#94a3b8'}
+    ]">
+      <span class="legend-dot" [style.background]="item.color"></span>
+      {{ item.label }}
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#1e293b"></span> Haz clic en una barra para ir al Gantt del proyecto
+    </div>
+  </div>
+
+</div>

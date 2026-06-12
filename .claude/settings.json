@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/dgdia/.claude/projects/c--Users-dgdia-Documents-AtomicFlow-atomic-flow/memory/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\dgdia\\.claude\\projects\\c--Users-dgdia-Documents-AtomicFlow-atomic-flow\\memory"
+    ]
+  }
+}

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { Api } from '../../../core/services/api'; // Asegúrate de que la ruta sea correcta
+import { NotificationService } from '../../../shared/services/notification.service';
 import Swal from 'sweetalert2';
 
 @Component({
@@ -15,7 +16,7 @@ export class Login {
   isLoading = false;
 
   // 👈 TIENES que inyectar el apiService aquí
-  constructor(private apiService: Api, private router: Router) {}
+  constructor(private apiService: Api, private router: Router, private notifSvc: NotificationService) {}
 
   // login.ts
 
@@ -33,8 +34,10 @@ onLogin() {
       this.isLoading = false; 
       
       if (res.success) {
+        this.notifSvc.reconnect();
+
         // 1. Verificación de cambio de contraseña
-        if (res.user.mustChange === 1) {
+        if (res.user.mustChange === 1 || res.user.mustChange === true) {
           localStorage.setItem('tempEmail', this.email);
           localStorage.setItem('tempPass', this.password);
           this.router.navigate(['/auth/change-password']);
@@ -42,11 +45,12 @@ onLogin() {
         }
 
         // 2. Redirección por Rol
-        const roleRoutes: any = { 
-          1: 'admin', 
-          2: 'coordinator', 
-          3: 'director', 
-          4: 'operator' 
+        const roleRoutes: any = {
+          1: 'admin',
+          2: 'director',
+          3: 'coordinator',
+          4: 'operator',
+          5: 'superoperario',
         };
 
         const targetRoute = roleRoutes[res.user.roleId];
@@ -67,4 +71,6 @@ onLogin() {
     }
   });
 }
+
+
 }

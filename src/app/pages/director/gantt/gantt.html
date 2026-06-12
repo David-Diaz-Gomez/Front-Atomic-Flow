@@ -1,1 +1,482 @@
-<p>gantt works!</p>
+<div class="gantt-page">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1><i class="fa fa-bar-chart"></i> Cronograma y Asignaciones</h1>
+      <span class="subtitle">Gantt interactivo — clic en una tarea para ver su horario detallado</span>
+    </div>
+    <div class="project-selector">
+      <label>Proyecto</label>
+      <select [(ngModel)]="selectedProjectId" (ngModelChange)="onProjectIdChange($event)">
+        <option *ngFor="let p of projects" [ngValue]="p.id">{{ p.nombre }}</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Loading / Error -->
+  <div class="loading-state" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando proyecto...
+  </div>
+  <div class="error-state" *ngIf="!loading && error">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+  </div>
+
+  <!-- ══ Main layout: gantt + optional task panel ══ -->
+  <div class="main-layout" [class.panel-open]="showPanel" *ngIf="!loading && !error">
+
+    <!-- ─── Gantt ─────────────────────────────────────────────────────── -->
+    <div class="gantt-col">
+      <div class="gantt-panel">
+        <div class="panel-title">
+          <i class="fa fa-tasks"></i> Diagrama de Gantt
+          <span class="panel-sub">{{ selectedProject?.nombre }}</span>
+        </div>
+
+        <div class="gantt-wrapper">
+          <!-- Row labels -->
+          <div class="gantt-labels">
+            <div class="gantt-label-header">Fase / Tarea</div>
+            <ng-container *ngFor="let fase of selectedProject?.fases">
+              <div class="gantt-label fase-label">{{ fase.nombre }}</div>
+              <div class="gantt-label task-label" *ngFor="let t of fase.tareas"
+                   [class.selected-task]="panelTask?.id === t.id"
+                   (click)="openTaskPanel(t, fase)">
+                <i class="fa fa-circle-o task-icon"></i>{{ t.nombre }}
+                <i class="fa fa-mouse-pointer hint-icon"></i>
+              </div>
+            </ng-container>
+          </div>
+
+          <!-- Timeline -->
+          <div class="gantt-timeline-scroll">
+            <div class="gantt-timeline" [style.width.px]="ganttWidth + 2">
+              <div class="gantt-day-headers">
+                <div class="gantt-day-cell" *ngFor="let day of ganttDays"
+                     [class.today]="isTodayMarker(day)" [class.weekend]="isWeekend(day)"
+                     [style.width.px]="cellWidth">
+                  <span class="day-num">{{ dayLabel(day) }}</span>
+                  <span class="day-month">{{ monthLabel(day) }}</span>
+                </div>
+              </div>
+
+              <ng-container *ngFor="let fase of selectedProject?.fases">
+                <!-- Phase bar -->
+                <div class="gantt-row fase-row">
+                  <div class="gantt-grid-bg" *ngFor="let day of ganttDays"
+                       [class.today-col]="isTodayMarker(day)" [class.weekend-col]="isWeekend(day)"
+                       [style.width.px]="cellWidth"></div>
+                  <div class="gantt-bar fase-bar" [ngStyle]="getGanttBarStyle(fase)"
+                       [style.border-color]="fase.color" [style.color]="fase.color">
+                    <span>{{ fase.nombre }}</span>
+                  </div>
+                </div>
+                <!-- Task bars -->
+                <div class="gantt-row task-row" *ngFor="let t of fase.tareas"
+                     [class.selected-row]="panelTask?.id === t.id"
+                     (click)="openTaskPanel(t, fase)">
+                  <div class="gantt-grid-bg" *ngFor="let day of ganttDays"
+                       [class.today-col]="isTodayMarker(day)" [class.weekend-col]="isWeekend(day)"
+                       [style.width.px]="cellWidth"></div>
+                  <div class="gantt-bar task-bar" [ngClass]="getGanttBarClass(t.estado)"
+                       [ngStyle]="getGanttBarStyle(t)" [title]="t.nombre + ' — ' + getEstadoLabel(t.estado)">
+                    <span>{{ t.nombre }}</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ── Mueble deadline markers (red dashed lines) ── -->
+              <ng-container *ngFor="let mk of muebleMarkers">
+                <div class="mueble-marker"
+                     *ngIf="markerLeft(mk.fecha_fin) !== null"
+                     [style.left.px]="markerLeft(mk.fecha_fin)"
+                     [title]="'Entrega: ' + mk.nombre + ' (' + mk.fecha_fin + ')'">
+                  <div class="marker-line"></div>
+                  <span class="marker-label">{{ mk.nombre }}</span>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+
+        <div class="gantt-legend">
+          <span class="legend-item"><span class="legend-dot bar-done"></span> Completada</span>
+          <span class="legend-item"><span class="legend-dot bar-progress"></span> En Progreso</span>
+          <span class="legend-item"><span class="legend-dot bar-assigned"></span> Asignada</span>
+          <span class="legend-item"><span class="legend-dot bar-pending"></span> Pendiente</span>
+          <span class="legend-hint"><i class="fa fa-mouse-pointer"></i> Clic en tarea para ver horario</span>
+        </div>
+      </div>
+
+      <!-- ── Global machine occupancy calendar ───────────────────────── -->
+      <div class="calendar-panel">
+        <div class="panel-title">
+          <i class="fa fa-calendar"></i> Ocupación Semanal de Recursos
+        </div>
+        <div class="week-nav">
+          <button (click)="prevWeek()"><i class="fa fa-chevron-left"></i></button>
+          <span class="week-label">{{ calendarWeekLabel }}</span>
+          <button (click)="nextWeek()"><i class="fa fa-chevron-right"></i></button>
+        </div>
+        <div class="cal-scroll">
+          <table class="cal-table">
+            <thead><tr>
+              <th class="cal-resource-header">Recurso</th>
+              <th class="cal-day-header" *ngFor="let day of calendarDays"
+                  [class.today-head]="isTodayMarker(day)" [class.weekend-head]="isWeekend(day)">
+                <div class="cal-day-num">{{ dayLabel(day) }}</div>
+                <div class="cal-day-name">{{ weekDayLabel(day) }}</div>
+              </th>
+            </tr></thead>
+            <tbody>
+              <!-- Fila de rango activo del proyecto -->
+              <tr class="proj-range-row" *ngIf="selectedProject">
+                <td class="resource-label proj-range-label">
+                  <i class="fa fa-calendar-check-o"></i> Proyecto activo
+                </td>
+                <td *ngFor="let day of calendarDays"
+                    [class.proj-range-in]="isInProjectRange(day)"
+                    [class.proj-range-out]="!isInProjectRange(day)"
+                    [class.weekend-cell]="isWeekend(day)"
+                    class="cal-cell proj-range-cell"
+                    [title]="isInProjectRange(day) ? (getFaseForDay(day)?.nombre ?? 'En rango del proyecto') : 'Fuera del proyecto'">
+                  <span class="fase-dot" *ngIf="isInProjectRange(day) && getFaseForDay(day) as f"
+                        [style.background]="f.color" [title]="f.nombre"></span>
+                </td>
+              </tr>
+
+              <!-- ── Maquinaria ── -->
+              <tr>
+                <td colspan="8" class="section-row"><i class="fa fa-cog"></i> Maquinaria</td>
+              </tr>
+              <tr *ngFor="let maq of weeklyOcc">
+                <td class="resource-label"><i class="fa fa-wrench"></i> {{ maq.nombre }}</td>
+                <td *ngFor="let day of calendarDays"
+                    class="cal-cell"
+                    [class.weekend-cell]="isWeekend(day)"
+                    [class.today-cell]="isTodayMarker(day)"
+                    [class.out-of-proj]="!isInProjectRange(day)"
+                    [style.background]="getCeldaBg(maq, day)"
+                    [title]="getDayTooltip(maq, day)">
+                  <ng-container *ngIf="getDayData(maq, day) as diaData">
+                    <span class="occ-pct-top">{{ calcDayPct(diaData) }}%</span>
+                    <div class="occ-bar-track">
+                      <div class="occ-bloque" *ngFor="let b of diaData.bloques"
+                           [ngStyle]="getBloqueStyle(b, getProjectColor(b.proyecto_id))"></div>
+                    </div>
+                  </ng-container>
+                </td>
+              </tr>
+              <tr *ngIf="!weeklyOcc.length">
+                <td colspan="8" class="no-resources-msg"><i class="fa fa-info-circle"></i> Sin maquinaria registrada</td>
+              </tr>
+              <tr *ngIf="weeklyOcc.length && !weeklyOcc[0]?.dias?.length && !weeklyOcc[1]?.dias?.length">
+                <td colspan="8" class="no-resources-msg no-data-week">
+                  <i class="fa fa-calendar-o"></i> Sin ocupación de maquinaria esta semana
+                </td>
+              </tr>
+
+              <!-- ── Operarios ── -->
+              <tr *ngIf="weeklyOperariosOcc.length">
+                <td colspan="8" class="section-row"><i class="fa fa-users"></i> Operarios</td>
+              </tr>
+              <tr *ngFor="let op of weeklyOperariosOcc">
+                <td class="resource-label"><i class="fa fa-user"></i> {{ op.nombre_completo || ((op.nombre || '') + (op.apellido ? ' ' + op.apellido : '')) || ('Op.' + op.id) }}</td>
+                <td *ngFor="let day of calendarDays"
+                    class="cal-cell"
+                    [class.weekend-cell]="isWeekend(day)"
+                    [class.today-cell]="isTodayMarker(day)"
+                    [class.out-of-proj]="!isInProjectRange(day)"
+                    [style.background]="getCeldaBg(op, day)"
+                    [title]="getDayTooltip(op, day)">
+                  <ng-container *ngIf="getDayData(op, day) as diaData">
+                    <span class="occ-pct-top">{{ calcDayPct(diaData) }}%</span>
+                    <div class="occ-bar-track">
+                      <div class="occ-bloque" *ngFor="let b of diaData.bloques"
+                           [ngStyle]="getBloqueStyle(b, getProjectColor(b.proyecto_id))"></div>
+                    </div>
+                  </ng-container>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="cal-legend" *ngIf="projectColorLegend.length">
+          <span class="legend-item" *ngFor="let item of projectColorLegend">
+            <span class="legend-dot" [style.background]="item.color"></span> {{ item.nombre }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Task Detail Panel ──────────────────────────────────────────── -->
+    <div class="task-panel" *ngIf="showPanel && panelTask as task">
+      <div class="task-panel-header">
+        <div>
+          <h3>{{ task.nombre }}</h3>
+          <span class="task-badge" [ngClass]="getEstadoBadge(task.estado)">{{ getEstadoLabel(task.estado) }}</span>
+        </div>
+        <div class="panel-header-actions">
+          <button class="btn-open-modal" (click)="openTaskDetailModal(task, panelFase!)" title="Ver horario en ventana">
+            <i class="fa fa-expand"></i> Ver horario
+          </button>
+          <button class="panel-close" (click)="closePanel()"><i class="fa fa-times"></i></button>
+        </div>
+      </div>
+
+      <!-- Task info -->
+      <div class="task-meta">
+        <div class="meta-item"><i class="fa fa-sitemap"></i> {{ panelFase?.nombre }}</div>
+        <div class="meta-item"><i class="fa fa-calendar"></i> {{ task.fecha_inicio }} → {{ task.fecha_fin }}</div>
+        <div class="meta-item" *ngIf="task.operarios.length">
+          <i class="fa fa-users"></i> {{ task.operarios.join(', ') }}
+        </div>
+        <div class="meta-item" *ngIf="task.maquinarias.length">
+          <i class="fa fa-cog"></i> {{ task.maquinarias.join(', ') }}
+        </div>
+        <div class="meta-item" *ngIf="!task.operarios.length && !task.maquinarias.length">
+          <i class="fa fa-clock-o"></i> Sin asignar
+        </div>
+        <div class="meta-item" *ngIf="task.tipo"><i class="fa fa-tag"></i> {{ task.tipo }}</div>
+      </div>
+
+      <!-- ── Teams-style schedule ──────────────────────────────────────── -->
+      <div class="schedule-section">
+        <h4 class="panel-section-title"><i class="fa fa-clock-o"></i> Horario por día y recurso</h4>
+
+        <div class="loading-inline" *ngIf="task.horarioLoading">
+          <i class="fa fa-spinner fa-spin"></i> Cargando horario...
+        </div>
+
+        <ng-container *ngIf="!task.horarioLoading && hasAnySchedule(task); else noSchedule">
+          <p class="schedule-range-note">
+            <i class="fa fa-info-circle"></i>
+            Jornada 07:00–18:00 (11h). Ocupación calculada por horas reales asignadas.
+          </p>
+
+          <ng-container *ngIf="hasHorario(task); else noBlocks">
+            <div class="schedule-grid" [style.grid-template-columns]="'140px repeat(' + panelDays.length + ', 1fr)'">
+              <div class="sched-corner">Recurso / Día</div>
+              <div class="sched-day-header" *ngFor="let d of panelDays">{{ panelDayLabel(d) }}</div>
+
+              <ng-container *ngFor="let res of getScheduleResources(task)">
+                <div class="sched-resource" [class.res-maquina]="res.tipo === 'maquina'">
+                  <i class="fa" [ngClass]="res.tipo === 'maquina' ? 'fa-cog' : 'fa-user'"></i>
+                  <span>{{ res.name }}</span>
+                  <span class="res-type-badge">{{ res.tipo === 'maquina' ? 'MÁQ' : 'OPE' }}</span>
+                </div>
+                <div class="sched-day-cell" *ngFor="let d of panelDays">
+                  <div class="day-occ-pct"
+                       [class.occ-high]="getResourceDayOccupancy(task, res.name, d) >= 75"
+                       [class.occ-full]="getResourceDayOccupancy(task, res.name, d) >= 100"
+                       *ngIf="getResourceDayOccupancy(task, res.name, d) > 0">
+                    {{ getResourceDayOccupancy(task, res.name, d) }}%
+                  </div>
+                  <div class="hour-track">
+                    <div class="hour-label" *ngFor="let h of scheduleHours"
+                         [style.left.%]="((h - 7) / 11) * 100">{{ h }}</div>
+                    <div class="hour-block"
+                         *ngFor="let block of getBlocksForDay(task, res.name, d)"
+                         [ngStyle]="getBlockStyle(block)"
+                         [ngClass]="res.tipo === 'maquina' ? 'block-machine' : 'block-operator'"
+                         [title]="blockLabel(block)">
+                      <span>{{ blockLabel(block) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+          </ng-container>
+          <ng-template #noBlocks>
+            <p class="no-schedule">Recursos asignados pero sin bloques horarios registrados aún.</p>
+          </ng-template>
+        </ng-container>
+        <ng-template #noSchedule>
+          <p class="no-schedule" *ngIf="!task.horarioLoading">Sin recursos ni horario asignado aún</p>
+        </ng-template>
+      </div>
+
+      <!-- ── Global machine occupancy ──────────────────────────────────── -->
+      <div class="global-occ-section" *ngIf="globalOcc.length">
+        <h4 class="panel-section-title"><i class="fa fa-tachometer"></i> Ocupación global (semana activa)</h4>
+        <div class="gocc-list">
+          <div class="gocc-row" *ngFor="let occ of globalOcc">
+            <div class="gocc-name"><i class="fa fa-cog"></i> {{ occ.nombre }}</div>
+            <div class="gocc-bar-track">
+              <div class="gocc-bar-fill" [ngClass]="occStateClass(occ)" [style.width.%]="occ.porcentaje"></div>
+            </div>
+            <span class="gocc-pct" [ngClass]="occStateClass(occ)">{{ occ.porcentaje }}%</span>
+            <i class="fa gocc-icon" [ngClass]="occIcon(occ)"
+               [class.gocc-saturada]="occ.estado==='saturada'"
+               [class.gocc-alta]="occ.estado==='alta'"
+               [class.gocc-ok]="occ.estado !== 'saturada' && occ.estado !== 'alta'"></i>
+          </div>
+        </div>
+        <p class="occ-note" *ngIf="hasSaturatedMachines()">
+          <i class="fa fa-warning"></i> Máquinas saturadas impiden agendar nuevas tareas en este rango.
+        </p>
+      </div>
+
+      <!-- ── Date editing ───────────────────────────────────────────────── -->
+      <div class="date-edit-section">
+        <h4 class="panel-section-title"><i class="fa fa-pencil"></i> Editar fechas de la tarea</h4>
+
+        <ng-container *ngIf="!dateEdit">
+          <p class="date-current">
+            Actual: <strong>{{ task.fecha_inicio }}</strong> → <strong>{{ task.fecha_fin }}</strong>
+          </p>
+          <button class="btn-edit-dates" (click)="startDateEdit(task, panelFase!)">
+            <i class="fa fa-calendar"></i> Modificar fechas
+          </button>
+        </ng-container>
+
+        <ng-container *ngIf="dateEdit as de">
+          <div class="date-range-hint" *ngIf="panelFase">
+            <i class="fa fa-info-circle"></i>
+            Fase: <strong>{{ panelFase.fecha_inicio }}</strong> → <strong>{{ panelFase.fecha_fin }}</strong>
+            &nbsp;|&nbsp; Proyecto: <strong>{{ selectedProject?.fecha_inicio }}</strong> → <strong>{{ selectedProject?.fecha_fin }}</strong>
+          </div>
+          <div class="date-edit-form">
+            <div class="date-edit-row">
+              <label>Inicio</label>
+              <input type="date" [(ngModel)]="de.fecha_inicio"
+                     [min]="taskDateMin" [max]="taskDateMax">
+            </div>
+            <div class="date-edit-row">
+              <label>Fin</label>
+              <input type="date" [(ngModel)]="de.fecha_fin"
+                     [min]="taskDateMin" [max]="taskDateMax">
+            </div>
+          </div>
+
+          <button class="btn-verify-dates" (click)="checkDateConflict()"
+                  [disabled]="de.conflictCheck === 'checking'">
+            <i class="fa" [ngClass]="de.conflictCheck === 'checking' ? 'fa-spinner fa-spin' : 'fa-shield'"></i>
+            {{ de.conflictCheck === 'checking' ? 'Verificando...' : 'Verificar disponibilidad' }}
+          </button>
+
+          <div class="check-result check-ok" *ngIf="de.conflictCheck === 'ok'">
+            <i class="fa fa-check-circle"></i> {{ de.conflictMsg }}
+          </div>
+          <div class="check-result check-conflict" *ngIf="de.conflictCheck === 'conflict'">
+            <i class="fa fa-exclamation-triangle"></i> {{ de.conflictMsg }}
+          </div>
+
+          <div class="date-edit-actions">
+            <button class="btn-cancel-edit" (click)="cancelDateEdit()"><i class="fa fa-times"></i> Cancelar</button>
+            <button class="btn-save-edit" (click)="saveDateEdit()"
+                    [disabled]="de.conflictCheck === 'conflict' || de.conflictCheck === 'checking'">
+              <i class="fa fa-save"></i> Guardar
+            </button>
+          </div>
+        </ng-container>
+      </div>
+
+    </div><!-- /task-panel -->
+
+  </div><!-- /main-layout -->
+
+  <!-- Tooltip -->
+  <div class="gantt-tooltip" *ngIf="tooltip"
+       [style.left.px]="tooltip.x + 12" [style.top.px]="tooltip.y - 36">
+    {{ tooltip.text }}
+  </div>
+
+  <!-- ══ MODAL: Horario detallado de la tarea ══════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showTaskDetailModal && modalTask as mt" (click)="closeTaskDetailModal()">
+    <div class="task-detail-modal" (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="tdm-header">
+        <div class="tdm-title-block">
+          <h2>{{ mt.nombre }}</h2>
+          <span class="task-badge" [ngClass]="getEstadoBadge(mt.estado)">{{ getEstadoLabel(mt.estado) }}</span>
+          <span class="tdm-fase"><i class="fa fa-sitemap"></i> {{ modalFaseName }}</span>
+        </div>
+        <button class="tdm-close" (click)="closeTaskDetailModal()"><i class="fa fa-times"></i></button>
+      </div>
+
+      <!-- Meta info -->
+      <div class="tdm-meta">
+        <div class="tdm-meta-item"><i class="fa fa-calendar"></i> {{ mt.fecha_inicio }} → {{ mt.fecha_fin }}</div>
+        <div class="tdm-meta-item" *ngIf="mt.operarios.length"><i class="fa fa-users"></i> {{ mt.operarios.join(', ') }}</div>
+        <div class="tdm-meta-item" *ngIf="mt.maquinarias.length"><i class="fa fa-cog"></i> {{ mt.maquinarias.join(', ') }}</div>
+        <div class="tdm-meta-item" *ngIf="!mt.operarios.length && !mt.maquinarias.length"><i class="fa fa-clock-o"></i> Sin recursos asignados</div>
+        <div class="tdm-meta-item" *ngIf="mt.tipo"><i class="fa fa-tag"></i> {{ mt.tipo }}</div>
+      </div>
+
+      <!-- Schedule grid body -->
+      <div class="tdm-body">
+        <ng-container *ngIf="hasAnySchedule(mt); else noSchedModal">
+          <p class="tdm-jornada-note">
+            <i class="fa fa-info-circle"></i> Jornada 07:00–18:00 (11h disponibles). Horas reales de cada recurso por día.
+          </p>
+
+          <ng-container *ngIf="hasHorario(mt); else noBlocksModal">
+            <div class="tdm-scroll">
+              <table class="tdm-table">
+                <thead>
+                  <tr>
+                    <th class="tdm-res-col">Recurso</th>
+                    <th *ngFor="let d of modalDays" class="tdm-day-col">
+                      <div class="tdm-day-num">{{ dayLabel(d) }}</div>
+                      <div class="tdm-day-name">{{ weekDayLabel(d) }}</div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let res of getScheduleResources(mt)">
+                    <td class="tdm-res-label" [class.tdm-res-maq]="res.tipo === 'maquina'">
+                      <i class="fa" [ngClass]="res.tipo === 'maquina' ? 'fa-cog' : 'fa-user'"></i>
+                      {{ res.name }}
+                      <span class="tdm-res-badge">{{ res.tipo === 'maquina' ? 'MÁQ' : 'OPE' }}</span>
+                    </td>
+                    <td class="tdm-day-cell" *ngFor="let d of modalDays">
+                      <div class="tdm-occ-pct"
+                           [class.occ-high]="getResourceDayOccupancy(mt, res.name, d) >= 75"
+                           [class.occ-full]="getResourceDayOccupancy(mt, res.name, d) >= 100"
+                           *ngIf="getResourceDayOccupancy(mt, res.name, d) > 0">
+                        {{ getResourceDayOccupancy(mt, res.name, d) }}%
+                      </div>
+                      <div class="tdm-hour-track">
+                        <div class="tdm-hour-tick" *ngFor="let h of scheduleHours"
+                             [style.left.%]="((h - 7) / 11) * 100">
+                          <span class="tdm-tick-label">{{ h }}</span>
+                        </div>
+                        <div class="tdm-hour-block"
+                             *ngFor="let block of getBlocksForDay(mt, res.name, d)"
+                             [ngStyle]="getBlockStyle(block)"
+                             [ngClass]="res.tipo === 'maquina' ? 'tdm-block-maq' : 'tdm-block-ope'"
+                             [title]="blockLabel(block)">
+                          <span class="tdm-block-label">{{ blockLabel(block) }}</span>
+                        </div>
+                        <div class="tdm-empty-day" *ngIf="!getBlocksForDay(mt, res.name, d).length">—</div>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </ng-container>
+          <ng-template #noBlocksModal>
+            <div class="tdm-no-sched">
+              <i class="fa fa-clock-o"></i>
+              <p>Recursos asignados pero sin bloques horarios registrados aún.</p>
+            </div>
+          </ng-template>
+        </ng-container>
+        <ng-template #noSchedModal>
+          <div class="tdm-no-sched">
+            <i class="fa fa-clock-o"></i>
+            <p>Sin horario detallado asignado. El coordinador definirá los bloques horarios al asignar recursos.</p>
+          </div>
+        </ng-template>
+      </div>
+
+      <div class="tdm-footer">
+        <button class="tdm-btn-close" (click)="closeTaskDetailModal()"><i class="fa fa-times"></i> Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+</div>

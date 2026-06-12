@@ -1,0 +1,128 @@
+<div class="home-page">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-title">
+      <h1><i class="fa fa-briefcase"></i> Mis Proyectos</h1>
+      <span class="subtitle">Gestión y seguimiento de proyectos activos</span>
+    </div>
+    <div class="header-actions">
+      <app-notif-bell></app-notif-bell>
+      <button class="btn-evidencias" (click)="goToEvidencias()">
+        <i class="fa fa-camera"></i> Evidencias
+      </button>
+      <button class="btn-primary-action" (click)="goToNew()">
+        <i class="fa fa-plus"></i> Nuevo Proyecto
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card stat-total">
+      <div class="stat-icon"><i class="fa fa-folder-open"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Total</span>
+      </div>
+    </div>
+    <div class="stat-card stat-produccion">
+      <div class="stat-icon"><i class="fa fa-cogs"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.en_produccion }}</span>
+        <span class="stat-label">En Producción</span>
+      </div>
+    </div>
+    <div class="stat-card stat-revision">
+      <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.en_revision }}</span>
+        <span class="stat-label">En Revisión</span>
+      </div>
+    </div>
+    <div class="stat-card stat-aprobado">
+      <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.aprobado }}</span>
+        <span class="stat-label">Aprobados</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fa fa-search"></i>
+      <input type="text" placeholder="Buscar proyecto o cliente..."
+             [(ngModel)]="filterSearch" (ngModelChange)="applyFilters()">
+    </div>
+    <select [(ngModel)]="filterEstado" (ngModelChange)="applyFilters()" class="filter-select">
+      <option value="">Todos los estados</option>
+      <option value="borrador">Borrador</option>
+      <option value="en_revision">En Revisión</option>
+      <option value="aprobado">Aprobado</option>
+      <option value="en_produccion">En Producción</option>
+      <option value="completado">Completado</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando proyectos...
+  </div>
+
+  <!-- Error -->
+  <div class="error-state" *ngIf="error && !loading">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+    <button class="btn-outline" (click)="loadProjects()">Reintentar</button>
+  </div>
+
+  <!-- Projects Grid -->
+  <div class="projects-grid" *ngIf="!loading && filteredProjects.length > 0">
+    <div class="project-card" *ngFor="let p of filteredProjects">
+      <!-- Imagen del proyecto -->
+      <div class="card-image">
+        <img [src]="p.link_imagen || '/assets/img/project-default.png'"
+             [alt]="p.nombre" (error)="$any($event.target).src='/assets/img/project-default.png'">
+        <div class="card-image-overlay">
+          <span class="estado-badge" [ngClass]="getEstadoClass(p.estado)">{{ getEstadoLabel(p.estado) }}</span>
+          <span class="badge-cc" *ngIf="p.centro_costos">{{ p.centro_costos }}</span>
+        </div>
+        <a *ngIf="p.link_trello" [href]="p.link_trello" target="_blank" class="trello-link" title="Ver en Trello">
+          <i class="fa fa-trello"></i>
+        </a>
+      </div>
+      <div class="card-body">
+        <h3 class="project-name">{{ p.nombre }}</h3>
+        <p class="project-client"><i class="fa fa-building-o"></i> {{ p.cliente?.razon_social }}</p>
+        <p class="project-desc">{{ p.descripcion }}</p>
+        <div class="project-dates">
+          <i class="fa fa-calendar-o"></i>
+          {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}
+        </div>
+        <div class="project-team" *ngIf="p.coordinador?.nombre">
+          <i class="fa fa-user-o"></i>
+          {{ p.coordinador?.nombre }} {{ p.coordinador?.apellido }}
+        </div>
+      </div>
+      <div class="card-actions">
+        <button class="btn-action btn-ver" (click)="goToDetail(p.id)">
+          <i class="fa fa-eye"></i> Ver Detalle
+        </button>
+        <button class="btn-action btn-edit" (click)="goToEdit(p.id)">
+          <i class="fa fa-pencil"></i> Editar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State — solo si terminó de cargar y no hay resultados -->
+  <div class="empty-state" *ngIf="!loading && !error && filteredProjects.length === 0">
+    <i class="fa fa-folder-open-o"></i>
+    <p>No se encontraron proyectos</p>
+    <button class="btn-primary-action" (click)="goToNew()">
+      <i class="fa fa-plus"></i> Crear Primer Proyecto
+    </button>
+  </div>
+
+</div>

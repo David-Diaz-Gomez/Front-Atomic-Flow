@@ -1,0 +1,32 @@
+<div class="notif-bell-wrap">
+  <button class="btn-notif-bell" (click)="toggle()">
+    <i class="fa fa-bell"></i>
+    <span class="notif-badge" *ngIf="notifSvc.unreadCount > 0">{{ notifSvc.unreadCount }}</span>
+  </button>
+
+  <div class="notif-panel" *ngIf="showPanel" (click)="$event.stopPropagation()">
+    <div class="notif-panel-header">
+      <span>Notificaciones</span>
+      <button class="btn-mark-all" (click)="markAll()">Marcar todas leídas</button>
+    </div>
+    <div class="notif-list">
+      <div class="notif-item" *ngFor="let n of notifSvc.notifs"
+           [class.notif-unread]="!n.leida"
+           (click)="onClick(n)">
+        <div class="notif-icon" [ngClass]="'ni-' + n.tipo">
+          <i class="fa" [ngClass]="iconFor(n.tipo)"></i>
+        </div>
+        <div class="notif-body">
+          <div class="notif-title">{{ n.titulo }}</div>
+          <div class="notif-msg">{{ n.mensaje }}</div>
+          <div class="notif-hora">{{ n.hora }}</div>
+        </div>
+        <div class="notif-dot" *ngIf="!n.leida"></div>
+      </div>
+      <div class="notif-empty" *ngIf="notifSvc.notifs.length === 0">
+        <i class="fa fa-bell-slash-o"></i>
+        <span>Sin notificaciones</span>
+      </div>
+    </div>
+  </div>
+</div>

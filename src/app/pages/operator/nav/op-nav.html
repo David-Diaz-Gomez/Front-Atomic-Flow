@@ -1,0 +1,19 @@
+<nav class="op-bottom-nav">
+  <button class="nav-item" [class.nav-active]="isActive('/home') || isActive('/calendar')==false && !isActive('/notifications') && !isActive('/projects') && !isActive('/task')" (click)="go('home')">
+    <i class="fa fa-home"></i>
+    <span>Inicio</span>
+  </button>
+  <button class="nav-item" [class.nav-active]="isActive('/calendar')" (click)="go('calendar')">
+    <i class="fa fa-calendar"></i>
+    <span>Calendario</span>
+  </button>
+  <button class="nav-item" [class.nav-active]="isActive('/projects')" (click)="go('projects')">
+    <i class="fa fa-briefcase"></i>
+    <span>Proyectos</span>
+  </button>
+  <button class="nav-item" [class.nav-active]="isActive('/notifications')" (click)="go('notifications')">
+    <i class="fa fa-bell"></i>
+    <span>Notif.</span>
+    <span class="nav-badge">3</span>
+  </button>
+</nav>

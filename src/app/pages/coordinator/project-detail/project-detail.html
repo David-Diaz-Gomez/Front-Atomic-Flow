@@ -1,0 +1,711 @@
+<div class="coord-detail" *ngIf="project as p">
+
+  <!-- Header -->
+  <div class="page-header">
+    <button class="btn-back" (click)="goBack()"><i class="fa fa-arrow-left"></i></button>
+    <div class="header-info">
+      <h1>{{ p.nombre }}</h1>
+      <span class="header-meta">{{ p.cliente }} &bull; {{ p.centro_costos }} &bull; {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-outline" (click)="goToGantt()"><i class="fa fa-bar-chart"></i> Gantt</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav">
+    <button [class.active]="activeTab==='fases'"    (click)="setTab('fases')"><i class="fa fa-sitemap"></i> Fases delegadas</button>
+    <button [class.active]="activeTab==='todas'"    (click)="setTab('todas')"><i class="fa fa-list"></i> Todas las fases</button>
+    <button [class.active]="activeTab==='insumos'"  (click)="setTab('insumos')"><i class="fa fa-cube"></i> Insumos</button>
+  </div>
+
+  <!-- ═══ TAB: Fases delegadas ═══════════════════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab==='fases'">
+    <div class="fases-hint"><i class="fa fa-info-circle"></i> Solo se muestran las fases que el director te delegó. Asigna operarios, maquinaria e insumos a cada tarea.</div>
+
+    <div class="fases-list">
+      <div class="fase-card" *ngFor="let fase of fasesDelegate">
+        <div class="fase-header" (click)="toggleFase(fase.id)">
+          <div class="fase-toggle"><i class="fa" [ngClass]="isFaseExpanded(fase.id)?'fa-chevron-down':'fa-chevron-right'"></i></div>
+          <div class="fase-info">
+            <span class="fase-name">{{ fase.nombre }}</span>
+            <span class="fase-dates"><i class="fa fa-calendar-o"></i> {{ formatDate(fase.fecha_inicio) }} — {{ formatDate(fase.fecha_fin) }}</span>
+          </div>
+          <div class="fase-meta-right">
+            <div class="mini-progress">
+              <div class="mini-track"><div class="mini-fill" [style.width.%]="progressPct(fase)"></div></div>
+              <span class="mini-pct">{{ progressPct(fase) }}%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="fase-body" *ngIf="isFaseExpanded(fase.id)">
+          <div class="instruc-director" *ngIf="fase.instrucciones_director">
+            <i class="fa fa-comment-o"></i> <strong>Director:</strong> {{ fase.instrucciones_director }}
+          </div>
+
+          <div class="fase-body-actions">
+            <button class="btn-new-task" (click)="openNewTask(fase); $event.stopPropagation()">
+              <i class="fa fa-plus"></i> Nueva Tarea
+            </button>
+          </div>
+
+          <div class="task-list">
+            <div class="task-row" *ngFor="let t of fase.tareas">
+              <div class="task-top">
+                <div class="task-dot" [ngClass]="'dot-' + t.estado"></div>
+                <div class="task-info">
+                  <span class="task-name">{{ t.nombre }}</span>
+                  <span class="task-meta">{{ t.tipo_tarea }} &bull; {{ formatDate(t.fecha_inicio) }} — {{ formatDate(t.fecha_fin) }}</span>
+                </div>
+                <span class="task-badge" [ngClass]="estadoBadge(t.estado)">{{ estadoLabel(t.estado) }}</span>
+                <button class="btn-edit-task" (click)="openEditTask(t, fase); $event.stopPropagation()" *ngIf="t.estado !== 'completada'">
+                  <i class="fa fa-pencil"></i>
+                </button>
+                <button class="btn-assign" (click)="openAssign(t, fase)" *ngIf="t.estado !== 'completada'">
+                  <i class="fa fa-plus"></i> Asignar
+                </button>
+                <button class="btn-evidencia" (click)="openEvidModal(t)">
+                  <i class="fa fa-camera"></i> Evidencia
+                </button>
+              </div>
+
+              <!-- Assigned resources summary -->
+              <div class="task-assigns" *ngIf="t.operarios.length || t.maquinarias.length || t.insumos_aplicados.length">
+                <div class="assign-chips">
+                  <span class="achip achip-op" *ngFor="let op of t.operarios">
+                    <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
+                    <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
+                    <button class="achip-rm" (click)="removeOperario(t, op.id)"><i class="fa fa-times"></i></button>
+                  </span>
+                  <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
+                    <i class="fa fa-cog"></i> {{ m.nombre }}
+                    <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
+                    <button class="achip-rm" (click)="removeMaquina(t, m.id)"><i class="fa fa-times"></i></button>
+                  </span>
+                  <span class="achip achip-ins" *ngFor="let iid of t.insumos_aplicados">
+                    <i class="fa fa-cube"></i> {{ insumoNombre(iid) }}
+                  </span>
+                </div>
+                <div class="ev-warn" *ngIf="t.evidencias_pendientes > 0">
+                  <i class="fa fa-camera"></i> {{ t.evidencias_pendientes }} evidencia(s) por revisar
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" *ngIf="!fasesDelegate.length">
+        <i class="fa fa-lock"></i>
+        <p>No tienes fases delegadas en este proyecto.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: Todas las fases ═══════════════════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab==='todas'">
+    <div class="fases-list">
+      <div class="fase-card" *ngFor="let fase of fasesAll">
+        <div class="fase-header" (click)="toggleFase(fase.id + 1000)">
+          <div class="fase-toggle"><i class="fa" [ngClass]="isFaseExpanded(fase.id+1000)?'fa-chevron-down':'fa-chevron-right'"></i></div>
+          <div class="fase-info">
+            <span class="fase-name">{{ fase.nombre }}</span>
+            <span class="fase-dates"><i class="fa fa-calendar-o"></i> {{ formatDate(fase.fecha_inicio) }} — {{ formatDate(fase.fecha_fin) }}</span>
+          </div>
+          <div class="fase-meta-right">
+            <span class="delegada-badge" *ngIf="fase.delegada_a_mi"><i class="fa fa-check"></i> Delegada a mí</span>
+            <span class="no-delegada-badge" *ngIf="!fase.delegada_a_mi"><i class="fa fa-lock"></i> No delegada</span>
+          </div>
+        </div>
+        <div class="fase-body fase-body-compact" *ngIf="isFaseExpanded(fase.id+1000)">
+          <span class="task-count-label">{{ fase.tareas.length }} tarea(s)</span>
+          <div class="task-name-list">
+            <span *ngFor="let t of fase.tareas" class="task-mini-badge" [ngClass]="'dot-' + t.estado">{{ t.nombre }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TAB: Insumos ═══════════════════════════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab==='insumos'">
+    <div class="insumos-card">
+      <div class="insumos-note"><i class="fa fa-info-circle"></i> Estos son los materiales disponibles del proyecto. Puedes vincularlos a tareas desde el panel de asignación (sin indicar cantidades).</div>
+      <table class="insumos-table">
+        <thead><tr><th>Material / Insumo</th><th>Tipo</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let ins of p.insumos">
+            <td>{{ ins.nombre }}</td>
+            <td><span class="tipo-badge">{{ ins.tipo }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /coord-detail -->
+
+<div class="loading-state" *ngIf="!project"><i class="fa fa-spinner fa-spin"></i> Cargando...</div>
+
+<!-- ══ PANEL LATERAL: Asignación de recursos ══════════════════════════════════ -->
+<div class="assign-overlay" *ngIf="showAssignPanel" (click)="closeAssign()">
+  <div class="assign-panel" (click)="$event.stopPropagation()">
+
+    <!-- Panel header -->
+    <div class="assign-header">
+      <div>
+        <h3>Asignar recursos</h3>
+        <p class="assign-task-name"><i class="fa fa-tasks"></i> {{ assignTask?.nombre }}</p>
+        <p class="assign-task-dates"><i class="fa fa-calendar"></i> {{ formatDate(assignTask?.fecha_inicio??'') }} — {{ formatDate(assignTask?.fecha_fin??'') }}</p>
+      </div>
+      <button class="panel-close" (click)="closeAssign()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <!-- Panel tabs -->
+    <div class="panel-tabs">
+      <button [class.active]="assignTab==='operario'"   (click)="assignTab='operario'"><i class="fa fa-user"></i> Operarios</button>
+      <button [class.active]="assignTab==='maquinaria'" (click)="assignTab='maquinaria'"><i class="fa fa-cog"></i> Maquinaria</button>
+      <button [class.active]="assignTab==='insumos'"    (click)="assignTab='insumos'"><i class="fa fa-cube"></i> Insumos</button>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- ── TAB: OPERARIOS ────────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='operario'">
+
+        <!-- Already assigned -->
+        <div class="current-assigns" *ngIf="assignTask?.operarios?.length">
+          <h4 class="section-mini-title">Operarios ya asignados</h4>
+          <div class="assign-chips">
+            <span class="achip achip-op" *ngFor="let op of assignTask!.operarios">
+              <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }} ({{ op.hora_inicio }}–{{ op.hora_fin }})
+            </span>
+          </div>
+        </div>
+
+        <!-- Availability calendar -->
+        <div class="avail-section">
+          <h4 class="section-mini-title">
+            <i class="fa fa-calendar"></i> Disponibilidad de operarios
+            <span class="legend-row">
+              <span class="leg-own"></span> Este proy.
+              <span class="leg-busy"></span> Otro proy.
+              <span class="leg-queued"></span> En cola
+              <span class="leg-prop"></span> Propuesta
+              <span class="leg-conflict"></span> Conflicto
+            </span>
+          </h4>
+          <div class="avail-scroll">
+            <table class="avail-table">
+              <thead>
+                <tr>
+                  <th class="avail-op-col">Operario</th>
+                  <th class="avail-day-col" *ngFor="let d of taskDays">
+                    {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let op of operarios">
+                  <td class="avail-op-cell">
+                    <div class="op-select-row">
+                      <span class="op-name">{{ op.nombre }} {{ op.apellido }}</span>
+                      <button class="btn-select-op" [class.selected]="opForm.operario_id===op.id"
+                              (click)="opForm.operario_id=op.id; onOperarioOrHoursChange()">
+                        {{ opForm.operario_id===op.id ? 'Elegido' : 'Elegir' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="avail-timeline-cell" *ngFor="let d of taskDays; let di = index">
+                    <div class="timeline-track" (click)="openCellModal('op', op, toStr(d))">
+                      <!-- Hour tick marks -->
+                      <div class="hour-tick" *ngFor="let h of HOURS"
+                           [style.left.%]="((h - DAY_START) / DAY_H) * 100">
+                      </div>
+                      <!-- Busy blocks (existing assignments) -->
+                      <div class="busy-block"
+                           *ngFor="let b of getBusyBlocks(op.id, toStr(d))"
+                           [ngStyle]="blockStyle(b.hi, b.hf)"
+                           [class.block-own-project]="b.ownProject"
+                           [title]="b.info">
+                      </div>
+                      <!-- Queued (pending) slots — distinct color per slot index -->
+                      <ng-container *ngIf="opForm.operario_id === op.id">
+                        <div class="pending-slot-block"
+                             *ngFor="let pb of getPendingOpBlocks(toStr(d))"
+                             [ngStyle]="blockStyle(pb.hi, pb.hf)"
+                             [style.background]="slotColor(pb.idx)"
+                             [title]="'Cola #' + (pb.idx+1) + ': ' + pendingOpSlots[pb.idx].hora_inicio + '–' + pendingOpSlots[pb.idx].hora_fin">
+                        </div>
+                      </ng-container>
+                      <!-- Proposed assignment block (only for selected operator) -->
+                      <div class="proposed-block"
+                           *ngIf="opForm.operario_id===op.id && isOpDateSelected(toStr(d))"
+                           [ngStyle]="proposedBlockStyle()"
+                           [class.proposed-conflict]="proposedOverlaps(op.id, toStr(d))">
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Assignment form -->
+        <div class="assign-form">
+          <h4 class="section-mini-title"><i class="fa fa-plus-circle"></i> Nueva asignación</h4>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Operario *</label>
+              <select [(ngModel)]="opForm.operario_id" (ngModelChange)="onOperarioOrHoursChange()">
+                <option [ngValue]="null" disabled>Seleccionar...</option>
+                <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Hora inicio</label>
+              <input type="time" [(ngModel)]="opForm.hora_inicio" (ngModelChange)="onOperarioOrHoursChange()" min="07:00" max="18:00">
+            </div>
+            <div class="form-field">
+              <label>Hora fin</label>
+              <input type="time" [(ngModel)]="opForm.hora_fin" (ngModelChange)="onOperarioOrHoursChange()" min="07:00" max="18:00">
+            </div>
+          </div>
+          <div class="dates-pick">
+            <label>Días (dentro del rango de la tarea):</label>
+            <div class="day-chips">
+              <button class="day-chip" *ngFor="let d of taskDays"
+                      [class.chip-selected]="isOpDateSelected(toStr(d))"
+                      [class.chip-conflict]="opForm.operario_id && proposedOverlaps(opForm.operario_id, toStr(d))"
+                      (click)="toggleOpDate(toStr(d))">
+                {{ dayName(d) }} {{ dayLabel(d) }}
+                <i class="fa fa-exclamation" *ngIf="opForm.operario_id && proposedOverlaps(opForm.operario_id, toStr(d))"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Pending slots list -->
+          <div class="pending-slots-section" *ngIf="pendingOpSlots.length">
+            <label class="section-mini-title"><i class="fa fa-list-ul"></i> Horarios pendientes ({{ pendingOpSlots.length }})</label>
+            <div class="pending-slot-chips">
+              <div class="pending-slot-chip" *ngFor="let s of pendingOpSlots; let i = index">
+                <i class="fa fa-clock-o"></i>
+                <span>{{ s.hora_inicio }}–{{ s.hora_fin }}</span>
+                <span class="slot-days">{{ s.fechas.length }} día(s)</span>
+                <button class="slot-remove" (click)="removeOpSlot(i)"><i class="fa fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add another slot button -->
+          <button class="btn-add-slot" (click)="addOpSlot()">
+            <i class="fa fa-plus"></i> Agregar otro horario / día
+          </button>
+
+          <!-- Conflict check result -->
+          <button class="btn-verify" (click)="checkOpConflicts()" [disabled]="opConflict==='checking' || !opForm.operario_id">
+            <i class="fa" [ngClass]="opConflict==='checking'?'fa-spinner fa-spin':'fa-shield'"></i>
+            {{ opConflict==='checking' ? 'Verificando...' : 'Verificar choques' }}
+          </button>
+          <div class="conflict-ok"   *ngIf="opConflict==='ok'"><i class="fa fa-check-circle"></i> {{ opConflictMsg }}</div>
+          <div class="conflict-warn" *ngIf="opConflict==='conflict'">
+            <i class="fa fa-exclamation-triangle"></i> {{ opConflictMsg }}
+            <ul class="conflict-list">
+              <li *ngFor="let c of opConflictDetails"><i class="fa fa-calendar-times-o"></i> {{ c.fecha }}: {{ c.info }}</li>
+            </ul>
+          </div>
+
+          <button class="btn-save-assign" (click)="saveOperario()">
+            <i class="fa fa-save"></i> Guardar todo
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── TAB: MAQUINARIA ───────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='maquinaria'">
+
+        <!-- Ya asignadas -->
+        <div class="current-assigns" *ngIf="assignTask?.maquinarias?.length">
+          <h4 class="section-mini-title">Maquinaria ya asignada</h4>
+          <div class="assign-chips">
+            <span class="achip achip-maq" *ngFor="let m of assignTask!.maquinarias">
+              <i class="fa fa-cog"></i> {{ m.nombre }} ({{ m.hora_inicio }}–{{ m.hora_fin }})
+            </span>
+          </div>
+        </div>
+
+        <!-- Calendario de disponibilidad de máquinas -->
+        <div class="avail-section">
+          <h4 class="section-mini-title">
+            <i class="fa fa-calendar"></i> Disponibilidad de maquinaria
+            <span class="legend-row">
+              <span class="leg-own"></span> Este proy.
+              <span class="leg-busy"></span> Otra
+              <span class="leg-queued"></span> En cola
+              <span class="leg-prop"></span> Propuesta
+              <span class="leg-conflict"></span> Conflicto
+            </span>
+          </h4>
+          <div class="avail-scroll">
+            <table class="avail-table">
+              <thead>
+                <tr>
+                  <th class="avail-op-col">Máquina</th>
+                  <th class="avail-day-col" *ngFor="let d of taskDays">
+                    {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let maq of maquinas"
+                    [class.row-selected]="maqForm.maquinaria_id === maq.id">
+                  <td class="avail-op-cell">
+                    <div class="op-select-row">
+                      <span class="op-name">{{ maq.nombre }}</span>
+                      <button class="btn-select-op"
+                              [class.selected]="maqForm.maquinaria_id === maq.id"
+                              (click)="maqForm.maquinaria_id = maq.id">
+                        {{ maqForm.maquinaria_id === maq.id ? 'Elegida' : 'Elegir' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="avail-timeline-cell" *ngFor="let d of taskDays">
+                    <div class="timeline-track" (click)="openCellModal('maq', maq, toStr(d))">
+                      <div class="hour-tick" *ngFor="let h of HOURS"
+                           [style.left.%]="((h - DAY_START) / DAY_H) * 100"></div>
+                      <!-- Bloques ocupados -->
+                      <div class="busy-block"
+                           *ngFor="let b of getMaqBusyBlocks(maq.id, toStr(d))"
+                           [ngStyle]="blockStyle(b.hi, b.hf)"
+                           [class.block-own-project]="b.ownProject"
+                           [title]="b.info">
+                      </div>
+                      <!-- Queued (pending) slots para la máquina -->
+                      <ng-container *ngIf="maqForm.maquinaria_id === maq.id">
+                        <div class="pending-slot-block"
+                             *ngFor="let pb of getPendingMaqBlocks(toStr(d))"
+                             [ngStyle]="blockStyle(pb.hi, pb.hf)"
+                             [style.background]="slotColor(pb.idx)"
+                             [title]="'Cola #' + (pb.idx+1) + ': ' + pendingMaqSlots[pb.idx].hora_inicio + '–' + pendingMaqSlots[pb.idx].hora_fin">
+                        </div>
+                      </ng-container>
+                      <!-- Bloque propuesto para la máquina seleccionada -->
+                      <div class="proposed-block"
+                           *ngIf="maqForm.maquinaria_id === maq.id && isMaqDateSelected(toStr(d))"
+                           [ngStyle]="maqProposedBlockStyle()"
+                           [class.proposed-conflict]="maqProposedOverlaps(maq.id, toStr(d))">
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Formulario de asignación -->
+        <div class="assign-form">
+          <h4 class="section-mini-title"><i class="fa fa-plus-circle"></i> Configurar asignación</h4>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Maquinaria *</label>
+              <select [(ngModel)]="maqForm.maquinaria_id">
+                <option [ngValue]="null" disabled>Seleccionar...</option>
+                <option *ngFor="let m of maquinas" [ngValue]="m.id">{{ m.nombre }}</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Hora inicio</label>
+              <input type="time" [(ngModel)]="maqForm.hora_inicio" min="07:00" max="18:00">
+            </div>
+            <div class="form-field">
+              <label>Hora fin</label>
+              <input type="time" [(ngModel)]="maqForm.hora_fin" min="07:00" max="18:00">
+            </div>
+          </div>
+
+          <!-- Días -->
+          <div class="dates-pick">
+            <label>Días:</label>
+            <div class="day-chips">
+              <button class="day-chip" *ngFor="let d of taskDays"
+                      [class.chip-selected]="isMaqDateSelected(toStr(d))"
+                      [class.chip-conflict]="maqForm.maquinaria_id && maqProposedOverlaps(maqForm.maquinaria_id, toStr(d))"
+                      (click)="toggleMaqDate(toStr(d))">
+                {{ dayName(d) }} {{ dayLabel(d) }}
+                <i class="fa fa-exclamation"
+                   *ngIf="maqForm.maquinaria_id && maqProposedOverlaps(maqForm.maquinaria_id, toStr(d))"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Pending slots list -->
+          <div class="pending-slots-section" *ngIf="pendingMaqSlots.length">
+            <label class="section-mini-title"><i class="fa fa-list-ul"></i> Horarios pendientes ({{ pendingMaqSlots.length }})</label>
+            <div class="pending-slot-chips">
+              <div class="pending-slot-chip" *ngFor="let s of pendingMaqSlots; let i = index">
+                <i class="fa fa-clock-o"></i>
+                <span>{{ s.hora_inicio }}–{{ s.hora_fin }}</span>
+                <span class="slot-days">{{ s.fechas.length }} día(s)</span>
+                <button class="slot-remove" (click)="removeMaqSlot(i)"><i class="fa fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add another slot button -->
+          <button class="btn-add-slot" (click)="addMaqSlot()">
+            <i class="fa fa-plus"></i> Agregar otro horario / día
+          </button>
+
+          <!-- Operario opcional -->
+          <div class="op-optional-section">
+            <h4 class="section-mini-title" style="margin-top:14px">
+              <i class="fa fa-user-o"></i> Operario que opera la máquina
+              <span class="optional-badge">Opcional</span>
+            </h4>
+            <select [(ngModel)]="maqForm.operario_id" style="width:100%;margin-bottom:8px">
+              <option [ngValue]="null">— Sin operario (proceso automático) —</option>
+              <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+            </select>
+
+            <!-- Disponibilidad del operario elegido -->
+            <ng-container *ngIf="maqForm.operario_id">
+              <div class="avail-scroll" style="max-height:100px">
+                <table class="avail-table" style="min-width:unset">
+                  <thead>
+                    <tr>
+                      <th class="avail-op-col" style="width:90px">Operario</th>
+                      <th class="avail-day-col" *ngFor="let d of taskDays">
+                        {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <ng-container *ngFor="let op of operarios">
+                      <tr *ngIf="op.id === maqForm.operario_id">
+                        <td class="avail-op-cell">
+                          <span class="op-name">{{ op.nombre }}<br>{{ op.apellido }}</span>
+                        </td>
+                        <td class="avail-timeline-cell" *ngFor="let d of taskDays">
+                          <div class="timeline-track" (click)="openCellModal('op', op, toStr(d))">
+                            <div class="hour-tick" *ngFor="let h of HOURS"
+                                 [style.left.%]="((h - DAY_START) / DAY_H) * 100"></div>
+                            <div class="busy-block"
+                                 *ngFor="let b of getBusyBlocks(op.id, toStr(d))"
+                                 [ngStyle]="blockStyle(b.hi, b.hf)"
+                                 [class.block-own-project]="b.ownProject"
+                                 [title]="b.info">
+                            </div>
+                            <div class="proposed-block"
+                                 *ngIf="isMaqDateSelected(toStr(d))"
+                                 [ngStyle]="maqProposedBlockStyle()"
+                                 [class.proposed-conflict]="proposedOverlaps(op.id, toStr(d))">
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </ng-container>
+                  </tbody>
+                </table>
+              </div>
+            </ng-container>
+            <p class="maq-note" *ngIf="!maqForm.operario_id">
+              <i class="fa fa-info-circle"></i> Sin operario: la máquina se considera proceso automático.
+            </p>
+          </div>
+
+          <button class="btn-save-assign" (click)="saveMaquina()">
+            <i class="fa fa-save"></i> Guardar todo
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── TAB: INSUMOS ──────────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='insumos'">
+        <div class="insumos-assign">
+          <h4 class="section-mini-title"><i class="fa fa-cube"></i> Insumos aplicados a esta tarea</h4>
+          <p class="insumos-note">Marca los materiales del proyecto que se usan en esta tarea. No es necesario indicar cantidades.</p>
+          <div class="insumo-check-list" *ngIf="project">
+            <label class="insumo-check-item" *ngFor="let ins of project.insumos">
+              <input type="checkbox" [checked]="isInsumoSelected(ins.id)" (change)="toggleInsumo(ins.id)">
+              <div class="insumo-check-body">
+                <span class="insumo-check-name">{{ ins.nombre }}</span>
+                <span class="tipo-badge-sm">{{ ins.tipo }}</span>
+              </div>
+              <i class="fa fa-check-circle insumo-check-icon" *ngIf="isInsumoSelected(ins.id)"></i>
+            </label>
+          </div>
+          <div class="insumos-selected-count" *ngIf="assignTask">
+            {{ assignTask.insumos_aplicados.length }} insumo(s) vinculado(s) a esta tarea
+          </div>
+          <button class="btn-save-assign" (click)="saveInsumos()">
+            <i class="fa fa-save"></i> Guardar insumos
+          </button>
+        </div>
+      </ng-container>
+
+    </div><!-- /panel-body -->
+  </div><!-- /assign-panel -->
+</div><!-- /assign-overlay -->
+
+<!-- ══ MODAL: Editar Tarea ══════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showEditTaskModal" (click)="closeEditTask()">
+  <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa fa-pencil"></i> Editar Tarea — {{ editTaskFase?.nombre }}</h3>
+      <button class="modal-close" (click)="closeEditTask()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="mform-group">
+        <label>Nombre *</label>
+        <input type="text" [(ngModel)]="editForm.nombre" placeholder="Nombre de la tarea" class="mform-input">
+      </div>
+      <div class="mform-group">
+        <label>Descripción</label>
+        <textarea [(ngModel)]="editForm.descripcion" placeholder="Instrucciones o detalle" class="mform-input" rows="3"></textarea>
+      </div>
+      <div class="mform-group">
+        <label>Tipo de tarea</label>
+        <select [(ngModel)]="editForm.id_tipo_tarea" class="mform-input">
+          <option [ngValue]="null">— Seleccionar tipo —</option>
+          <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
+        </select>
+      </div>
+      <div class="mform-row">
+        <div class="mform-group">
+          <label>Fecha inicio *</label>
+          <input type="date" [(ngModel)]="editForm.fecha_inicio" class="mform-input"
+                 [min]="editTaskFase?.fecha_inicio?.substring(0,10)"
+                 [max]="editTaskFase?.fecha_fin?.substring(0,10)">
+        </div>
+        <div class="mform-group">
+          <label>Fecha fin *</label>
+          <input type="date" [(ngModel)]="editForm.fecha_fin" class="mform-input"
+                 [min]="editForm.fecha_inicio"
+                 [max]="editTaskFase?.fecha_fin?.substring(0,10)">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeEditTask()">Cancelar</button>
+      <button class="btn-primary" (click)="saveEditTask()"
+              [disabled]="!editForm.nombre.trim() || !editForm.id_tipo_tarea || !editForm.fecha_inicio || !editForm.fecha_fin || editSaving">
+        <i class="fa fa-save"></i> {{ editSaving ? 'Guardando...' : 'Guardar cambios' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Nueva Tarea ═══════════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showNewTaskModal" (click)="closeNewTask()">
+  <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa fa-tasks"></i> Nueva Tarea — {{ newTaskFase?.nombre }}</h3>
+      <button class="modal-close" (click)="closeNewTask()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="mform-group">
+        <label>Nombre *</label>
+        <input type="text" [(ngModel)]="taskForm.nombre" placeholder="Ej: Corte de láminas" class="mform-input">
+      </div>
+      <div class="mform-group">
+        <label>Descripción</label>
+        <textarea [(ngModel)]="taskForm.descripcion" placeholder="Instrucciones o detalle de la tarea" class="mform-input" rows="3"></textarea>
+      </div>
+      <div class="mform-group">
+        <label>Tipo de tarea</label>
+        <select [(ngModel)]="taskForm.id_tipo_tarea" class="mform-input">
+          <option [ngValue]="null">— Seleccionar tipo * —</option>
+          <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
+        </select>
+      </div>
+      <div class="mform-row">
+        <div class="mform-group">
+          <label>Fecha inicio *</label>
+          <input type="date" [(ngModel)]="taskForm.fecha_inicio" class="mform-input"
+                 [min]="newTaskFase?.fecha_inicio?.substring(0,10)"
+                 [max]="newTaskFase?.fecha_fin?.substring(0,10)">
+        </div>
+        <div class="mform-group">
+          <label>Fecha fin *</label>
+          <input type="date" [(ngModel)]="taskForm.fecha_fin" class="mform-input"
+                 [min]="taskForm.fecha_inicio"
+                 [max]="newTaskFase?.fecha_fin?.substring(0,10)">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeNewTask()">Cancelar</button>
+      <button class="btn-primary" (click)="saveNewTask()" [disabled]="!taskForm.nombre.trim() || !taskForm.id_tipo_tarea || !taskForm.fecha_inicio || !taskForm.fecha_fin || taskSaving">
+        <i class="fa fa-save"></i> {{ taskSaving ? 'Guardando...' : 'Crear Tarea' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Subir evidencia ═══════════════════════════════════════════════ -->
+<div class="modal-overlay" *ngIf="showEvidModal" (click)="closeEvidModal()">
+  <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa fa-camera"></i> Subir evidencia — {{ evidTask?.nombre }}</h3>
+      <button class="modal-close" (click)="closeEvidModal()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <label class="drop-zone" *ngIf="!isMobile">
+        <input type="file" multiple accept="image/*" (change)="onEvidFilesSelected($event)" style="display:none">
+        <i class="fa fa-cloud-upload"></i>
+        <span>Haz clic o arrastra hasta <strong>10 fotos</strong></span>
+        <small>jpg · png · webp</small>
+      </label>
+      <div class="evid-mobile-actions" *ngIf="isMobile">
+        <label class="btn-capture">
+          <input type="file" accept="image/*" capture="environment" multiple (change)="onEvidFilesSelected($event)" style="display:none">
+          <i class="fa fa-camera"></i> Tomar foto
+        </label>
+        <label class="btn-capture btn-capture--alt">
+          <input type="file" accept="image/*" multiple (change)="onEvidFilesSelected($event)" style="display:none">
+          <i class="fa fa-image"></i> Subir archivo
+        </label>
+      </div>
+      <div class="preview-grid" *ngIf="evidPreviews.length">
+        <div class="preview-item" *ngFor="let src of evidPreviews; let i = index">
+          <img [src]="src" alt="preview">
+          <button class="preview-rm" (click)="removeEvidFile(i)"><i class="fa fa-times"></i></button>
+        </div>
+      </div>
+      <div class="mform-group">
+        <label>Descripción (opcional)</label>
+        <textarea [(ngModel)]="evidDesc" placeholder="Observaciones sobre la evidencia..." class="mform-input" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" (click)="closeEvidModal()">Cancelar</button>
+      <button class="btn-primary" (click)="subirEvidencia()" [disabled]="!evidFiles.length || evidSaving">
+        <i class="fa fa-upload"></i> {{ evidSaving ? 'Subiendo...' : 'Subir ' + evidFiles.length + ' foto(s)' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Detalle de celda (calendario disponibilidad) ════════════════════ -->
+<div class="modal-overlay" *ngIf="showCellModal" (click)="closeCellModal()">
+  <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fa fa-clock-o"></i> {{ cellModalTitle }}</h3>
+      <button class="modal-close" (click)="closeCellModal()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <ul class="cell-modal-list" *ngIf="cellModalItems.length; else cellModalEmpty">
+        <li *ngFor="let it of cellModalItems">
+          <span class="cell-modal-hora">{{ it.hora }}</span>
+          <span class="cell-modal-nombre">{{ it.nombre }}</span>
+        </li>
+      </ul>
+      <ng-template #cellModalEmpty>
+        <p class="cell-modal-empty">Sin asignaciones para este día.</p>
+      </ng-template>
+    </div>
+  </div>
+</div>

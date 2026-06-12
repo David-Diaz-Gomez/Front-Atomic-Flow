@@ -1,0 +1,236 @@
+<div class="approvals-page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1><i class="fa fa-check-circle"></i> Aprobaciones</h1>
+      <span class="subtitle">Revise el presupuesto completo antes de aprobar o rechazar</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="approval-stats">
+    <div class="astat pending"><i class="fa fa-clock-o"></i><span class="astat-num">{{ pendingCount }}</span><span class="astat-label">Pendiente(s)</span></div>
+    <div class="astat approved"><i class="fa fa-check"></i><span class="astat-num">{{ approvedCount }}</span><span class="astat-label">Aprobado(s)</span></div>
+    <div class="astat rejected"><i class="fa fa-times"></i><span class="astat-num">{{ rejectedCount }}</span><span class="astat-label">Rechazado(s)</span></div>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-state" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando proyectos para revisión...
+  </div>
+  <div class="empty-state" *ngIf="!loading && !error && projects.length === 0">
+    <i class="fa fa-check-circle"></i>
+    <p>No hay proyectos pendientes de aprobación</p>
+  </div>
+  <div class="error-state" *ngIf="error && !loading">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+  </div>
+
+  <!-- Cards -->
+  <div class="approval-list" *ngIf="!loading && projects.length > 0">
+    <div class="approval-card" *ngFor="let p of projects" [ngClass]="'card-' + p.estado">
+      <div class="card-stripe"></div>
+      <div class="card-content">
+
+        <!-- Card header -->
+        <div class="card-header">
+          <div class="card-title-block">
+            <h3>{{ p.nombre }}</h3>
+            <p class="client-name"><i class="fa fa-building-o"></i> {{ p.cliente.razon_social }}</p>
+          </div>
+          <span class="estado-chip" [ngClass]="'chip-' + p.estado">
+            {{ p.estado === 'en_revision' ? 'En Revisión' : p.estado === 'aprobado' ? 'Aprobado' : 'Rechazado' }}
+          </span>
+        </div>
+
+        <!-- Card details row -->
+        <div class="card-details">
+          <div class="detail-item"><i class="fa fa-calendar-o"></i> {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}</div>
+          <div class="detail-item"><i class="fa fa-money"></i> {{ formatCOP(budgetGrandTotal(p.budget)) }}</div>
+          <div class="detail-item"><i class="fa fa-user"></i> Dir.: {{ p.director_asignado.nombre }} {{ p.director_asignado.apellido }}</div>
+          <div class="detail-item"><i class="fa fa-users"></i> Coord.: {{ p.coordinador.nombre }} {{ p.coordinador.apellido }}</div>
+          <div class="detail-item"><i class="fa fa-barcode"></i> {{ p.centro_costos }}</div>
+        </div>
+
+        <p class="project-desc">{{ p.descripcion }}</p>
+
+        <!-- Rejection note -->
+        <div class="rejection-note" *ngIf="p.observaciones_rechazo">
+          <i class="fa fa-comment"></i>
+          <div><strong>Observaciones:</strong> {{ p.observaciones_rechazo }}</div>
+        </div>
+
+        <!-- Budget toggle -->
+        <button class="btn-toggle-budget" (click)="toggleBudget(p)">
+          <i class="fa" [ngClass]="expandedBudget === p.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+          <ng-container *ngIf="p.budgetLoading">Cargando presupuesto... <i class="fa fa-spinner fa-spin"></i></ng-container>
+          <ng-container *ngIf="!p.budgetLoading">{{ expandedBudget === p.id ? 'Ocultar presupuesto' : 'Ver presupuesto completo' }}</ng-container>
+        </button>
+
+        <!-- ── Full budget detail ──────────────────────────────────── -->
+        <div class="budget-detail" *ngIf="expandedBudget === p.id && !p.budgetLoading">
+
+          <!-- Budget section tabs -->
+          <div class="budget-tabs">
+            <button [class.active]="activeBudgetSection === 'materia_prima'" (click)="setBudgetSection('materia_prima')">
+              <i class="fa fa-cubes"></i> Materia Prima
+              <span class="tab-total">{{ formatCOP(budgetSectionTotal(p.budget, 'materia_prima')) }}</span>
+            </button>
+            <button [class.active]="activeBudgetSection === 'proveedores'" (click)="setBudgetSection('proveedores')">
+              <i class="fa fa-truck"></i> Proveedores
+              <span class="tab-total">{{ formatCOP(budgetSectionTotal(p.budget, 'proveedores')) }}</span>
+            </button>
+            <button [class.active]="activeBudgetSection === 'carpinteria'" (click)="setBudgetSection('carpinteria')">
+              <i class="fa fa-wrench"></i> Carpintería
+              <span class="tab-total">{{ formatCOP(budgetSectionTotal(p.budget, 'carpinteria')) }}</span>
+            </button>
+            <button [class.active]="activeBudgetSection === 'impresiones'" (click)="setBudgetSection('impresiones')">
+              <i class="fa fa-print"></i> Impresiones
+              <span class="tab-total">{{ formatCOP(budgetSectionTotal(p.budget, 'impresiones')) }}</span>
+            </button>
+            <button [class.active]="activeBudgetSection === 'mano_de_obra'" (click)="setBudgetSection('mano_de_obra')">
+              <i class="fa fa-users"></i> Mano de Obra
+              <span class="tab-total">{{ formatCOP(budgetSectionTotal(p.budget, 'mano_de_obra')) }}</span>
+            </button>
+          </div>
+
+          <!-- Materia Prima -->
+          <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'materia_prima'">
+            <table class="budget-view-table">
+              <thead><tr><th>Mueble</th><th>Nombre</th><th>Observaciones</th><th>Precio/u</th><th>Cant.</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of p.budget.materia_prima">
+                  <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+                  <td>{{ r.nombre }}</td><td class="muted">{{ r.observaciones || '—' }}</td>
+                  <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
+                  <td class="center">{{ r.cantidad }}</td>
+                  <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Proveedores -->
+          <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'proveedores'">
+            <table class="budget-view-table">
+              <thead><tr><th>Mueble</th><th>Nombre</th><th>Observaciones</th><th>Precio/u</th><th>Cant.</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of p.budget.proveedores">
+                  <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+                  <td>{{ r.nombre }}</td><td class="muted">{{ r.observaciones || '—' }}</td>
+                  <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
+                  <td class="center">{{ r.cantidad }}</td>
+                  <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Carpintería -->
+          <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'carpinteria'">
+            <table class="budget-view-table">
+              <thead><tr><th>Mueble</th><th>Descripción</th><th>Cant.</th><th>Materiales</th><th>Ancho</th><th>Alto</th><th>Fondo</th><th>Precio/u</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of p.budget.carpinteria">
+                  <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+                  <td>{{ r.nombre }}</td>
+                  <td class="center">{{ r.cantidad }}</td>
+                  <td><span class="material-chips">{{ carpMaterials(r) }}</span></td>
+                  <td class="center">{{ r.ancho }}cm</td>
+                  <td class="center">{{ r.alto }}cm</td>
+                  <td class="center">{{ r.fondo }}cm</td>
+                  <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
+                  <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Impresiones -->
+          <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'impresiones'">
+            <table class="budget-view-table">
+              <thead><tr><th>Mueble</th><th>Descripción</th><th>Prov.</th><th>Cant.</th><th>Dimensiones</th><th>Cal.</th><th>CMYK</th><th>M²</th><th>Precio/u</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of p.budget.impresiones">
+                  <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+                  <td>{{ r.nombre }}</td>
+                  <td class="center">{{ r.proveedor }}</td>
+                  <td class="center">{{ r.cantidad }}</td>
+                  <td class="center">{{ r.ancho_m }}×{{ r.alto_m }}m</td>
+                  <td class="center">{{ r.calibre }}</td>
+                  <td class="center cmyk-cell">
+                    <span class="cmyk-c">{{ r.c }}</span>
+                    <span class="cmyk-m">{{ r.m }}</span>
+                    <span class="cmyk-y">{{ r.y }}</span>
+                    <span class="cmyk-k">{{ r.k }}</span>
+                  </td>
+                  <td class="center">{{ r.m2_vinilo.toFixed(3) }}</td>
+                  <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
+                  <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Mano de Obra -->
+          <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'mano_de_obra'">
+            <table class="budget-view-table">
+              <thead><tr><th>Mueble</th><th>Concepto</th><th>Precio/u</th><th>Cant.</th><th class="right">Total</th></tr></thead>
+              <tbody>
+                <tr *ngFor="let r of p.budget.mano_de_obra">
+                  <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+                  <td>{{ r.nombre }}</td>
+                  <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
+                  <td class="center">{{ r.cantidad }}</td>
+                  <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Grand Total -->
+          <div class="budget-grand-total">
+            <span>TOTAL PRESUPUESTO</span>
+            <strong>{{ formatCOP(budgetGrandTotal(p.budget)) }}</strong>
+          </div>
+        </div>
+        <!-- /budget-detail -->
+
+        <!-- Actions -->
+        <div class="card-actions" *ngIf="p.estado === 'en_revision'">
+          <button class="btn-approve" (click)="approve(p)"><i class="fa fa-check"></i> Aprobar</button>
+          <button class="btn-reject" (click)="openRejectModal(p)"><i class="fa fa-times"></i> Rechazar</button>
+        </div>
+        <div class="resolved-badge approved-badge" *ngIf="p.estado === 'aprobado'">
+          <i class="fa fa-check-circle"></i> Proyecto Aprobado
+        </div>
+        <div class="resolved-badge rejected-badge" *ngIf="p.estado === 'rechazado'">
+          <i class="fa fa-times-circle"></i> Proyecto Rechazado
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Reject Modal -->
+  <div class="modal-overlay" *ngIf="showRejectModal" (click)="closeRejectModal()">
+    <div class="modal-box" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-times-circle"></i> Rechazar Proyecto</h3>
+        <button class="modal-close" (click)="closeRejectModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p>Proyecto: <strong>{{ rejectingProject?.nombre }}</strong></p>
+        <label>Observaciones de rechazo *</label>
+        <textarea [(ngModel)]="rejectObservaciones" rows="4"
+                  placeholder="Explica el motivo del rechazo y los cambios necesarios en el presupuesto..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" (click)="closeRejectModal()">Cancelar</button>
+        <button class="btn-confirm-reject" (click)="confirmReject()"><i class="fa fa-paper-plane"></i> Enviar Rechazo</button>
+      </div>
+    </div>
+  </div>
+
+</div>

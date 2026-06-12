@@ -5,16 +5,18 @@ import { SharedModule } from '../shared/shared-module';
 import { CommonModule } from '@angular/common';
 import { Dashboard } from './dashboard/dashboard';
 
-import { Login } from './auth/login/login';
-import { Recover } from './auth/recover/recover';
-import { ChangePassword } from './auth/change-password/change-password';
+import { Login }             from './auth/login/login';
+import { Recover }           from './auth/recover/recover';
+import { ChangePassword }    from './auth/change-password/change-password';
+import { OperarioPassword }  from './auth/operario-password/operario-password';
 
 @NgModule({
   declarations: [
     Dashboard,
     Login,
     Recover,
-    ChangePassword
+    ChangePassword,
+    OperarioPassword,
   ],
   imports: [
     CommonModule,

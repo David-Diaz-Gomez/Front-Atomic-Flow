@@ -4,26 +4,45 @@
       <h1 class="audiowide-title">Módulo de Usuarios</h1>
       <p class="montserrat-sub">Gestión centralizada de colaboradores Atómicos</p>
     </div>
+
     <button class="btn-atomo-gradient" (click)="openModal()">
-      <i class="fa fa-user-plus"></i> <span class="d-none d-sm-inline">NUEVO USUARIO</span>
+      <i class="fa fa-user-plus"></i>
+      <span class="d-none d-sm-inline">NUEVO USUARIO</span>
     </button>
   </header>
 
   <div class="filter-bar">
+
     <div class="filter-group">
       <i class="fa fa-search"></i>
-      <input type="text" [(ngModel)]="filterName" placeholder="Buscar nombre o apellido..." (input)="onFilterChange()">
+
+      <input
+        type="text"
+        [(ngModel)]="filterName"
+        placeholder="Buscar nombre o apellido..."
+        (input)="onFilterChange()">
     </div>
+
     <div class="filter-group">
       <i class="fa fa-filter"></i>
+
       <select [(ngModel)]="filterRole" (change)="onFilterChange()">
         <option value="">Todos los Roles</option>
-        <option *ngFor="let r of rolesList" [value]="r.ID">{{r.Nombre}}</option>
+
+        <option
+          *ngFor="let r of rolesList"
+          [value]="r.id">
+
+          {{ r.nombre }}
+
+        </option>
       </select>
     </div>
+
   </div>
 
   <div class="user-list">
+
     <div class="list-head d-none d-lg-grid">
       <div class="c-id">ID</div>
       <div class="c-info">COLABORADOR</div>
@@ -32,97 +51,281 @@
       <div class="c-actions">ACCIONES</div>
     </div>
 
-    <div class="user-item-card" *ngFor="let user of users">
+    <div
+      class="user-item-card"
+      *ngFor="let user of users">
+
       <div class="c-id" data-label="ID">
-        <span class="bergen-mono">#{{user.ID}}</span>
+        <span class="bergen-mono">
+
+          #{{ user.id }}
+
+        </span>
       </div>
-      
+
       <div class="c-info">
-        <div class="avatar">{{ (user.Nombre || 'U')[0] }}</div>
+
+        <div class="avatar">
+
+          {{ (user.nombre || 'U')[0] }}
+
+        </div>
+
         <div class="details">
-          <strong class="name">{{user.Nombre}} {{user.Apellido}}</strong>
-          <span class="email">{{user.Correo}}</span>
+
+          <strong class="name">
+
+            {{ user.nombre }} {{ user.apellido }}
+
+          </strong>
+
+          <span class="email">
+
+            {{ user.correo }}
+
+          </span>
+
         </div>
       </div>
 
       <div class="c-doc" data-label="DOCUMENTO">
-        <span class="bergen-mono">{{user.Numero_Documento}}</span>
+
+        <span class="bergen-mono">
+
+          {{ user.numero_documento }}
+
+        </span>
+
       </div>
 
       <div class="c-role" data-label="CARGO">
-        <span class="role-badge" [attr.data-role]="user.ID_Rol_Usuario">
-          {{ user.ID_Rol_Usuario === 1 ? 'Admin' : user.ID_Rol_Usuario === 2 ? 'Coord' : user.ID_Rol_Usuario === 3 ? 'Director' : 'Operario' }}
+
+        <span
+          class="role-badge"
+          [attr.data-role]="user.id_rol_usuario">
+
+          {{
+            user.id_rol_usuario === 1 ? 'Admin'
+            : user.id_rol_usuario === 2 ? 'Director'
+            : user.id_rol_usuario === 3 ? 'Coordinador'
+            : user.id_rol_usuario === 5 ? 'SuperOperario'
+            : 'Operario'
+          }}
+
         </span>
+
       </div>
 
       <div class="c-actions">
-  <button class="action-btn edit" (click)="openModal(user)" title="Editar">
-    <i class="fa fa-pencil"></i>
-  </button>
-  
-  <button class="action-btn delete" (click)="confirmDelete(user)" title="Eliminar">
-    <i class="fa fa-trash-o"></i>
-  </button>
-</div>
+
+        <button
+          class="action-btn edit"
+          (click)="openModal(user)"
+          title="Editar">
+
+          <i class="fa fa-pencil"></i>
+
+        </button>
+
+        <button
+          class="action-btn delete"
+          (click)="confirmDelete(user)"
+          title="Eliminar">
+
+          <i class="fa fa-trash-o"></i>
+
+        </button>
+
+      </div>
+
     </div>
 
-    <div class="empty-state" *ngIf="users.length === 0">
+    <div
+      class="empty-state"
+      *ngIf="users.length === 0">
+
       <i class="fa fa-folder-open-o"></i>
+
       <p>No se encontraron registros en esta página.</p>
+
     </div>
+
   </div>
 
-  <div class="pagination-wrapper" *ngIf="totalPages > 1">
-    <button class="page-btn" [disabled]="currentPage === 1" (click)="changePage(-1)">
+  <div
+    class="pagination-wrapper"
+    *ngIf="totalPages > 1">
+
+    <button
+      class="page-btn"
+      [disabled]="currentPage === 1"
+      (click)="changePage(-1)">
+
       <i class="fa fa-chevron-left"></i>
-    </button>
-    
-    <span class="page-info">Página <strong>{{currentPage}}</strong> de {{totalPages}}</span>
 
-    <button class="page-btn" [disabled]="currentPage === totalPages" (click)="changePage(1)">
-      <i class="fa fa-chevron-right"></i>
     </button>
+
+    <span class="page-info">
+
+      Página <strong>{{ currentPage }}</strong> de {{ totalPages }}
+
+    </span>
+
+    <button
+      class="page-btn"
+      [disabled]="currentPage === totalPages"
+      (click)="changePage(1)">
+
+      <i class="fa fa-chevron-right"></i>
+
+    </button>
+
   </div>
+
 </div>
 
-<div class="modal-backdrop" *ngIf="showModal">
+<div
+  class="modal-backdrop"
+  *ngIf="showModal">
+
   <div class="modal-card-tech">
+
     <div class="modal-header-clean">
-      <h3>{{ editingUser.ID ? 'EDITAR_COLABORADOR' : 'REGISTRAR_NUEVO' }}</h3>
-      <button class="close-x" (click)="showModal = false">&times;</button>
+
+      <h3>
+
+        {{ editingUser.id ? 'EDITAR_COLABORADOR' : 'REGISTRAR_NUEVO' }}
+
+      </h3>
+
+      <button
+        class="close-x"
+        (click)="showModal = false">
+
+        &times;
+
+      </button>
+
     </div>
 
     <div class="modal-body-form">
+
       <div class="form-grid">
+
         <div class="input-group-atomo">
+
           <label>Tipo Doc</label>
+
           <select [(ngModel)]="editingUser.id_tipo_doc">
-            <option *ngFor="let t of docTypesList" [value]="t.ID">{{t.Nombre}}</option>
+
+            <option
+              *ngFor="let t of docTypesList"
+              [value]="t.id">
+
+              {{ t.nombre }}
+
+            </option>
+
           </select>
+
         </div>
+
         <div class="input-group-atomo">
           <label>Documento</label>
-          <input type="text" [(ngModel)]="editingUser.numero_documento">
+
+          <input
+            type="text"
+            [(ngModel)]="editingUser.numero_documento">
         </div>
-        <div class="input-group-atomo"><label>Nombres</label><input [(ngModel)]="editingUser.nombre"></div>
-        <div class="input-group-atomo"><label>Apellidos</label><input [(ngModel)]="editingUser.apellido"></div>
-        <div class="input-group-atomo"><label>Correo</label><input [(ngModel)]="editingUser.correo"></div>
-        <div class="input-group-atomo"><label>Teléfono</label><input [(ngModel)]="editingUser.telefono"></div>
+
         <div class="input-group-atomo">
-          <label>Rol</label>
-          <select [(ngModel)]="editingUser.id_rol">
-            <option *ngFor="let r of rolesList" [value]="r.ID">{{r.Nombre}}</option>
-          </select>
+          <label>Nombres</label>
+
+          <input [(ngModel)]="editingUser.nombre">
         </div>
-        <div class="input-group-atomo"><label>EPS</label><input [(ngModel)]="editingUser.eps"></div>
-        <div class="input-group-atomo"><label>ARL</label><input [(ngModel)]="editingUser.arl"></div>
-        <div class="input-group-atomo" style="grid-column: span 2;"><label>Dirección</label><input [(ngModel)]="editingUser.direccion"></div>
+
+        <div class="input-group-atomo">
+          <label>Apellidos</label>
+
+          <input [(ngModel)]="editingUser.apellido">
+        </div>
+
+        <div class="input-group-atomo">
+          <label>Correo</label>
+
+          <input [(ngModel)]="editingUser.correo">
+        </div>
+
+        <div class="input-group-atomo">
+          <label>Teléfono</label>
+
+          <input [(ngModel)]="editingUser.telefono">
+        </div>
+
+        <div class="input-group-atomo">
+
+          <label>Rol</label>
+
+          <select [(ngModel)]="editingUser.id_rol">
+
+            <option
+              *ngFor="let r of rolesList"
+              [value]="r.id">
+
+              {{ r.nombre }}
+
+            </option>
+
+          </select>
+
+        </div>
+
+        <div class="input-group-atomo">
+          <label>EPS</label>
+
+          <input [(ngModel)]="editingUser.eps">
+        </div>
+
+        <div class="input-group-atomo">
+          <label>ARL</label>
+
+          <input [(ngModel)]="editingUser.arl">
+        </div>
+
+        <div
+          class="input-group-atomo"
+          style="grid-column: span 2;">
+
+          <label>Dirección</label>
+
+          <input [(ngModel)]="editingUser.direccion">
+
+        </div>
+
       </div>
+
     </div>
 
     <div class="modal-footer-clean">
-      <button class="btn-cancel-text" (click)="showModal = false">DESCARTAR</button>
-      <button class="btn-atomo-gradient" (click)="save()">GUARDAR CAMBIOS</button>
+
+      <button
+        class="btn-cancel-text"
+        (click)="showModal = false">
+
+        DESCARTAR
+
+      </button>
+
+      <button
+        class="btn-atomo-gradient"
+        (click)="save()">
+
+        GUARDAR CAMBIOS
+
+      </button>
+
     </div>
+
   </div>
+
 </div>

@@ -1,15 +1,24 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { Projects } from './projects/projects';
+import { Home } from './home/home';
+import { ProjectForm } from './project-form/project-form';
+import { ProjectDetail } from './project-detail/project-detail';
 import { Gantt } from './gantt/gantt';
-import { Resources } from './resources/resources';
+import { Approvals } from './approvals/approvals';
+import { GanttGeneral }        from '../../shared/components/gantt-general/gantt-general';
+import { PlantillasFases }     from '../../shared/components/plantillas-fases/plantillas-fases';
+import { DirectorEvidencias }  from './evidencias/evidencias';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'projects', pathMatch: 'full' },
-  { path: 'home', component: Projects },
-  { path: 'projects', component: Projects },
-  { path: 'gantt', component: Gantt },
-  { path: 'resources', component: Resources }
+  { path: '',                            redirectTo: 'home', pathMatch: 'full' },
+  { path: 'home',                        component: Home },
+  { path: 'project-new',                 component: ProjectForm },
+  { path: 'project/:id',                 component: ProjectDetail },
+  { path: 'gantt',                       component: Gantt },
+  { path: 'approvals',                   component: Approvals },
+  { path: 'evidencias',                  component: DirectorEvidencias },
+  { path: 'vista-general',               component: GanttGeneral },
+  { path: 'plantillas/:proyectoId',      component: PlantillasFases },
 ];
 
 @NgModule({

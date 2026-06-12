@@ -1,0 +1,227 @@
+<div class="gantt-page">
+  <div class="page-header">
+    <div>
+      <h1><i class="fa fa-bar-chart"></i> Cronograma — Vista Coordinador</h1>
+      <span class="subtitle">Gantt interactivo con ocupación horaria de operarios y maquinaria</span>
+    </div>
+    <div class="header-right">
+      <div class="project-selector">
+        <label>Proyecto</label>
+        <select [(ngModel)]="selectedProjectId" (ngModelChange)="selectProject($event)">
+          <option *ngFor="let p of projects" [ngValue]="p.id">{{ p.nombre }}</option>
+        </select>
+      </div>
+      <button class="btn-assign-link" (click)="goToProject(selectedProjectId)">
+        <i class="fa fa-user-plus"></i> Asignar recursos
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading / Error -->
+  <div class="loading-state" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando proyecto...
+  </div>
+  <div class="error-state" *ngIf="!loading && error">
+    <i class="fa fa-exclamation-circle"></i> {{ error }}
+  </div>
+
+  <div class="main-layout" [class.panel-open]="showPanel" *ngIf="!loading && !error">
+
+    <!-- ── Gantt ───────────────────────────────────────────────────────────── -->
+    <div class="gantt-col">
+      <div class="gantt-panel">
+        <div class="panel-title"><i class="fa fa-tasks"></i> Diagrama de Gantt
+          <span class="panel-sub">{{ selectedProject?.nombre }}</span>
+        </div>
+        <div class="gantt-wrapper">
+          <div class="gantt-labels">
+            <div class="gantt-label-header">Fase / Tarea</div>
+            <ng-container *ngFor="let fase of selectedProject?.fases">
+              <div class="gantt-label fase-label">{{ fase.nombre }}</div>
+              <div class="gantt-label task-label" *ngFor="let t of fase.tareas"
+                   [class.selected-task]="panelTask?.id===t.id"
+                   (click)="openPanel(t, fase.nombre)">
+                <i class="fa fa-circle-o task-icon"></i>{{ t.nombre }}
+                <i class="fa fa-mouse-pointer hint-icon"></i>
+              </div>
+            </ng-container>
+          </div>
+          <div class="gantt-timeline-scroll">
+            <div class="gantt-timeline" [style.width.px]="ganttWidth+2">
+              <div class="gantt-day-headers">
+                <div class="gantt-day-cell" *ngFor="let day of ganttDays"
+                     [class.today]="isTodayMarker(day)" [class.weekend]="isWeekend(day)"
+                     [style.width.px]="cellWidth">
+                  <span class="day-num">{{ dayLabel(day) }}</span>
+                  <span class="day-month">{{ monthLabel(day) }}</span>
+                </div>
+              </div>
+              <ng-container *ngFor="let fase of selectedProject?.fases">
+                <div class="gantt-row fase-row">
+                  <div class="gantt-grid-bg" *ngFor="let day of ganttDays"
+                       [class.today-col]="isTodayMarker(day)" [class.weekend-col]="isWeekend(day)"
+                       [style.width.px]="cellWidth"></div>
+                  <div class="gantt-bar fase-bar" [ngStyle]="getBarStyle(fase)"
+                       [style.border-color]="fase.color" [style.color]="fase.color">
+                    <span>{{ fase.nombre }}</span>
+                  </div>
+                </div>
+                <div class="gantt-row task-row" *ngFor="let t of fase.tareas"
+                     [class.selected-row]="panelTask?.id===t.id"
+                     (click)="openPanel(t, fase.nombre)">
+                  <div class="gantt-grid-bg" *ngFor="let day of ganttDays"
+                       [class.today-col]="isTodayMarker(day)" [class.weekend-col]="isWeekend(day)"
+                       [style.width.px]="cellWidth"></div>
+                  <div class="gantt-bar task-bar" [ngClass]="getBarClass(t.estado)"
+                       [ngStyle]="getBarStyle(t)" [title]="t.nombre+' — '+estadoLabel(t.estado)">
+                    <span>{{ t.nombre }}</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ── Mueble delivery markers (red dashed lines) ── -->
+              <ng-container *ngFor="let mk of muebleMarkers">
+                <div class="mueble-marker"
+                     *ngIf="markerLeft(mk.fecha_fin) !== null"
+                     [style.left.px]="markerLeft(mk.fecha_fin)"
+                     [title]="'Entrega: ' + mk.nombre + ' (' + mk.fecha_fin + ')'">
+                  <div class="marker-line"></div>
+                  <span class="marker-label">{{ mk.nombre }}</span>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+        <div class="gantt-legend">
+          <span class="legend-item"><span class="legend-dot bar-done"></span> Completada</span>
+          <span class="legend-item"><span class="legend-dot bar-progress"></span> En Progreso</span>
+          <span class="legend-item"><span class="legend-dot bar-assigned"></span> Asignada</span>
+          <span class="legend-item"><span class="legend-dot bar-pending"></span> Pendiente</span>
+        </div>
+      </div>
+
+      <!-- ── Ocupación semanal con detalle por hora ──────────────────────── -->
+      <div class="calendar-panel">
+        <div class="panel-title"><i class="fa fa-calendar"></i> Ocupación Semanal — Detalle por hora
+          <span class="occ-legend-row">
+            <span class="occ-leg occ-disponible"></span>Disponible
+            <span class="occ-leg occ-alta"></span>Alta (&ge;75%)
+            <span class="occ-leg occ-saturada"></span>Saturada (100%)
+          </span>
+        </div>
+        <div class="week-nav">
+          <button (click)="prevWeek()"><i class="fa fa-chevron-left"></i></button>
+          <span class="week-label">{{ calendarWeekLabel }}</span>
+          <button (click)="nextWeek()"><i class="fa fa-chevron-right"></i></button>
+        </div>
+
+        <div class="cal-scroll">
+          <table class="cal-table">
+            <thead><tr>
+              <th class="cal-resource-header">Recurso</th>
+              <th class="cal-day-header" *ngFor="let day of calendarDays"
+                  [class.today-head]="isTodayMarker(day)" [class.weekend-head]="isWeekend(day)">
+                <div class="cal-day-num">{{ dayLabel(day) }}</div>
+                <div class="cal-day-name">{{ weekDayLabel(day) }}</div>
+              </th>
+            </tr></thead>
+            <tbody>
+              <!-- Fila proyecto activo -->
+              <tr class="proj-range-row" *ngIf="selectedProject">
+                <td class="resource-label proj-range-label"><i class="fa fa-calendar-check-o"></i> Proyecto activo</td>
+                <td *ngFor="let day of calendarDays" class="cal-cell proj-range-cell"
+                    [class.proj-range-in]="isInProjectRange(day)"
+                    [class.proj-range-out]="!isInProjectRange(day)"
+                    [class.weekend-cell]="isWeekend(day)"></td>
+              </tr>
+
+              <!-- Maquinaria -->
+              <tr><td colspan="8" class="section-row"><i class="fa fa-cog"></i> Maquinaria</td></tr>
+              <tr *ngFor="let maq of filteredMaqOcc">
+                <td class="resource-label"><i class="fa fa-wrench"></i> {{ maq.nombre }}</td>
+                <td *ngFor="let day of calendarDays" class="cal-cell"
+                    [class.weekend-cell]="isWeekend(day)"
+                    [class.today-cell]="isTodayMarker(day)"
+                    [class.out-of-proj]="!isInProjectRange(day)"
+                    [style.background]="getCeldaBg(maq, day)"
+                    [title]="getDayTooltip(maq, day)">
+                  <ng-container *ngIf="getDayData(maq, day) as diaData">
+                    <span class="occ-pct-top">{{ calcDayPct(diaData) }}%</span>
+                    <div class="occ-bar-track">
+                      <div class="occ-bloque" *ngFor="let b of diaData.bloques"
+                           [ngStyle]="getBloqueStyle(b, getProjectColor(b.proyecto_id))"></div>
+                    </div>
+                  </ng-container>
+                </td>
+              </tr>
+              <tr *ngIf="!filteredMaqOcc.length">
+                <td colspan="8" class="no-resources-msg"><i class="fa fa-info-circle"></i> Sin maquinaria asignada en este proyecto</td>
+              </tr>
+
+              <!-- Operarios -->
+              <tr *ngIf="filteredOpOcc.length">
+                <td colspan="8" class="section-row"><i class="fa fa-users"></i> Operarios</td>
+              </tr>
+              <tr *ngFor="let op of filteredOpOcc">
+                <td class="resource-label"><i class="fa fa-user"></i> {{ op.nombre_completo || ((op.nombre||'') + (op.apellido?' '+op.apellido:'')) || ('Op.'+op.id) }}</td>
+                <td *ngFor="let day of calendarDays" class="cal-cell"
+                    [class.weekend-cell]="isWeekend(day)"
+                    [class.today-cell]="isTodayMarker(day)"
+                    [class.out-of-proj]="!isInProjectRange(day)"
+                    [style.background]="getCeldaBg(op, day)"
+                    [title]="getDayTooltip(op, day)">
+                  <ng-container *ngIf="getDayData(op, day) as diaData">
+                    <span class="occ-pct-top">{{ calcDayPct(diaData) }}%</span>
+                    <div class="occ-bar-track">
+                      <div class="occ-bloque" *ngFor="let b of diaData.bloques"
+                           [ngStyle]="getBloqueStyle(b, getProjectColor(b.proyecto_id))"></div>
+                    </div>
+                  </ng-container>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cal-legend" *ngIf="projectColorLegend.length">
+          <span class="legend-item" *ngFor="let item of projectColorLegend">
+            <span class="legend-dot" [style.background]="item.color"></span> {{ item.nombre }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Task detail panel ──────────────────────────────────────────────── -->
+    <div class="task-panel" *ngIf="showPanel && panelTask as task">
+      <div class="task-panel-header">
+        <div>
+          <h3>{{ task.nombre }}</h3>
+          <span class="task-badge" [ngClass]="estadoBadge(task.estado)">{{ estadoLabel(task.estado) }}</span>
+        </div>
+        <button class="panel-close" (click)="closePanel()"><i class="fa fa-times"></i></button>
+      </div>
+
+      <div class="task-meta">
+        <div class="meta-item"><i class="fa fa-sitemap"></i> {{ panelFase }}</div>
+        <div class="meta-item"><i class="fa fa-calendar"></i> {{ task.fecha_inicio }} → {{ task.fecha_fin }}</div>
+        <div class="meta-item" *ngIf="task.operarios?.length"><i class="fa fa-users"></i> {{ task.operarios.join(', ') }}</div>
+        <div class="meta-item" *ngIf="task.maquinarias?.length"><i class="fa fa-cog"></i> {{ task.maquinarias.join(', ') }}</div>
+        <div class="meta-item" *ngIf="!task.operarios?.length && !task.maquinarias?.length"><i class="fa fa-clock-o"></i> Sin recursos asignados aún</div>
+      </div>
+
+      <div class="schedule-section">
+        <p class="sched-note">
+          <i class="fa fa-info-circle"></i>
+          El horario por bloques se visualiza en la sección <strong>Ocupación Semanal</strong>. Para asignar o modificar recursos ve al detalle del proyecto.
+        </p>
+      </div>
+
+      <div class="panel-actions">
+        <button class="btn-go-assign" (click)="goToProject(selectedProjectId)">
+          <i class="fa fa-user-plus"></i> Asignar recursos a esta tarea
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

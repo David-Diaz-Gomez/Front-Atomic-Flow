@@ -1,0 +1,117 @@
+<div class="op-home">
+
+  <!-- Saludo del día -->
+  <div class="home-greeting">
+    <div class="greeting-text">
+      <h2>¡Hola! Buen día 👷</h2>
+      <p>{{ todayStr }}</p>
+    </div>
+    <div class="greeting-kpis">
+      <div class="gkpi">
+        <span class="gkpi-val">{{ kpi.tareas_hoy }}</span>
+        <span class="gkpi-lbl">tareas hoy</span>
+      </div>
+      <div class="gkpi-divider"></div>
+      <div class="gkpi">
+        <span class="gkpi-val">{{ kpi.horas_hoy }}h</span>
+        <span class="gkpi-lbl">programadas</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicadores rápidos -->
+  <div class="stat-row">
+    <div class="stat-card stat-blue">
+      <i class="fa fa-play-circle"></i>
+      <span class="stat-num">{{ kpi.en_progreso }}</span>
+      <span class="stat-lbl">En progreso</span>
+    </div>
+    <div class="stat-card stat-orange">
+      <i class="fa fa-clock-o"></i>
+      <span class="stat-num">{{ kpi.asignadas }}</span>
+      <span class="stat-lbl">Por iniciar</span>
+    </div>
+    <div class="stat-card stat-red">
+      <i class="fa fa-camera"></i>
+      <span class="stat-num">{{ kpi.evidencias_pend }}</span>
+      <span class="stat-lbl">Evidencias</span>
+    </div>
+  </div>
+
+  <!-- Tareas de hoy -->
+  <div class="section-header">
+    <div class="section-title">
+      <i class="fa fa-list-ul"></i>
+      <span>Tareas de Hoy</span>
+    </div>
+  </div>
+
+  <div class="task-cards" *ngIf="tasksToday.length; else noTasks">
+    <div class="task-card" *ngFor="let t of tasksToday" (click)="goTask(t.id)"
+         [class.card-progreso]="t.estado==='en_progreso'"
+         [class.card-asignada]="t.estado==='asignada'"
+         [class.card-completada]="t.estado==='completada'">
+
+      <!-- Color band lateral -->
+      <div class="card-band"></div>
+
+      <div class="card-body">
+        <div class="card-top">
+          <div class="card-title-block">
+            <span class="card-name">{{ t.nombre }}</span>
+            <span class="card-project"><i class="fa fa-briefcase"></i> {{ t.proyecto }}</span>
+          </div>
+          <span class="estado-chip" [ngClass]="estadoBadge(t.estado)">{{ estadoLabel(t.estado) }}</span>
+        </div>
+
+        <div class="card-time-block">
+          <i class="fa fa-clock-o"></i>
+          <span class="card-time">{{ t.hora_inicio }} – {{ t.hora_fin }}</span>
+          <span class="card-fase"><i class="fa fa-sitemap"></i> {{ t.fase }}</span>
+        </div>
+
+        <div class="card-comment" *ngIf="t.comentario_coordinador">
+          <i class="fa fa-comment-o"></i> {{ t.comentario_coordinador }}
+        </div>
+
+        <div class="card-footer">
+          <span class="ev-alert" *ngIf="t.evidencias_pendientes > 0">
+            <i class="fa fa-camera"></i> {{ t.evidencias_pendientes }} evidencia(s) pendiente(s)
+          </span>
+          <span class="card-cta">Ver detalle <i class="fa fa-arrow-right"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #noTasks>
+    <div class="empty-day">
+      <div class="empty-icon"><i class="fa fa-sun-o"></i></div>
+      <p class="empty-title">¡Día libre!</p>
+      <p class="empty-sub">No tienes tareas asignadas para hoy.</p>
+    </div>
+  </ng-template>
+
+  <!-- Próximas tareas -->
+  <div class="section-header" *ngIf="upcoming.length">
+    <div class="section-title">
+      <i class="fa fa-forward"></i>
+      <span>Próximas</span>
+    </div>
+  </div>
+
+  <div class="upcoming-list" *ngIf="upcoming.length">
+    <div class="upcoming-item" *ngFor="let t of upcoming" (click)="goTask(t.id)">
+      <div class="upcoming-date">
+        <span class="date-day">{{ getDay(t.fecha) }}</span>
+        <span class="date-mon">{{ getMon(t.fecha) }}</span>
+      </div>
+      <div class="upcoming-info">
+        <span class="up-name">{{ t.nombre }}</span>
+        <span class="up-meta">{{ t.proyecto }} · {{ t.hora_inicio }}–{{ t.hora_fin }}</span>
+      </div>
+      <span class="estado-chip chip-sm" [ngClass]="estadoBadge(t.estado)">{{ estadoLabel(t.estado) }}</span>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,58 @@
+<div class="op-projects">
+
+  <div class="op-page-header">
+    <h1><i class="fa fa-briefcase"></i> Mis Proyectos</h1>
+    <span class="op-subtitle">{{ projects.length }} proyecto(s) asignados</span>
+  </div>
+
+  <div class="empty-tab" *ngIf="!loading && !projects.length">
+    <i class="fa fa-briefcase"></i>
+    <p>No tienes proyectos asignados.</p>
+  </div>
+
+  <div class="project-list" *ngIf="!loading">
+    <div class="project-card" *ngFor="let p of projects">
+      <!-- Card header -->
+      <div class="proj-card-header" [style.border-left-color]="p.color" (click)="toggle(p.id)">
+        <div class="proj-color-dot" [style.background]="p.color"></div>
+        <div class="proj-header-body">
+          <span class="proj-name">{{ p.nombre }}</span>
+          <span class="proj-cliente"><i class="fa fa-user-o"></i> {{ p.cliente }}</span>
+          <div class="proj-meta-row">
+            <span class="proj-estado">{{ estadoLabel(p.estado) }}</span>
+            <span class="proj-coord"><i class="fa fa-sitemap"></i> {{ p.coordinador }}</span>
+          </div>
+        </div>
+        <i class="fa proj-chevron" [ngClass]="isExpanded(p.id) ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="proj-progress-wrap">
+        <div class="proj-progress-bar">
+          <div class="proj-progress-fill" [style.width.%]="progressPct(p)" [style.background]="p.color"></div>
+        </div>
+        <span class="proj-progress-label">{{ p.tareas_completadas }}/{{ p.mis_tareas }} tareas</span>
+      </div>
+
+      <!-- Date row -->
+      <div class="proj-dates">
+        <span><i class="fa fa-calendar-o"></i> {{ p.fecha_inicio }}</span>
+        <span>→ {{ p.fecha_fin }}</span>
+      </div>
+
+      <!-- Expanded: fase + tareas -->
+      <div class="proj-fases" *ngIf="isExpanded(p.id)">
+        <div class="proj-fase" *ngFor="let f of p.fases">
+          <div class="fase-label"><i class="fa fa-layer-group"></i> {{ f.nombre }}</div>
+          <div class="tarea-chip" *ngFor="let t of f.tareas" (click)="goTask(t.id)">
+            <i class="fa fa-circle-o"></i> {{ t.nombre }}
+            <i class="fa fa-chevron-right" style="margin-left:auto;font-size:.6rem;color:var(--text-muted)"></i>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+

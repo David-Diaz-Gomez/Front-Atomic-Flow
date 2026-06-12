@@ -1,15 +1,18 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { Phases } from './phases/phases';
-import { Tasks } from './tasks/tasks';
-import { Approvals } from './approvals/approvals';
+import { CoordHome } from './home/home';
+import { CoordProjectDetail } from './project-detail/project-detail';
+import { CoordGantt } from './gantt/gantt';
+import { PlantillasFases } from '../../shared/components/plantillas-fases/plantillas-fases';
+import { CoordEvidences } from './evidences/evidences';
 
 const routes: Routes = [
-  { path: '', redirectTo: 'phases', pathMatch: 'full' },
-  { path: 'home', component: Phases },
-  { path: 'phases', component: Phases },
-  { path: 'tasks', component: Tasks },
-  { path: 'approvals', component: Approvals }
+  { path: '',                         redirectTo: 'home', pathMatch: 'full' },
+  { path: 'home',                     component: CoordHome },
+  { path: 'project/:id',              component: CoordProjectDetail },
+  { path: 'gantt',                    component: CoordGantt },
+  { path: 'evidences',                component: CoordEvidences },
+  { path: 'plantillas/:proyectoId',   component: PlantillasFases },
 ];
 
 @NgModule({

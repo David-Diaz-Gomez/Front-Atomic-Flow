@@ -263,10 +263,17 @@ $grid-template: 60px 2fr 1.5fr 1.2fr 200px;
 
 .role-badge {
   padding: 4px 12px; border-radius: 50px; font-family: 'Bergen Mono', monospace; font-size: 0.65rem; font-weight: bold; text-transform: uppercase;
-  &[data-role="admin"] { background: #fee2e2; color: #dc2626; }
-  &[data-role="director"] { background: #dcfce7; color: #166534; }
+  // Por nombre (legacy)
+  &[data-role="admin"]       { background: #fee2e2; color: #dc2626; }
+  &[data-role="director"]    { background: #dcfce7; color: #166534; }
   &[data-role="coordinator"] { background: #fef9c3; color: #92400e; }
-  &[data-role="operator"] { background: #e0f2fe; color: #075985; }
+  &[data-role="operator"]    { background: #e0f2fe; color: #075985; }
+  // Por id_rol (numérico — el HTML usa id_rol_usuario)
+  &[data-role="1"] { background: #fee2e2; color: #dc2626; }
+  &[data-role="2"] { background: #dcfce7; color: #166534; }
+  &[data-role="3"] { background: #fef9c3; color: #92400e; }
+  &[data-role="4"] { background: #e0f2fe; color: #075985; }
+  &[data-role="5"] { background: #f3e8ff; color: #6b21a8; } // SuperOperario — violeta
 }
 
 /* BARRA DE FILTROS PREMIUM */

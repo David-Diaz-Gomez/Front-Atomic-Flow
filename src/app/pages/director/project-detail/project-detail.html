@@ -1,0 +1,497 @@
+<div class="detail-page" *ngIf="project as p">
+
+  <!-- Header -->
+  <div class="page-header">
+    <button class="btn-back" (click)="goBack()"><i class="fa fa-arrow-left"></i></button>
+    <div class="header-info">
+      <div class="header-top">
+        <h1>{{ p.nombre }}</h1>
+        <span class="badge-urgente" *ngIf="p.urgente === true"><i class="fa fa-bolt"></i> URGENTE</span>
+        <span class="estado-badge" [ngClass]="'estado-' + p.estado">{{ getEstadoLabel(p.estado) }}</span>
+      </div>
+      <p class="subtitle">{{ p.cliente.razon_social }} &bull; {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}</p>
+    </div>
+    <div class="header-actions">
+      <button class="btn-outline" (click)="goToEdit()"><i class="fa fa-pencil"></i> Editar</button>
+      <button class="btn-outline" (click)="goToGantt()"><i class="fa fa-bar-chart"></i> Gantt</button>
+      <button class="btn-primary" (click)="sendToReview()"
+              *ngIf="p.estado === 'borrador' || p.estado === 'rechazado'">
+        <i class="fa fa-paper-plane"></i> Enviar a Revisión
+      </button>
+    </div>
+  </div>
+
+  <!-- Global Progress -->
+  <div class="global-progress">
+    <div class="progress-track"><div class="progress-fill" [style.width.%]="p.progreso ?? 0"></div></div>
+    <span class="progress-pct">{{ p.progreso ?? 0 }}% completado</span>
+  </div>
+
+  <!-- Phase-management banner -->
+  <div class="approval-banner" *ngIf="canManagePhases">
+    <i class="fa fa-check-circle"></i>
+    Proyecto aprobado — puedes planificar las fases y tareas, y delegarlas a un coordinador.
+  </div>
+  <div class="pending-approval-banner" *ngIf="p.estado === 'en_revision'">
+    <i class="fa fa-clock-o"></i>
+    Esperando aprobación del Director de Revisión. Las fases se habilitarán tras la aprobación.
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav">
+    <button [class.active]="activeTab === 'resumen'"     (click)="setTab('resumen')"><i class="fa fa-info-circle"></i> Resumen</button>
+    <button [class.active]="activeTab === 'fases'"       (click)="setTab('fases')">
+      <i class="fa fa-tasks"></i> Fases y Tareas
+      <span class="tab-badge" *ngIf="p.fases.length">{{ p.fases.length }}</span>
+    </button>
+    <button [class.active]="activeTab === 'cronograma'"  (click)="setTab('cronograma')"><i class="fa fa-calendar"></i> Cronograma</button>
+    <button [class.active]="activeTab === 'recursos'"    (click)="setTab('recursos')"><i class="fa fa-cube"></i> Recursos</button>
+    <button class="tab-download" (click)="downloadRecursos()"><i class="fa fa-file-excel-o"></i> Descargar</button>
+    <button *ngIf="p.link_trello" class="tab-trello" (click)="openTrello(p.link_trello)">
+      <i class="fa fa-trello"></i> Trello
+    </button>
+  </div>
+
+  <!-- ═══════════════════ TAB: Resumen ═══════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab === 'resumen'">
+    <div class="info-grid">
+      <div class="info-card">
+        <h3><i class="fa fa-folder"></i> Datos del Proyecto</h3>
+        <table class="info-table">
+          <tr><td class="info-label">Centro Costos</td><td>{{ p.centro_costos }}</td></tr>
+          <tr><td class="info-label">Fecha Inicio</td><td>{{ formatDate(p.fecha_inicio) }}</td></tr>
+          <tr><td class="info-label">Fecha Fin</td><td>{{ formatDate(p.fecha_fin) }}</td></tr>
+          <tr><td class="info-label">Presupuesto</td><td><strong>{{ formatCOP(totalRecursosValue || p.monto_presupuestado || 0) }}</strong></td></tr>
+          <tr><td class="info-label">Descripción</td><td>{{ p.descripcion }}</td></tr>
+          <tr><td class="info-label">Progreso</td><td>{{ p.progreso ?? 0 }}%</td></tr>
+        </table>
+      </div>
+      <div class="info-card">
+        <h3><i class="fa fa-users"></i> Equipo Asignado</h3>
+        <div class="team-list">
+          <div class="team-item"><span class="team-label">Director</span><span>{{ p.director_asignado.nombre }} {{ p.director_asignado.apellido }}</span></div>
+          <div class="team-item"><span class="team-label">Dir. Revisión</span><span>{{ p.director_revision.nombre }} {{ p.director_revision.apellido }}</span></div>
+          <div class="team-item" *ngIf="p.coordinador?.nombre"><span class="team-label">Coordinador</span><span>{{ p.coordinador.nombre }} {{ p.coordinador.apellido }}</span></div>
+          <div class="team-item"><span class="team-label">Cliente</span><span>{{ p.cliente.razon_social }}</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: Fases y Tareas ════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab === 'fases'">
+
+    <!-- Action bar (solo si aprobado+) -->
+    <div class="fases-action-bar" *ngIf="canManagePhases">
+      <span class="fases-hint">
+        <i class="fa fa-info-circle"></i>
+        Crea las fases del proyecto, añade tareas y délegalas al coordinador para que asigne operarios y horarios.
+      </span>
+      <button class="btn-plantilla" (click)="goToPlantillas()">
+        <i class="fa fa-clone"></i> Usar Plantilla
+      </button>
+      <button class="btn-new-phase" (click)="openNewPhase()">
+        <i class="fa fa-plus"></i> Nueva Fase
+      </button>
+    </div>
+
+    <!-- Empty state: aprobado pero sin fases -->
+    <div class="fases-empty" *ngIf="canManagePhases && !p.fases.length">
+      <div class="empty-icon"><i class="fa fa-sitemap"></i></div>
+      <h3>Sin fases planificadas</h3>
+      <p>Crea las fases manualmente o usa una plantilla para acelerar la planificación.</p>
+      <div class="fases-empty__actions">
+        <button class="btn-plantilla btn-plantilla--lg" (click)="goToPlantillas()">
+          <i class="fa fa-clone"></i> Usar Plantilla
+        </button>
+        <button class="btn-new-phase" (click)="openNewPhase()">
+          <i class="fa fa-plus"></i> Crear Primera Fase
+        </button>
+      </div>
+    </div>
+
+    <!-- Locked state: no aprobado aún -->
+    <div class="fases-locked" *ngIf="!canManagePhases && !p.fases.length">
+      <i class="fa fa-lock"></i>
+      <p>Las fases se habilitarán cuando el proyecto sea aprobado por el Director de Revisión.</p>
+    </div>
+
+    <!-- Fases list -->
+    <div class="fases-list" *ngIf="p.fases.length">
+      <div class="fase-card" *ngFor="let fase of p.fases">
+
+        <!-- Fase header -->
+        <div class="fase-header">
+          <div class="fase-header-left" (click)="toggleFase(fase.id)">
+            <div class="fase-toggle-icon">
+              <i class="fa" [ngClass]="isFaseExpanded(fase.id) ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+            </div>
+            <div class="fase-info">
+              <span class="fase-name">{{ fase.nombre }}</span>
+              <span class="fase-dates"><i class="fa fa-calendar-o"></i> {{ formatDate(fase.fecha_inicio) }} — {{ formatDate(fase.fecha_fin) }}</span>
+              <span class="fase-summary">{{ getFaseTareasSummary(fase) }}</span>
+              <span class="fase-delegado-chip" *ngIf="fase.instrucciones != null || getFaseCoord(fase.id)">
+                <i class="fa fa-user"></i>
+                <ng-container *ngIf="getFaseCoord(fase.id); else soloLabel">
+                  {{ getFaseCoord(fase.id).nombre }} {{ getFaseCoord(fase.id).apellido }}
+                </ng-container>
+                <ng-template #soloLabel>Delegada</ng-template>
+              </span>
+            </div>
+          </div>
+          <div class="fase-header-right">
+            <!-- Progress mini-bar -->
+            <div class="fase-mini-progress" *ngIf="fase.tareas.length">
+              <div class="mini-bar-track">
+                <div class="mini-bar-fill" [style.width.%]="getFaseProgressPct(fase)"></div>
+              </div>
+              <span class="mini-pct">{{ getFaseProgressPct(fase) }}%</span>
+            </div>
+            <!-- Actions: solo si el proyecto permite edición -->
+            <div class="fase-actions" *ngIf="canManagePhases">
+              <button class="btn-fase-action btn-delegate"
+                      (click)="openDelegate(fase)" [disabled]="!(fase.total_tareas || fase.tareas?.length)"
+                      [title]="!(fase.total_tareas || fase.tareas?.length) ? 'Agrega tareas antes de delegar' : 'Delegar al coordinador'">
+                <i class="fa fa-share"></i> Delegar
+              </button>
+              <button class="btn-fase-action btn-edit-fase" (click)="openEditPhase(fase)">
+                <i class="fa fa-pencil"></i>
+              </button>
+              <button class="btn-fase-action btn-delete-fase" (click)="deletePhase(fase)">
+                <i class="fa fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fase body: tasks -->
+        <div class="fase-body" *ngIf="isFaseExpanded(fase.id)">
+
+          <!-- Task list -->
+          <div class="task-list" *ngIf="fase.tareas.length">
+            <div class="task-row" *ngFor="let t of fase.tareas">
+              <div class="task-dot" [ngClass]="getTareaStateClass(t.estado)"></div>
+              <div class="task-info">
+                <span class="task-name">{{ t.nombre }}</span>
+                <span class="task-meta">
+                  {{ getTaskTipoStr(t) }} &bull; {{ formatDate(t.fecha_inicio) }} — {{ formatDate(t.fecha_fin) }}
+                </span>
+                <div class="task-assign-tags">
+                  <span class="assign-tag tag-operarios" *ngIf="t.operarios?.length">
+                    <i class="fa fa-users"></i> {{ getTaskOperariosStr(t) }}
+                  </span>
+                  <span class="assign-tag tag-machines" *ngIf="t.maquinarias?.length">
+                    <i class="fa fa-cog"></i> {{ getTaskMaquinariasStr(t) }}
+                  </span>
+                  <span class="assign-tag tag-pending" *ngIf="!t.operarios?.length && !t.maquinarias?.length">
+                    <i class="fa fa-clock-o"></i> Pendiente de asignación por coordinador
+                  </span>
+                  <span class="assign-tag tag-auto" *ngIf="!t.operarios?.length && t.maquinarias?.length">
+                    <i class="fa fa-cog"></i> Automático
+                  </span>
+                </div>
+              </div>
+              <span class="task-badge" [ngClass]="'tbadge-' + t.estado">{{ getEstadoLabel(t.estado) }}</span>
+              <div class="task-actions" *ngIf="canManagePhases && t.estado === 'pendiente'">
+                <button class="btn-task-action" (click)="openEditTask(fase, t)" title="Editar tarea">
+                  <i class="fa fa-pencil"></i>
+                </button>
+                <button class="btn-task-action btn-task-delete" (click)="deleteTask(fase.id, t)" title="Eliminar tarea">
+                  <i class="fa fa-times"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Insumos aplicados a la fase -->
+          <div class="fase-insumos-row" *ngIf="fase.insumos_aplicados?.length">
+            <span class="fase-insumos-label"><i class="fa fa-cube"></i> Insumos:</span>
+            <span class="fase-insumo-chip" *ngFor="let iid of fase.insumos_aplicados">{{ insumoLabel(iid) }}</span>
+          </div>
+
+          <!-- Add task -->
+          <div class="add-task-row" *ngIf="canManagePhases">
+            <button class="btn-add-task" (click)="openNewTask(fase)">
+              <i class="fa fa-plus"></i> Agregar tarea a esta fase
+            </button>
+          </div>
+          <p class="no-tasks-note" *ngIf="!fase.tareas.length && !canManagePhases">
+            Sin tareas en esta fase.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: Cronograma ════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab === 'cronograma'">
+    <div class="crono-card">
+      <div class="crono-header">
+        <h3>{{ formatDate(p.fecha_inicio) }} → {{ formatDate(p.fecha_fin) }}</h3>
+        <button class="btn-outline" (click)="goToGantt()"><i class="fa fa-expand"></i> Ver Gantt Completo</button>
+      </div>
+      <!-- Proyecto sin aprobación: aún no tiene fases -->
+      <div class="crono-pending" *ngIf="p.estado === 'borrador' || p.estado === 'en_revision' || p.estado === 'rechazado'">
+        <i class="fa fa-lock"></i>
+        <p>El cronograma estará disponible una vez que el proyecto sea <strong>aprobado</strong>.</p>
+        <span>Estado actual: <span class="estado-badge" [ngClass]="'estado-' + p.estado">{{ getEstadoLabel(p.estado) }}</span></span>
+      </div>
+
+      <!-- Proyecto aprobado pero sin fases creadas -->
+      <div class="empty-state" *ngIf="canManagePhases && p.fases.length === 0">
+        <i class="fa fa-calendar-o"></i>
+        <p>Aún no hay fases creadas. Ve a <strong>Fases y Tareas</strong> para comenzar.</p>
+      </div>
+
+      <!-- Fases sin fechas asignadas -->
+      <div class="empty-state" *ngIf="canManagePhases && p.fases.length > 0 && fasesConFechas.length === 0">
+        <i class="fa fa-clock-o"></i>
+        <p>Las fases aún no tienen fechas asignadas. Edítalas en <strong>Fases y Tareas</strong>.</p>
+      </div>
+
+      <!-- Cronograma real -->
+      <div class="crono-chart" *ngIf="fasesConFechas.length > 0">
+        <div class="crono-row" *ngFor="let fase of fasesConFechas; let i = index">
+          <div class="crono-label">{{ fase.nombre }}</div>
+          <div class="crono-track">
+            <div class="crono-bar" [ngStyle]="getCronoBarStyle(fase)"
+                 [style.background]="i % 2 === 0 ? 'var(--atomo-gradient)' : 'linear-gradient(135deg,#8DC63F,#00A859)'">
+              <span>{{ fase.nombre }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: Recursos ══════════════════════════════════ -->
+  <div class="tab-content" *ngIf="activeTab === 'recursos'">
+    <div class="recursos-card" *ngIf="resourceSummary.length || totalRecursosValue">
+      <table class="recursos-table">
+        <thead>
+          <tr><th>Categoría</th><th class="right">Total</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let r of resourceSummary">
+            <td><span class="tipo-badge">{{ r.tipo }}</span></td>
+            <td class="right">{{ formatCOP(r.total) }}</td>
+          </tr>
+          <tr class="gran-total">
+            <td><strong>Gran Total</strong></td>
+            <td class="right"><strong>{{ formatCOP(totalRecursosValue) }}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="empty-state" *ngIf="!resourceSummary.length && !totalRecursosValue">
+      <i class="fa fa-cube"></i>
+      <p>Sin recursos registrados en este proyecto.</p>
+    </div>
+  </div>
+
+
+  <!-- ══ MODAL: Nueva / Editar Fase ═════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showPhaseModal" (click)="closePhaseModal()">
+    <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-sitemap"></i> {{ editingPhaseId ? 'Editar Fase' : 'Nueva Fase' }}</h3>
+        <button class="modal-close" (click)="closePhaseModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="mform-group">
+          <label>Nombre de la Fase *</label>
+          <input type="text" [(ngModel)]="phaseForm.nombre" placeholder="Ej: Corte y mecanizado">
+        </div>
+        <div class="mform-group">
+          <label>Descripción</label>
+          <textarea [(ngModel)]="phaseForm.descripcion" rows="2" placeholder="Describe brevemente las actividades..."></textarea>
+        </div>
+        <div class="date-range-hint-modal">
+          <i class="fa fa-calendar-o"></i>
+          Rango del proyecto: <strong>{{ formatDate(project.fecha_inicio) }}</strong> → <strong>{{ formatDate(project.fecha_fin) }}</strong>
+        </div>
+        <div class="mform-row">
+          <div class="mform-group">
+            <label>Fecha Inicio *</label>
+            <input type="date" [(ngModel)]="phaseForm.fecha_inicio"
+                   [min]="phaseDateMin" [max]="phaseDateMax"
+                   (ngModelChange)="resetPhaseConflict()">
+          </div>
+          <div class="mform-group">
+            <label>Fecha Fin *</label>
+            <input type="date" [(ngModel)]="phaseForm.fecha_fin"
+                   [min]="phaseDateMin" [max]="phaseDateMax"
+                   (ngModelChange)="resetPhaseConflict()">
+          </div>
+        </div>
+
+        <!-- ── Insumos / Materiales de la fase ── -->
+        <div class="mform-group" *ngIf="project?.insumos?.length">
+          <label>Insumos aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(selecciona los que aplican)</span></label>
+          <div class="insumo-phase-list">
+            <label class="insumo-check-item" *ngFor="let ins of project!.insumos">
+              <input type="checkbox" [checked]="isPhaseInsumoSelected(ins.id)" (change)="togglePhaseInsumo(ins.id)">
+              <span class="insumo-check-name">{{ ins.nombre }}</span>
+              <span class="tipo-badge-sm">{{ ins.tipo }}</span>
+            </label>
+          </div>
+          <div class="insumos-sel-count" *ngIf="phaseInsumos.length > 0">
+            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} insumo(s) seleccionado(s)
+          </div>
+        </div>
+
+        <!-- ── Validación de disponibilidad ── -->
+        <div class="phase-avail-section">
+          <button class="btn-check-avail" (click)="checkPhaseAvailability()"
+                  [disabled]="phaseConflictState === 'checking'">
+            <i class="fa" [ngClass]="phaseConflictState === 'checking' ? 'fa-spinner fa-spin' : 'fa-shield'"></i>
+            {{ phaseConflictState === 'checking' ? 'Verificando...' : 'Verificar disponibilidad' }}
+          </button>
+
+          <!-- OK -->
+          <div class="phase-avail-ok" *ngIf="phaseConflictState === 'ok'">
+            <i class="fa fa-check-circle"></i> {{ phaseConflictMsg }}
+            <div class="phase-occ-bars">
+              <div class="phase-occ-row" *ngFor="let m of phaseMachineOcc">
+                <span class="pocc-name">{{ m.nombre }}</span>
+                <div class="pocc-track"><div class="pocc-fill" [ngClass]="phaseOccClass(m)" [style.width.%]="m.porcentaje"></div></div>
+                <span class="pocc-pct">{{ m.porcentaje }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Conflicto -->
+          <div class="phase-avail-warn" *ngIf="phaseConflictState === 'conflict'">
+            <i class="fa fa-exclamation-triangle"></i> {{ phaseConflictMsg }}
+            <div class="phase-occ-bars">
+              <div class="phase-occ-row" *ngFor="let m of phaseMachineOcc">
+                <span class="pocc-name">{{ m.nombre }}</span>
+                <div class="pocc-track"><div class="pocc-fill" [ngClass]="phaseOccClass(m)" [style.width.%]="m.porcentaje"></div></div>
+                <span class="pocc-pct" [ngClass]="phaseOccClass(m)">{{ m.porcentaje }}%</span>
+              </div>
+            </div>
+            <p class="phase-avail-note"><i class="fa fa-info-circle"></i> El director puede confirmar la fase aunque haya saturación.</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" (click)="closePhaseModal()">Cancelar</button>
+        <button class="btn-confirm-modal" (click)="savePhase()">
+          <i class="fa fa-save"></i> {{ editingPhaseId ? 'Actualizar' : 'Crear Fase' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Nueva / Editar Tarea ═══════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showTaskModal" (click)="closeTaskModal()">
+    <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-tasks"></i> {{ editingTaskId ? 'Editar Tarea' : 'Nueva Tarea' }}</h3>
+        <button class="modal-close" (click)="closeTaskModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-fase-ctx">
+          <i class="fa fa-sitemap"></i> Fase: <strong>{{ taskFaseName }}</strong>
+        </div>
+        <div class="mform-group">
+          <label>Nombre de la Tarea *</label>
+          <input type="text" [(ngModel)]="taskForm.nombre" placeholder="Ej: Corte láminas MDF">
+        </div>
+        <div class="mform-group">
+          <label>Descripción</label>
+          <textarea [(ngModel)]="taskForm.descripcion" rows="2" placeholder="Describe brevemente la tarea..."></textarea>
+        </div>
+        <div class="mform-group">
+          <label>Tipo de Tarea</label>
+          <select [(ngModel)]="taskForm.id_tipo_tarea" (ngModelChange)="onTipoTareaChange()">
+            <option *ngFor="let t of tiposTarea" [ngValue]="t.id">{{ t.nombre }}</option>
+          </select>
+        </div>
+        <div class="date-range-hint-modal" *ngIf="taskFase">
+          <i class="fa fa-calendar-o"></i>
+          Rango de la fase: <strong>{{ formatDate(taskFase.fecha_inicio) }}</strong> → <strong>{{ formatDate(taskFase.fecha_fin) }}</strong>
+        </div>
+        <div class="mform-row">
+          <div class="mform-group">
+            <label>Fecha Inicio *</label>
+            <input type="date" [(ngModel)]="taskForm.fecha_inicio"
+                   [min]="taskDateMin" [max]="taskDateMax">
+          </div>
+          <div class="mform-group">
+            <label>Fecha Fin *</label>
+            <input type="date" [(ngModel)]="taskForm.fecha_fin"
+                   [min]="taskDateMin" [max]="taskDateMax">
+          </div>
+        </div>
+        <div class="modal-info-note">
+          <i class="fa fa-info-circle"></i>
+          Los operarios y maquinaria serán asignados por el Coordinador después de que delegues esta fase.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" (click)="closeTaskModal()">Cancelar</button>
+        <button class="btn-confirm-modal" (click)="saveTask()">
+          <i class="fa fa-save"></i> {{ editingTaskId ? 'Actualizar' : 'Crear Tarea' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Delegar Fase a Coordinador ═════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showDelegateModal" (click)="closeDelegateModal()">
+    <div class="modal-box modal-md" (click)="$event.stopPropagation()">
+      <div class="modal-header modal-header-delegate">
+        <h3><i class="fa fa-share"></i> Delegar Fase</h3>
+        <button class="modal-close" (click)="closeDelegateModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-fase-ctx">
+          <i class="fa fa-sitemap"></i> Fase: <strong>{{ delegatingFaseName }}</strong>
+        </div>
+        <div class="delegate-info">
+          <i class="fa fa-info-circle"></i>
+          El coordinador seleccionado recibirá esta fase y podrá asignar operarios, maquinaria y horarios a cada tarea.
+        </div>
+        <div class="mform-group">
+          <label>Coordinador Responsable *</label>
+          <select [(ngModel)]="delegateCoordinadorId">
+            <option [ngValue]="null" disabled>Seleccionar coordinador...</option>
+            <option *ngFor="let c of coordinators" [ngValue]="c.id">
+              {{ c.nombre }} {{ c.apellido }}
+            </option>
+          </select>
+        </div>
+        <div class="mform-group">
+          <label>Instrucciones para el Coordinador</label>
+          <textarea [(ngModel)]="delegateInstrucciones" rows="3"
+                    placeholder="Ej: Priorizar el corte CNC antes del laminado. Coordinar con el proveedor de MDF..."></textarea>
+        </div>
+        <!-- ── Insumos disponibles del proyecto ── -->
+        <div class="mform-group" *ngIf="project?.insumos?.length">
+          <label>Insumos aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(marca los que aplican)</span></label>
+          <div class="insumo-phase-list">
+            <label class="insumo-check-item" *ngFor="let ins of project!.insumos">
+              <input type="checkbox" [checked]="isPhaseInsumoSelected(ins.id)" (change)="togglePhaseInsumo(ins.id)">
+              <span class="insumo-check-name">{{ ins.nombre }}</span>
+              <span class="tipo-badge-sm">{{ ins.tipo }}</span>
+            </label>
+          </div>
+          <div class="insumos-sel-count" *ngIf="phaseInsumos.length > 0">
+            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} insumo(s) seleccionado(s)
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel-modal" (click)="closeDelegateModal()">Cancelar</button>
+        <button class="btn-delegate-confirm" (click)="saveDelegate()">
+          <i class="fa fa-share"></i> Delegar Fase
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+</div><!-- /detail-page -->
+
+<div class="loading-state" *ngIf="!project"><i class="fa fa-spinner fa-spin"></i> Cargando proyecto...</div>

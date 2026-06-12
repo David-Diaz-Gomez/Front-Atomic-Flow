@@ -1,0 +1,50 @@
+<div class="op-notifs">
+
+  <div class="op-page-header">
+    <div>
+      <h1><i class="fa fa-bell"></i> Notificaciones</h1>
+      <span class="op-subtitle" *ngIf="unread > 0">{{ unread }} sin leer</span>
+    </div>
+    <button class="mark-all-btn" *ngIf="unread > 0" (click)="markAll()">
+      <i class="fa fa-check-double"></i> Marcar todas
+    </button>
+  </div>
+
+  <!-- Filter chips -->
+  <div class="filter-chips">
+    <button class="filter-chip" [class.active]="!filterTipo" (click)="filterTipo=''">Todas</button>
+    <button class="filter-chip" [class.active]="filterTipo==='asignacion'"   (click)="filterTipo='asignacion'">Asignaciones</button>
+    <button class="filter-chip" [class.active]="filterTipo==='reasignacion'" (click)="filterTipo='reasignacion'">Reasignaciones</button>
+    <button class="filter-chip" [class.active]="filterTipo==='comentario'"   (click)="filterTipo='comentario'">Comentarios</button>
+    <button class="filter-chip" [class.active]="filterTipo==='recordatorio'" (click)="filterTipo='recordatorio'">Recordatorios</button>
+  </div>
+
+  <!-- List -->
+  <div class="notif-list">
+    <div class="notif-item" *ngFor="let n of filtradas"
+         [class.unread]="!n.leida"
+         (click)="open(n)">
+      <div class="notif-icon" [style.background]="tipoColor(n.tipo)+'18'" [style.color]="tipoColor(n.tipo)">
+        <i class="fa" [ngClass]="tipoIcon(n.tipo)"></i>
+      </div>
+      <div class="notif-body">
+        <div class="notif-top">
+          <span class="notif-title">{{ n.titulo }}</span>
+          <span class="notif-unread-dot" *ngIf="!n.leida"></span>
+        </div>
+        <p class="notif-cuerpo">{{ n.mensaje }}</p>
+        <div class="notif-meta">
+          <span class="notif-tipo-chip" [style.background]="tipoColor(n.tipo)+'15'" [style.color]="tipoColor(n.tipo)">{{ tipoLabel(n.tipo) }}</span>
+          <span class="notif-time">{{ n.hora }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="op-empty" *ngIf="!filtradas.length">
+      <i class="fa fa-inbox"></i>
+      <p>Sin notificaciones en esta categoría</p>
+    </div>
+  </div>
+
+</div>
+

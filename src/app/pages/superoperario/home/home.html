@@ -1,0 +1,283 @@
+<div class="kiosko">
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════════ -->
+  <div class="kiosko-header">
+    <div class="kiosko-header__left">
+      <h1><i class="fa fa-desktop"></i> Kiosko de Producción</h1>
+      <span class="kiosko-date">{{ todayLabel }}</span>
+    </div>
+    <app-notif-bell></app-notif-bell>
+    <div class="kiosko-header__tabs">
+      <button [class.tab-active]="view === 'calendar'" (click)="switchView('calendar')">
+        <i class="fa fa-calendar"></i> Día
+      </button>
+      <button [class.tab-active]="view === 'semana'" (click)="switchView('semana')">
+        <i class="fa fa-th"></i> Semana
+      </button>
+      <button [class.tab-active]="view === 'planner'" (click)="switchView('planner')">
+        <i class="fa fa-list"></i> Lista
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ FILTER BAR ══════════════════════════════════════════════════════════ -->
+  <div class="kiosko-filter">
+    <div class="filter-row" *ngIf="!isFiltered">
+      <div class="filter-field">
+        <label>Operario</label>
+        <select [(ngModel)]="selectedOperarioId" class="f-select">
+          <option [ngValue]="null">— Seleccionar —</option>
+          <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+        </select>
+      </div>
+      <div class="filter-field" *ngIf="selectedOperarioId">
+        <label>Contraseña</label>
+        <input type="password" [(ngModel)]="filterPassword" class="f-input"
+               placeholder="••••••••" (keydown.enter)="doFilter()">
+      </div>
+      <button class="btn-identificar" (click)="doFilter()" [disabled]="!selectedOperarioId || isLoading">
+        <i class="fa fa-sign-in"></i> Identificar
+      </button>
+      <span class="filter-error" *ngIf="filterError">
+        <i class="fa fa-exclamation-triangle"></i> {{ filterError }}
+      </span>
+    </div>
+    <div class="filter-session" *ngIf="isFiltered">
+      <div class="session-info">
+        <div class="session-avatar">{{ filteredOperario?.nombre?.charAt(0) }}</div>
+        <div class="session-text">
+          <strong>{{ filteredOperario?.nombre }} {{ filteredOperario?.apellido }}</strong>
+          <span class="session-badge"><i class="fa fa-circle"></i> Sesión activa</span>
+        </div>
+      </div>
+      <span class="session-task-count"><i class="fa fa-tasks"></i> {{ filteredTareas.length }} tarea(s) hoy</span>
+      <button class="btn-cerrar-sesion" (click)="clearFilter()">
+        <i class="fa fa-sign-out"></i> Cerrar sesión
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ VISTA DÍA (CALENDAR) ═══════════════════════════════════════════════ -->
+  <div class="kiosko-body" *ngIf="view === 'calendar'">
+
+    <div class="kiosko-legend" *ngIf="!isFiltered">
+      <div class="legend-item" *ngFor="let op of operarios">
+        <span class="legend-dot" [style.background]="getColor(op.id)"></span>
+        {{ op.nombre }} {{ op.apellido }}
+      </div>
+    </div>
+
+    <div class="kiosko-note" *ngIf="!isFiltered">
+      <i class="fa fa-info-circle"></i>
+      Identifícate para ver el detalle y completar tus tareas.
+    </div>
+
+    <div class="timeline">
+      <div class="tl-axis">
+        <div class="tl-axis-label" *ngFor="let h of HOURS; let i = index"
+             [style.top.%]="getGridTop(i)">{{ h }}:00</div>
+      </div>
+      <div class="tl-track">
+        <div class="tl-grid" *ngFor="let h of HOURS; let i = index" [style.top.%]="getGridTop(i)"></div>
+        <div class="tl-empty" *ngIf="!displayTareas.length">
+          <i class="fa fa-check-circle"></i><p>Sin tareas para hoy.</p>
+        </div>
+        <!-- Layout sin solapamiento -->
+        <div class="tl-block"
+             *ngFor="let item of calendarLayout"
+             [style.top.%]="getBlockTop(item.task)"
+             [style.height.%]="getBlockHeight(item.task)"
+             [style.left.%]="item.col / item.cols * 100"
+             [style.width.%]="1 / item.cols * 100"
+             [style.background-color]="getColor(item.task.id_operario) + '22'"
+             [style.border-left-color]="getColor(item.task.id_operario)"
+             [class.tl-block--clickable]="isFiltered"
+             [class.tl-block--done]="item.task.estado === 'completada'"
+             (click)="openTask(item.task)">
+          <span class="tl-block__name">{{ item.task.nombre }}</span>
+          <span class="tl-block__time">{{ item.task.hora_inicio }}–{{ item.task.hora_fin }}</span>
+          <span class="tl-block__op" *ngIf="!isFiltered">{{ item.task.operario }}</span>
+          <i class="fa fa-check-circle tl-block__done-icon" *ngIf="item.task.estado === 'completada'"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VISTA SEMANA ════════════════════════════════════════════════════════ -->
+  <div class="kiosko-body" *ngIf="view === 'semana'">
+
+    <!-- Week navigator -->
+    <div class="week-nav">
+      <button class="week-btn" (click)="prevWeek()"><i class="fa fa-chevron-left"></i></button>
+      <span class="week-label">{{ weekLabel }}</span>
+      <button class="week-btn" (click)="nextWeek()"><i class="fa fa-chevron-right"></i></button>
+    </div>
+
+    <div class="week-loading" *ngIf="weekLoading">
+      <i class="fa fa-spinner fa-spin"></i> Cargando semana...
+    </div>
+
+    <div class="week-grid" *ngIf="!weekLoading">
+
+      <!-- Fixed header row with day names -->
+      <div class="wg-header-row">
+        <div class="wg-header-axis"></div>
+        <div class="wg-header-col" *ngFor="let d of weekDays"
+             [class.wg-header-col--today]="isToday(d)">
+          <span class="wg-header-dayname">{{ dayLabel(d).split(' ')[0] }}</span>
+          <span class="wg-header-daynum">{{ dayLabel(d).split(' ')[1] }}</span>
+        </div>
+      </div>
+
+      <!-- Scrollable body -->
+      <div class="wg-body">
+        <!-- Hour axis -->
+        <div class="wg-axis">
+          <div class="wg-axis__hour" *ngFor="let h of HOURS; let i = index"
+               [style.top.%]="getGridTop(i)">{{ h }}:00</div>
+        </div>
+
+        <!-- Day columns -->
+        <div class="wg-days">
+          <div class="wg-col" *ngFor="let d of weekDays" [class.wg-col--today]="isToday(d)">
+            <div class="wg-col__track">
+              <!-- Grid lines -->
+              <div class="wg-grid-line" *ngFor="let h of HOURS; let i = index"
+                   [style.top.%]="getGridTop(i)"></div>
+
+              <!-- Teams-style event blocks -->
+              <ng-container *ngFor="let item of getWeekLayout(getDayTareas(d))">
+                <div class="wg-event"
+                     [style.top.%]="getBlockTop(item.task)"
+                     [style.height.%]="getBlockHeight(item.task)"
+                     [style.left.%]="item.col / item.cols * 100"
+                     [style.width.%]="1 / item.cols * 100"
+                     [style.--event-color]="getColor(item.task.id_operario)"
+                     [style.background]="getColor(item.task.id_operario) + '18'"
+                     [style.border-color]="getColor(item.task.id_operario) + '44'"
+                     [class.wg-event--done]="item.task.estado === 'completada'"
+                     [class.wg-event--clickable]="isFiltered"
+                     (click)="openTask(item.task)">
+                  <div class="wg-event__bar"></div>
+                  <div class="wg-event__body">
+                    <span class="wg-event__name">{{ item.task.nombre }}</span>
+                    <span class="wg-event__time">{{ item.task.hora_inicio }}–{{ item.task.hora_fin }}</span>
+                    <span class="wg-event__op" *ngIf="!isFiltered">{{ item.task.operario }}</span>
+                    <i class="fa fa-check-circle wg-event__check" *ngIf="item.task.estado === 'completada'"></i>
+                  </div>
+                </div>
+              </ng-container>
+
+              <div class="wg-empty" *ngIf="!getDayTareas(d).length">
+                <i class="fa fa-minus"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Leyenda semana -->
+    <div class="kiosko-legend" *ngIf="!weekLoading">
+      <div class="legend-item" *ngFor="let op of operarios">
+        <span class="legend-dot" [style.background]="getColor(op.id)"></span>
+        {{ op.nombre }} {{ op.apellido }}
+      </div>
+      <span class="legend-item" style="color:#94a3b8; font-size:12px">
+        Pasa el cursor sobre un bloque para ver los detalles
+      </span>
+    </div>
+  </div>
+
+  <!-- ══ VISTA LISTA (PLANNER) ═══════════════════════════════════════════════ -->
+  <div class="kiosko-body" *ngIf="view === 'planner'">
+    <div class="kiosko-note" *ngIf="!isFiltered">
+      <i class="fa fa-info-circle"></i>
+      Identifícate para ver el detalle y completar tus tareas.
+    </div>
+    <div class="planner-empty" *ngIf="!plannerTareas.length">
+      <i class="fa fa-check-circle"></i><p>Sin tareas para hoy.</p>
+    </div>
+    <div class="planner-list" *ngIf="plannerTareas.length">
+      <div class="planner-row" *ngFor="let t of plannerTareas"
+           [class.planner-row--done]="t.estado === 'completada'"
+           [class.planner-row--clickable]="isFiltered"
+           (click)="openTask(t)">
+        <div class="planner-color" [style.background]="getColor(t.id_operario)"></div>
+        <div class="planner-time">
+          <span class="time-start">{{ t.hora_inicio }}</span>
+          <span class="time-sep">—</span>
+          <span class="time-end">{{ t.hora_fin }}</span>
+        </div>
+        <div class="planner-info">
+          <span class="planner-name">{{ t.nombre }}</span>
+          <span class="planner-sub">{{ t.proyecto }} · {{ t.fase }}</span>
+        </div>
+        <div class="planner-op" *ngIf="!isFiltered"><span>{{ t.operario }}</span></div>
+        <div class="planner-status">
+          <span class="status-badge" [class]="'status-' + t.estado">{{ estadoLabel(t.estado) }}</span>
+          <small *ngIf="t.estado === 'completada' && t.completado_en" class="completada-hora">{{ completadaHora(t.completado_en) }}</small>
+        </div>
+        <i class="fa fa-check-circle planner-done-icon" *ngIf="t.estado === 'completada'"></i>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TASK MODAL ══════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showTaskModal" (click)="closeTask()">
+    <div class="task-modal" (click)="$event.stopPropagation()">
+      <button class="modal-close" (click)="closeTask()"><i class="fa fa-times"></i></button>
+      <div class="task-modal__header">
+        <span class="task-status-badge" [class]="'status-' + selectedTarea?.estado">{{ estadoLabel(selectedTarea?.estado) }}</span>
+        <h2>{{ selectedTarea?.nombre }}</h2>
+      </div>
+      <div class="task-modal__meta">
+        <div class="meta-item"><i class="fa fa-briefcase"></i><span>{{ selectedTarea?.proyecto }}</span></div>
+        <div class="meta-item"><i class="fa fa-sitemap"></i><span>{{ selectedTarea?.fase }}</span></div>
+        <div class="meta-item"><i class="fa fa-clock-o"></i><span>{{ selectedTarea?.hora_inicio }} – {{ selectedTarea?.hora_fin }}</span></div>
+      </div>
+      <div class="task-modal__body">
+        <div class="task-section" *ngIf="selectedTarea?.descripcion">
+          <label>Descripción</label><p>{{ selectedTarea?.descripcion }}</p>
+        </div>
+        <div class="task-section" *ngIf="selectedTarea?.instrucciones">
+          <label>Instrucciones</label><p>{{ selectedTarea?.instrucciones }}</p>
+        </div>
+      </div>
+      <div class="task-modal__footer">
+        <button class="btn-completar" *ngIf="selectedTarea?.estado !== 'completada'"
+                (click)="marcarCompletada()" [disabled]="isLoading">
+          <i class="fa fa-check"></i> {{ isLoading ? 'Guardando...' : 'Marcar como Completada' }}
+        </button>
+        <div class="completada-msg" *ngIf="selectedTarea?.estado === 'completada'">
+          <i class="fa fa-check-circle"></i> Completada a las {{ completadaHora(selectedTarea?.completado_en ?? null) }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ INACTIVITY MODAL ════════════════════════════════════════════════════ -->
+  <div class="modal-overlay inactivity-overlay" *ngIf="showInactivityModal">
+    <div class="inactivity-modal">
+      <div class="inactivity-icon"><i class="fa fa-clock-o"></i></div>
+      <h3>¿Sigues ahí, {{ filteredOperario?.nombre }}?</h3>
+      <p>Tu sesión se cerrará por inactividad.</p>
+      <div class="countdown-ring">
+        <svg viewBox="0 0 44 44">
+          <circle cx="22" cy="22" r="18" stroke="#e2e8f0" stroke-width="4" fill="none"/>
+          <circle cx="22" cy="22" r="18" stroke="#0052cc" stroke-width="4" fill="none"
+                  stroke-dasharray="113"
+                  [style.stroke-dashoffset]="113 - (113 * countdown / 30)"
+                  stroke-linecap="round" transform="rotate(-90 22 22)"/>
+        </svg>
+        <span class="countdown-num">{{ countdown }}</span>
+      </div>
+      <div class="inactivity-actions">
+        <button class="btn-continue" (click)="continueSession()"><i class="fa fa-refresh"></i> Continuar</button>
+        <button class="btn-close-inactivity" (click)="clearFilter()"><i class="fa fa-sign-out"></i> Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+
+</div>

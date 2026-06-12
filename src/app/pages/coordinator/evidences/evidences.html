@@ -1,0 +1,168 @@
+<div class="ev-wrap">
+
+  <div class="ev-header">
+    <h1><i class="fa fa-camera"></i> Evidencias</h1>
+    <span class="ev-sub">Tareas completadas por operarios esperando evidencia</span>
+  </div>
+
+  <div class="ev-loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando...
+  </div>
+
+  <div class="ev-empty" *ngIf="!loading && !tareas.length">
+    <i class="fa fa-check-circle"></i>
+    <p>Todo al día — no hay tareas completadas pendientes de evidencia.</p>
+  </div>
+
+  <div class="ev-list" *ngIf="!loading && tareas.length">
+    <div class="ev-card" *ngFor="let t of tareas">
+      <div class="ev-card__left">
+        <div class="ev-card__icon"><i class="fa fa-check-circle"></i></div>
+      </div>
+      <div class="ev-card__body">
+        <span class="ev-card__name">{{ t.nombre }}</span>
+        <span class="ev-card__meta">
+          <i class="fa fa-briefcase"></i> {{ t.proyecto }} &nbsp;·&nbsp;
+          <i class="fa fa-sitemap"></i> {{ t.fase }}
+        </span>
+        <span class="ev-card__op">
+          <i class="fa fa-user"></i> {{ t.operario ?? operarioNombre(t.id_operario) }}
+          completó a las <strong>{{ formatDateTime(t.completado_en) }}</strong>
+        </span>
+      </div>
+      <div class="ev-card__actions">
+        <button class="btn-evidencia" (click)="openEvidModal(t)">
+          <i class="fa fa-camera"></i> Subir evidencias
+        </button>
+        <button class="btn-reasignar" (click)="openReasignModal(t)">
+          <i class="fa fa-refresh"></i> Reasignar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: Subir evidencias -->
+<div class="modal-overlay" *ngIf="showEvidModal" (click)="closeEvidModal()">
+  <div class="ev-modal" (click)="$event.stopPropagation()">
+    <div class="ev-modal__header">
+      <h3><i class="fa fa-camera"></i> Subir evidencias</h3>
+      <span class="ev-modal__task">{{ evidTarea?.nombre }}</span>
+      <button class="modal-close" (click)="closeEvidModal()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="ev-modal__body">
+      <label class="drop-zone" *ngIf="!isMobile">
+        <input type="file" multiple accept="image/*" (change)="onFilesSelected($event)" style="display:none">
+        <i class="fa fa-cloud-upload"></i>
+        <span>Haz clic o arrastra hasta <strong>10 fotos</strong></span>
+        <small>jpg · png · webp</small>
+      </label>
+      <div class="evid-mobile-actions" *ngIf="isMobile">
+        <label class="btn-capture">
+          <input type="file" accept="image/*" capture="environment" multiple (change)="onFilesSelected($event)" style="display:none">
+          <i class="fa fa-camera"></i> Tomar foto
+        </label>
+        <label class="btn-capture btn-capture--alt">
+          <input type="file" accept="image/*" multiple (change)="onFilesSelected($event)" style="display:none">
+          <i class="fa fa-image"></i> Subir archivo
+        </label>
+      </div>
+      <div class="preview-grid" *ngIf="previews.length">
+        <div class="preview-item" *ngFor="let src of previews; let i = index">
+          <img [src]="src" alt="preview">
+          <button class="preview-rm" (click)="removeFile(i)"><i class="fa fa-times"></i></button>
+        </div>
+      </div>
+      <div class="ev-modal__desc">
+        <label>Descripción (opcional)</label>
+        <textarea [(ngModel)]="evidDesc" placeholder="Observaciones sobre las evidencias..." rows="2"></textarea>
+      </div>
+    </div>
+    <div class="ev-modal__footer">
+      <button class="btn-cancel" (click)="closeEvidModal()">Cancelar</button>
+      <button class="btn-primary" (click)="subirEvidencias()"
+              [disabled]="!selectedFiles.length || evidSaving">
+        <i class="fa fa-upload"></i>
+        {{ evidSaving ? 'Subiendo...' : 'Subir ' + selectedFiles.length + ' foto(s)' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Reasignar -->
+<div class="modal-overlay" *ngIf="showReasignModal" (click)="closeReasignModal()">
+  <div class="ev-modal ev-modal--reasign" (click)="$event.stopPropagation()">
+    <div class="ev-modal__header">
+      <h3><i class="fa fa-refresh"></i> Reasignar tarea</h3>
+      <span class="ev-modal__task">{{ reasignTarea?.nombre }}</span>
+      <button class="modal-close" (click)="closeReasignModal()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="ev-modal__body">
+      <div class="mform-group">
+        <label>Operario *</label>
+        <select [(ngModel)]="reasignForm.id_operario" class="mform-input"
+                (ngModelChange)="disponibilidad = null">
+          <option [ngValue]="null">— Seleccionar operario —</option>
+          <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+        </select>
+      </div>
+      <div class="mform-row">
+        <div class="mform-group">
+          <label>Fecha inicio *</label>
+          <input type="date" [(ngModel)]="reasignForm.fecha_inicio" class="mform-input"
+                 (ngModelChange)="disponibilidad = null">
+        </div>
+        <div class="mform-group">
+          <label>Fecha fin</label>
+          <input type="date" [(ngModel)]="reasignForm.fecha_fin" class="mform-input"
+                 [min]="reasignForm.fecha_inicio">
+        </div>
+      </div>
+      <div class="mform-row">
+        <div class="mform-group">
+          <label>Hora inicio</label>
+          <input type="time" [(ngModel)]="reasignForm.hora_inicio" class="mform-input">
+        </div>
+        <div class="mform-group">
+          <label>Hora fin</label>
+          <input type="time" [(ngModel)]="reasignForm.hora_fin" class="mform-input">
+        </div>
+      </div>
+      <button class="btn-check-disp"
+              (click)="checkDisponibilidad()"
+              [disabled]="!reasignForm.id_operario || !reasignForm.fecha_inicio || dispLoading">
+        <i class="fa fa-calendar-check-o" *ngIf="!dispLoading"></i>
+        <i class="fa fa-spinner fa-spin" *ngIf="dispLoading"></i>
+        Verificar disponibilidad
+      </button>
+      <div class="disp-result" *ngIf="disponibilidad">
+        <div class="disp-libre" *ngIf="disponibilidad.libre?.length">
+          <strong><i class="fa fa-check-circle"></i> Slots libres:</strong>
+          <span *ngFor="let sl of disponibilidad.libre">{{ sl.hora_inicio }} – {{ sl.hora_fin }}</span>
+        </div>
+        <div class="disp-ocupado" *ngIf="disponibilidad.ocupado?.length">
+          <strong><i class="fa fa-exclamation-triangle"></i> Ocupado:</strong>
+          <span *ngFor="let bl of disponibilidad.ocupado">{{ bl.hora_inicio }}–{{ bl.hora_fin }} · {{ bl.nombre }}</span>
+        </div>
+        <div class="disp-ok" *ngIf="!disponibilidad.ocupado.length">
+          <i class="fa fa-check-circle"></i> Sin conflictos para esa fecha
+        </div>
+      </div>
+      <div class="mform-group" style="margin-top:12px">
+        <label>Motivo</label>
+        <textarea [(ngModel)]="reasignForm.motivo"
+                  placeholder="Ej: Pieza no cumple medidas requeridas"
+                  class="mform-input" rows="2"></textarea>
+      </div>
+    </div>
+    <div class="ev-modal__footer">
+      <button class="btn-cancel" (click)="closeReasignModal()">Cancelar</button>
+      <button class="btn-reasign-confirm" (click)="reasignar()"
+              [disabled]="!reasignForm.id_operario || !reasignForm.fecha_inicio || reasignSaving">
+        <i class="fa fa-refresh"></i>
+        {{ reasignSaving ? 'Reasignando...' : 'Confirmar reasignación' }}
+      </button>
+    </div>
+  </div>
+</div>

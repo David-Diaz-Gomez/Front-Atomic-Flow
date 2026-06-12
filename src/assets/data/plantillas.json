@@ -1,0 +1,267 @@
+[
+  {
+    "id": 1,
+    "nombre": "Plantilla 1 — [Nombre del tipo de proyecto]",
+    "descripcion": "[Descripción corta del tipo de proyecto al que aplica esta plantilla]",
+    "fases": [
+      {
+        "nombre": "[Nombre Fase 1]",
+        "duracion_dias": 5,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 1.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[Carpintería | Impresiones | Logística | Diseño | Instalación | ...]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 1.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 3,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 2]",
+        "duracion_dias": 7,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 2.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 3,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 2.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 2.3]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 3]",
+        "duracion_dias": 3,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 3.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 1,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 3.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "nombre": "Plantilla 2 — [Nombre del tipo de proyecto]",
+    "descripcion": "[Descripción corta del tipo de proyecto al que aplica esta plantilla]",
+    "fases": [
+      {
+        "nombre": "[Nombre Fase 1]",
+        "duracion_dias": 4,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 1.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 1.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 2]",
+        "duracion_dias": 6,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 2.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 2.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 2.3]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 3]",
+        "duracion_dias": 5,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 3.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 3.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 3,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 4]",
+        "duracion_dias": 3,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 4.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 1,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 4.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "nombre": "Plantilla 3 — [Nombre del tipo de proyecto]",
+    "descripcion": "[Descripción corta del tipo de proyecto al que aplica esta plantilla]",
+    "fases": [
+      {
+        "nombre": "[Nombre Fase 1]",
+        "duracion_dias": 3,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 1.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 1,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 1.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 2]",
+        "duracion_dias": 5,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 2.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 2.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 3,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      },
+      {
+        "nombre": "[Nombre Fase 3]",
+        "duracion_dias": 4,
+        "tareas": [
+          {
+            "nombre": "[Nombre Tarea 3.1]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 2,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 3.2]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 1,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          },
+          {
+            "nombre": "[Nombre Tarea 3.3]",
+            "descripcion": "[Descripción de la tarea]",
+            "tipo_tarea": "[tipo]",
+            "duracion_dias": 1,
+            "hora_inicio": "07:00",
+            "hora_fin": "17:00"
+          }
+        ]
+      }
+    ]
+  }
+]

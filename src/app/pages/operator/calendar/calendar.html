@@ -1,1 +1,81 @@
-<p>calendar works!</p>
+<div class="op-calendar">
+
+  <!-- Header -->
+  <div class="op-page-header">
+    <h1><i class="fa fa-calendar"></i> Mi Calendario</h1>
+    <span class="op-subtitle">Ocupación semanal asignada</span>
+  </div>
+
+  <!-- Week navigator -->
+  <div class="week-nav">
+    <button (click)="prevWeek()"><i class="fa fa-chevron-left"></i></button>
+    <span class="week-label">{{ weekLabel }}</span>
+    <button (click)="nextWeek()"><i class="fa fa-chevron-right"></i></button>
+    <i class="fa fa-spinner fa-spin" *ngIf="loading" style="margin-left:8px;color:#94a3b8"></i>
+  </div>
+
+  <!-- Day chips -->
+  <div class="day-chips">
+    <div class="day-chip"
+         *ngFor="let d of weekDays"
+         [class.chip-today]="isToday(d)"
+         [class.chip-selected]="isSelected(d)"
+         [class.chip-has-work]="hasBloques(d)"
+         (click)="selectDay(d)">
+      <span class="chip-dow">{{ weekDayLabel(d) }}</span>
+      <span class="chip-num">{{ dayLabel(d) }}</span>
+      <span class="chip-dot" *ngIf="hasBloques(d)"></span>
+    </div>
+  </div>
+
+  <!-- Selected day detail -->
+  <div class="day-detail" *ngIf="selectedDay">
+    <div class="day-detail-header">
+      <span class="day-detail-label">{{ selectedDayLabel }}</span>
+      <span class="day-total-h" *ngIf="selectedDayBloques.length">
+        <i class="fa fa-clock-o"></i> {{ totalHorasHoy() }}h trabajadas
+      </span>
+    </div>
+
+    <!-- Timeline visual -->
+    <div class="timeline-wrap" *ngIf="selectedDayBloques.length">
+      <div class="timeline-hours">
+        <div class="hour-label" *ngFor="let h of HOURS">{{ h }}:00</div>
+      </div>
+      <div class="timeline-track">
+        <div class="hour-line" *ngFor="let h of HOURS"></div>
+        <div class="tl-block"
+             *ngFor="let b of selectedDayBloques"
+             [style.top.%]="getBlockTop(b)"
+             [style.height.%]="getBlockHeight(b)"
+             [style.background]="b.color + '22'"
+             [style.border-left-color]="b.color"
+             (click)="goTask(b.tarea_id)">
+          <span class="tl-name">{{ b.tarea }}</span>
+          <span class="tl-time">{{ b.hora_inicio }}–{{ b.hora_fin }}</span>
+          <span class="tl-proj">{{ b.proyecto }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Task list for day -->
+    <div class="day-tasks">
+      <div class="day-task-item" *ngFor="let b of selectedDayBloques" (click)="goTask(b.tarea_id)">
+        <div class="dt-color-bar" [style.background]="b.color"></div>
+        <div class="dt-info">
+          <span class="dt-name">{{ b.tarea }}</span>
+          <span class="dt-proj">{{ b.proyecto }}</span>
+          <span class="dt-time"><i class="fa fa-clock-o"></i> {{ b.hora_inicio }} – {{ b.hora_fin }}</span>
+        </div>
+        <i class="fa fa-chevron-right dt-arrow"></i>
+      </div>
+    </div>
+
+    <div class="op-empty" *ngIf="!selectedDayBloques.length">
+      <i class="fa fa-sun-o"></i>
+      <p>Día libre — sin tareas asignadas</p>
+    </div>
+  </div>
+
+</div>
+

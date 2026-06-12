@@ -1,0 +1,285 @@
+<div class="op-task-detail" *ngIf="task; else notFound">
+
+  <!-- ── Back + título ──────────────────────────────────────────────────── -->
+  <div class="td-header">
+    <button class="back-btn" (click)="back()"><i class="fa fa-arrow-left"></i></button>
+    <div class="td-title-block">
+      <h2>{{ task.nombre }}</h2>
+      <div class="td-meta-row">
+        <span class="td-project"><i class="fa fa-briefcase"></i> {{ task.proyecto }}</span>
+        <span class="estado-badge" [ngClass]="estadoBadge(task.estado)">{{ estadoLabel(task.estado) }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Alerta de acción principal ────────────────────────────────────── -->
+
+  <!-- Iniciar tarea -->
+  <div class="action-banner banner-start" *ngIf="canStart">
+    <div class="banner-text">
+      <i class="fa fa-play-circle"></i>
+      <div>
+        <strong>¿Listo para empezar?</strong>
+        <p>Toca el botón para registrar tu hora de inicio.</p>
+      </div>
+    </div>
+    <button class="banner-btn btn-start" (click)="iniciarTarea()" [disabled]="submitting">
+      <i class="fa" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-play'"></i>
+      {{ submitting ? 'Registrando...' : 'Iniciar tarea' }}
+    </button>
+  </div>
+
+  <!-- En progreso: recordatorio de evidencia -->
+  <div class="action-banner banner-progress" *ngIf="isInProgress">
+    <div class="banner-text">
+      <i class="fa fa-clock-o"></i>
+      <div>
+        <strong>Tarea en curso</strong>
+        <p>Inicio: {{ formatDateTime(task.inicio_real) }}</p>
+      </div>
+    </div>
+    <button class="banner-btn btn-evidence" (click)="activeTab='evidencias'; showEvidForm=true">
+      <i class="fa fa-camera"></i> Subir evidencia
+    </button>
+  </div>
+
+  <!-- En revisión / rechazada -->
+  <div class="action-banner banner-review" *ngIf="isCompleted && !hasRejected">
+    <i class="fa fa-hourglass-half"></i>
+    <div>
+      <strong>Esperando revisión</strong>
+      <p>Tu evidencia fue enviada al coordinador. Fin: {{ formatDateTime(task.fin_real) }}</p>
+    </div>
+  </div>
+
+  <div class="action-banner banner-rejected" *ngIf="hasRejected && isCompleted">
+    <div class="banner-text">
+      <i class="fa fa-exclamation-circle"></i>
+      <div>
+        <strong>Evidencia rechazada</strong>
+        <p>El coordinador solicitó una nueva evidencia.</p>
+      </div>
+    </div>
+    <button class="banner-btn btn-retry" (click)="reintentar()">
+      <i class="fa fa-refresh"></i> Reintentar
+    </button>
+  </div>
+
+  <!-- ── Tabs ────────────────────────────────────────────────────────────── -->
+  <div class="td-tabs">
+    <button class="td-tab" [class.tab-active]="activeTab==='info'" (click)="activeTab='info'">
+      <i class="fa fa-info-circle"></i> Tarea
+    </button>
+    <button class="td-tab" [class.tab-active]="activeTab==='evidencias'" (click)="activeTab='evidencias'">
+      <i class="fa fa-camera"></i> Evidencias
+      <span class="tab-count" *ngIf="pendingEvidencias">{{ pendingEvidencias }}</span>
+    </button>
+    <button class="td-tab" [class.tab-active]="activeTab==='horas'" (click)="activeTab='horas'">
+      <i class="fa fa-clock-o"></i> Mis horas
+    </button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Tab: INFO ─────────────────────────────────────────────────────────── -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-body" *ngIf="activeTab==='info'">
+
+    <!-- Contexto de fase -->
+    <div class="info-card fase-context">
+      <div class="fase-ctx-header">
+        <i class="fa fa-sitemap"></i>
+        <span>Fase: <strong>{{ task.fase }}</strong></span>
+      </div>
+      <div class="fase-ctx-detail">
+        <span><i class="fa fa-calendar-o"></i> {{ task.fecha_inicio }} → {{ task.fecha_fin }}</span>
+        <span><i class="fa fa-clock-o"></i> Horario: {{ task.hora_inicio }} – {{ task.hora_fin }}</span>
+        <span *ngFor="let m of task.maquinaria"><i class="fa fa-cog"></i> {{ m.nombre }}</span>
+      </div>
+    </div>
+
+    <!-- Descripción -->
+    <div class="info-card">
+      <div class="info-card-title"><i class="fa fa-align-left"></i> Descripción</div>
+      <p class="info-text">{{ task.descripcion }}</p>
+    </div>
+
+    <!-- Instrucciones del coordinador -->
+    <div class="info-card instruc-card">
+      <div class="info-card-title"><i class="fa fa-bullhorn"></i> Instrucciones del coordinador</div>
+      <p class="info-text">{{ task.instrucciones || 'Sin instrucciones adicionales.' }}</p>
+    </div>
+
+    <!-- Tiempos registrados -->
+    <div class="info-card times-card">
+      <div class="info-card-title"><i class="fa fa-history"></i> Tiempos registrados</div>
+      <div class="times-row">
+        <div class="time-item">
+          <span class="time-label">Inicio real</span>
+          <span class="time-val time-start">{{ formatDateTime(task.inicio_real) }}</span>
+        </div>
+        <div class="time-divider"><i class="fa fa-arrow-right"></i></div>
+        <div class="time-item">
+          <span class="time-label">Finalización</span>
+          <span class="time-val time-end">{{ formatDateTime(task.fin_real) }}</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Tab: EVIDENCIAS ───────────────────────────────────────────────────── -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-body" *ngIf="activeTab==='evidencias'">
+
+    <!-- Formulario de subida -->
+    <div class="upload-form" *ngIf="showEvidForm">
+      <div class="upload-form-title">
+        <i class="fa fa-camera"></i>
+        {{ hasRejected ? 'Nueva evidencia (reintento)' : 'Subir evidencia de avance' }}
+      </div>
+
+      <label class="upload-zone" [class.has-preview]="evPreview">
+        <input type="file" accept="image/*" capture="environment" (change)="onFileChange($event)" hidden>
+        <ng-container *ngIf="!evPreview">
+          <i class="fa fa-camera" style="font-size:2rem;color:var(--text-muted)"></i>
+          <span class="upload-hint">Toca para tomar foto</span>
+          <span class="upload-hint-sub">o seleccionar desde galería</span>
+        </ng-container>
+        <img *ngIf="evPreview" [src]="evPreview" class="ev-preview-img">
+      </label>
+
+      <textarea class="ev-input" [(ngModel)]="evDescripcion"
+                placeholder="Describe lo que muestra la foto (ej: 'Corte terminado del bloque A')..."
+                rows="3"></textarea>
+
+      <div class="upload-actions">
+        <button class="btn-cancel-upload" (click)="showEvidForm=false">Cancelar</button>
+        <button class="btn-submit-ev" (click)="submitEvidencia()"
+                [disabled]="submitting || !evDescripcion.trim()">
+          <i class="fa" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+          {{ submitting ? 'Enviando...' : 'Enviar y marcar completada' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Botón abrir form (si no está abierto y tarea en progreso) -->
+    <button class="btn-add-evidence" *ngIf="!showEvidForm && (isInProgress || hasRejected)"
+            (click)="showEvidForm=true">
+      <i class="fa fa-camera"></i>
+      {{ hasRejected ? 'Reintentar evidencia' : 'Agregar evidencia' }}
+    </button>
+
+    <!-- Lista de evidencias -->
+    <div class="ev-list" *ngIf="task.evidencias.length; else noEv">
+      <div class="ev-card" *ngFor="let e of task.evidencias">
+        <img [src]="e.url" class="ev-img" [alt]="e.descripcion">
+        <div class="ev-info">
+          <div class="ev-top">
+            <span class="ev-desc">{{ e.descripcion }}</span>
+            <span class="ev-estado" [ngClass]="'ev-'+e.estado">
+              <i class="fa" [ngClass]="e.estado==='aprobada' ? 'fa-check-circle' : e.estado==='rechazada' ? 'fa-times-circle' : 'fa-clock-o'"></i>
+              {{ evEstadoLabel(e.estado) }}
+            </span>
+          </div>
+          <span class="ev-date"><i class="fa fa-calendar-o"></i> {{ e.fecha }} · {{ e.hora }}</span>
+          <div class="ev-rechazo-msg" *ngIf="e.motivo_rechazo">
+            <i class="fa fa-exclamation-triangle"></i> {{ e.motivo_rechazo }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #noEv>
+      <div class="empty-tab">
+        <i class="fa fa-camera"></i>
+        <p>Aún no hay evidencias subidas.</p>
+        <small *ngIf="isInProgress">Inicia la tarea y luego sube una foto de avance.</small>
+      </div>
+    </ng-template>
+
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <!-- Tab: HORAS ────────────────────────────────────────────────────────── -->
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="tab-body" *ngIf="activeTab==='horas'">
+
+    <div class="horas-header-card">
+      <div class="horas-total">
+        <span class="horas-num">{{ totalHoras }}h</span>
+        <span class="horas-lbl">registradas en esta tarea</span>
+      </div>
+      <button class="btn-add-horas" (click)="showHoraForm=!showHoraForm">
+        <i class="fa" [ngClass]="showHoraForm ? 'fa-minus' : 'fa-plus'"></i>
+        {{ showHoraForm ? 'Cancelar' : 'Registrar horas' }}
+      </button>
+    </div>
+
+    <!-- Formulario horas -->
+    <div class="hora-form" *ngIf="showHoraForm">
+      <div class="hora-form-title"><i class="fa fa-pencil"></i> Nuevo registro</div>
+
+      <div class="field-row">
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" [(ngModel)]="horaForm.fecha">
+        </div>
+      </div>
+      <div class="field-row field-row-2">
+        <div class="field">
+          <label>Hora inicio</label>
+          <input type="time" [(ngModel)]="horaForm.hora_inicio">
+        </div>
+        <div class="field">
+          <label>Hora fin</label>
+          <input type="time" [(ngModel)]="horaForm.hora_fin">
+        </div>
+      </div>
+      <div class="duracion-chip"><i class="fa fa-clock-o"></i> Duración: {{ horasDuracion }}</div>
+      <div class="field">
+        <label>¿Qué hiciste?</label>
+        <textarea [(ngModel)]="horaForm.actividad"
+                  placeholder="Ej: Calibración de CNC y corte del primer bloque..."
+                  rows="3"></textarea>
+      </div>
+      <button class="btn-save-horas" (click)="submitHoras()" [disabled]="savingHora || !horaForm.actividad.trim()">
+        <i class="fa" [ngClass]="savingHora ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+        {{ savingHora ? 'Guardando...' : 'Guardar registro' }}
+      </button>
+    </div>
+
+    <!-- Lista registros -->
+    <div class="registro-list" *ngIf="task.registros.length; else noReg">
+      <div class="registro-card" *ngFor="let r of task.registros">
+        <div class="reg-left">
+          <span class="reg-h-big">{{ r.horas % 1 === 0 ? r.horas : r.horas.toFixed(1) }}h</span>
+        </div>
+        <div class="reg-right">
+          <div class="reg-time-row">
+            <span class="reg-date">{{ r.fecha }}</span>
+            <span class="reg-range">{{ r.hora_inicio }} – {{ r.hora_fin }}</span>
+          </div>
+          <p class="reg-actividad">{{ r.actividad }}</p>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #noReg>
+      <div class="empty-tab">
+        <i class="fa fa-clock-o"></i>
+        <p>Aún no tienes horas registradas.</p>
+      </div>
+    </ng-template>
+
+  </div>
+
+</div>
+
+<ng-template #notFound>
+  <div class="not-found">
+    <i class="fa fa-exclamation-circle"></i>
+    <p>Tarea no encontrada</p>
+    <button (click)="back()">Volver</button>
+  </div>
+</ng-template>

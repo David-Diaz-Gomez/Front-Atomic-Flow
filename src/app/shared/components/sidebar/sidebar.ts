@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { Api } from '../../../core/services/api';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -13,7 +14,7 @@ export class Sidebar implements OnInit {
   currentUser: any = null;
   isMenuOpen = false; // 👈 Lo único nuevo
 
-  constructor(private apiService: Api, private router: Router) {}
+  constructor(private apiService: Api, private router: Router, private notifSvc: NotificationService) {}
 
   ngOnInit(): void {
   this.loadSidebarData();
@@ -39,6 +40,7 @@ loadSidebarData() {
   }
 
   logout() {
+    this.notifSvc.disconnect();
     localStorage.removeItem('currentUser');
     this.router.navigate(['/auth/login']);
   }

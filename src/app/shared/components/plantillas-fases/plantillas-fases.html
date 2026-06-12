@@ -1,0 +1,178 @@
+<div class="pf-wrap">
+
+  <!-- HEADER -->
+  <div class="pf-header">
+    <div class="pf-header__left">
+      <button class="back-btn" *ngIf="step === 'edit'" (click)="volver()">
+        <i class="fa fa-arrow-left"></i>
+      </button>
+      <div>
+        <h1><i class="fa fa-clone"></i> Plantillas de Fases</h1>
+        <span class="pf-sub">Proyecto #{{ proyectoId }}</span>
+      </div>
+    </div>
+    <div class="pf-step-indicator">
+      <span [class.active]="step === 'select'">1. Elegir plantilla</span>
+      <i class="fa fa-chevron-right"></i>
+      <span [class.active]="step === 'edit'">2. Revisar y enviar</span>
+    </div>
+  </div>
+
+  <!-- ══ STEP 1: SELECT ══════════════════════════════════════════════════════ -->
+  <div class="pf-body" *ngIf="step === 'select'">
+
+    <div class="pf-loading" *ngIf="isLoading">
+      <i class="fa fa-spinner fa-spin"></i> Cargando plantillas...
+    </div>
+
+    <div class="pf-cards" *ngIf="!isLoading">
+
+      <div class="pf-card" *ngFor="let p of plantillas" (click)="selectPlantilla(p)">
+        <div class="pf-card__icon"><i class="fa fa-clone"></i></div>
+        <div class="pf-card__body">
+          <h3>{{ p.nombre }}</h3>
+          <p>{{ p.descripcion }}</p>
+          <div class="pf-card__stats">
+            <span><i class="fa fa-code-fork"></i> {{ p.fases.length }} fases</span>
+            <span><i class="fa fa-tasks"></i> {{ countTareas(p) }} tareas</span>
+          </div>
+        </div>
+        <div class="pf-card__arrow"><i class="fa fa-arrow-right"></i></div>
+      </div>
+
+      <div class="pf-card pf-card--manual" (click)="sinPlantilla()">
+        <div class="pf-card__icon"><i class="fa fa-pencil"></i></div>
+        <div class="pf-card__body">
+          <h3>Crear manualmente</h3>
+          <p>Registra fases y tareas una por una sin usar una plantilla.</p>
+        </div>
+        <div class="pf-card__arrow"><i class="fa fa-arrow-right"></i></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ STEP 2: EDIT ════════════════════════════════════════════════════════ -->
+  <div class="pf-body pf-body--edit" *ngIf="step === 'edit'">
+
+    <div class="edit-summary">
+      <span *ngIf="selectedPlantilla">
+        <i class="fa fa-clone"></i> Plantilla: <strong>{{ selectedPlantilla.nombre }}</strong>
+      </span>
+      <span *ngIf="!selectedPlantilla"><i class="fa fa-pencil"></i> Creación manual</span>
+      <span><i class="fa fa-code-fork"></i> {{ fases.length }} fases · {{ totalTareas }} tareas</span>
+    </div>
+
+    <div class="fase-list">
+      <div class="fase-block" *ngFor="let f of fases; let fi = index"
+           [class.fase-block--error]="!!faseError(f)">
+
+        <!-- Fase header row -->
+        <div class="fase-header">
+          <button class="fase-toggle" (click)="f.expanded = !f.expanded">
+            <i class="fa" [ngClass]="f.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+          </button>
+          <div class="fase-fields">
+            <input type="text" [(ngModel)]="f.nombre" placeholder="Nombre de la fase *"
+                   class="fase-nombre-input">
+            <input type="date" [(ngModel)]="f.fecha_inicio" class="fase-date-input"
+                   [min]="proyectoFechaInicio" [max]="proyectoFechaFin || f.fecha_fin">
+            <span class="date-sep">→</span>
+            <input type="date" [(ngModel)]="f.fecha_fin" class="fase-date-input"
+                   [min]="f.fecha_inicio || proyectoFechaInicio" [max]="proyectoFechaFin">
+          </div>
+          <span class="fase-count">{{ f.tareas.length }} tarea(s)</span>
+          <button class="fase-remove-btn" (click)="removeFase(fi)" title="Eliminar fase">
+            <i class="fa fa-trash"></i>
+          </button>
+        </div>
+
+        <!-- Fase validation error -->
+        <div class="row-error" *ngIf="faseError(f)">
+          <i class="fa fa-exclamation-triangle"></i> {{ faseError(f) }}
+        </div>
+
+        <!-- Expanded content -->
+        <div class="fase-expanded" *ngIf="f.expanded">
+
+          <!-- Fase description -->
+          <div class="fase-desc-row">
+            <textarea [(ngModel)]="f.descripcion"
+                      placeholder="Descripción de la fase (opcional)"
+                      class="fase-desc" rows="2"></textarea>
+          </div>
+
+          <!-- Tarea list -->
+          <div class="tarea-list" *ngIf="f.tareas.length">
+            <div class="tarea-block" *ngFor="let t of f.tareas; let ti = index"
+                 [class.tarea-block--error]="!!tareaError(f, t)">
+
+              <!-- Tarea main row -->
+              <div class="tarea-row__main">
+                <input type="text" [(ngModel)]="t.nombre" placeholder="Nombre de la tarea *"
+                       class="t-nombre">
+                <input type="date" [(ngModel)]="t.fecha_inicio" class="t-date"
+                       [min]="f.fecha_inicio" [max]="f.fecha_fin || t.fecha_fin">
+                <span class="date-sep">→</span>
+                <input type="date" [(ngModel)]="t.fecha_fin" class="t-date"
+                       [min]="t.fecha_inicio || f.fecha_inicio" [max]="f.fecha_fin">
+                <input type="time" [(ngModel)]="t.hora_inicio" class="t-time">
+                <span class="date-sep">–</span>
+                <input type="time" [(ngModel)]="t.hora_fin" class="t-time">
+                <select [(ngModel)]="t.tipo_tarea" class="t-tipo-select">
+                  <option value="">— Tipo —</option>
+                  <option *ngFor="let tp of tiposTarea" [value]="tp">{{ tp }}</option>
+                </select>
+                <button class="tarea-remove-btn" (click)="removeTarea(f, ti)" title="Eliminar tarea">
+                  <i class="fa fa-times"></i>
+                </button>
+              </div>
+
+              <!-- Tarea validation error -->
+              <div class="row-error row-error--sm" *ngIf="tareaError(f, t)">
+                <i class="fa fa-exclamation-triangle"></i> {{ tareaError(f, t) }}
+              </div>
+
+              <!-- Tarea description -->
+              <div class="tarea-row__desc">
+                <textarea [(ngModel)]="t.descripcion"
+                          placeholder="Descripción / instrucciones de la tarea (opcional)"
+                          class="t-desc" rows="2"></textarea>
+              </div>
+
+            </div>
+          </div>
+
+          <button class="btn-add-tarea" (click)="addTarea(f)">
+            <i class="fa fa-plus"></i> Agregar tarea
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+
+    <button class="btn-add-fase" (click)="addFase()">
+      <i class="fa fa-plus-circle"></i> Agregar fase
+    </button>
+
+    <!-- Submit bar -->
+    <div class="submit-bar">
+      <button class="btn-volver" (click)="volver()">
+        <i class="fa fa-arrow-left"></i> Volver
+      </button>
+      <span class="submit-error" *ngIf="hasErrors">
+        <i class="fa fa-exclamation-triangle"></i>
+        Corrige los errores antes de guardar
+      </span>
+      <button class="btn-submit"
+              [disabled]="!canSubmit() || isSubmitting"
+              (click)="submit()">
+        <i class="fa fa-save"></i>
+        {{ isSubmitting ? 'Guardando...' : 'Crear ' + fases.length + ' fases y ' + totalTareas + ' tareas' }}
+      </button>
+    </div>
+
+  </div>
+
+</div>

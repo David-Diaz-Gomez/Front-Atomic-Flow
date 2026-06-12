@@ -1,0 +1,687 @@
+<div class="form-page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <button class="btn-back" (click)="cancel()"><i class="fa fa-arrow-left"></i></button>
+    <div class="header-text">
+      <h1>{{ pageTitle }}</h1>
+      <span class="subtitle">Presupuesto completo por secciones</span>
+    </div>
+  </div>
+
+  <!-- Section tabs -->
+  <div class="section-tabs">
+    <button *ngFor="let s of SECTIONS"
+            class="stab" [class.active]="activeSection === s"
+            [class.completed]="isCompleted(s)"
+            (click)="setSection(s)">
+      <i class="fa" [ngClass]="isCompleted(s) ? 'fa-check-circle' : SECTION_ICONS[s]"></i>
+      <span>{{ SECTION_LABELS[s] }}</span>
+    </button>
+  </div>
+
+  <!-- ══ GENERAL ══ -->
+  <div class="section-body" *ngIf="activeSection === 'general'">
+    <div class="form-section">
+      <h2 class="section-title"><i class="fa fa-info-circle"></i> Información General</h2>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>Nombre del Proyecto *</label>
+          <input type="text" [(ngModel)]="form.nombre" placeholder="Ej: Cocina integral Suerox">
+        </div>
+        <div class="form-group full-width">
+          <label>Descripción</label>
+          <textarea [(ngModel)]="form.descripcion" rows="2" placeholder="Descripción breve..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Centro de Costos</label>
+          <input type="text" [(ngModel)]="form.centro_costos" placeholder="CC-2860">
+        </div>
+        <div class="form-group">
+          <label>Fecha de Inicio *</label>
+          <input type="date" [(ngModel)]="form.fecha_inicio">
+        </div>
+        <div class="form-group">
+          <label>Fecha de Fin *</label>
+          <input type="date" [(ngModel)]="form.fecha_fin">
+        </div>
+        <!-- Cliente + botón crear nuevo -->
+        <div class="form-group">
+          <label>Cliente</label>
+          <div class="client-select-row">
+            <select [(ngModel)]="form.id_cliente" class="client-select">
+              <option [ngValue]="null" disabled>Seleccionar cliente...</option>
+              <option *ngFor="let c of clients" [ngValue]="c.id">{{ c.razon_social }}</option>
+            </select>
+            <button type="button" class="btn-new-client" (click)="openClientModal()" title="Registrar nuevo cliente">
+              <i class="fa fa-plus"></i> Nuevo
+            </button>
+          </div>
+        </div>
+
+        <!-- Director de Revisión -->
+        <div class="form-group">
+          <label>Director de Revisión</label>
+          <select [(ngModel)]="form.id_director_revision">
+            <option [ngValue]="null">Sin director de revisión</option>
+            <option *ngFor="let d of directors" [ngValue]="d.id">{{ d.nombre }} {{ d.apellido }}</option>
+          </select>
+        </div>
+
+        <!-- Links externos -->
+        <div class="form-group">
+          <label><i class="fa fa-image" style="color:var(--atomo-green-dark);margin-right:5px"></i> Imagen del Proyecto</label>
+          <div class="image-upload-area">
+            <img *ngIf="imagePreviewUrl || currentLinkImagen"
+                 [src]="imagePreviewUrl || currentLinkImagen"
+                 class="image-preview"
+                 (error)="$any($event.target).style.display='none'">
+            <label class="btn-upload-img">
+              <i class="fa fa-upload"></i>
+              {{ (imagePreviewUrl || currentLinkImagen) ? 'Cambiar imagen' : 'Seleccionar imagen' }}
+              <input type="file" accept="image/*" (change)="onImageSelected($event)" style="display:none">
+            </label>
+            <span *ngIf="selectedImageFile" class="img-filename">{{ selectedImageFile.name }}</span>
+          </div>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-trello" style="color:#0079bf;margin-right:5px"></i> Link de Trello</label>
+          <input type="url" [(ngModel)]="form.link_trello" placeholder="https://trello.com/b/xxxxxxx/nombre-tablero">
+        </div>
+      </div>
+    </div>
+
+    <!-- Muebles del proyecto -->
+    <div class="form-section">
+      <div class="muebles-header">
+        <h2 class="section-title" style="margin:0;border:none;padding:0">
+          <i class="fa fa-th-large"></i> Muebles del Proyecto
+          <span class="muebles-hint">Los ítems de presupuesto se vincularán a un mueble (opcional)</span>
+        </h2>
+        <button class="btn-add-mueble" (click)="openMuebleModal()">
+          <i class="fa fa-plus"></i> Agregar mueble
+        </button>
+      </div>
+      <div class="muebles-list" *ngIf="muebles.length">
+        <div class="mueble-chip" *ngFor="let m of muebles">
+          <i class="fa fa-th-large"></i>
+          <span class="mueble-nombre">{{ m.nombre }}</span>
+          <span class="mueble-fecha">hasta {{ m.fecha_fin }}</span>
+          <button class="mueble-edit" (click)="openMuebleModal(m)" title="Editar"><i class="fa fa-pencil"></i></button>
+          <button class="mueble-rm" (click)="removeMueble(m.tempId)" title="Eliminar"><i class="fa fa-times"></i></button>
+        </div>
+      </div>
+      <p class="muebles-empty" *ngIf="!muebles.length">
+        <i class="fa fa-info-circle"></i> Sin muebles — puedes igualmente ingresar ítems sin asociar a un mueble.
+      </p>
+    </div>
+
+    <!-- Conflict check -->
+    <div class="form-section">
+      <h2 class="section-title"><i class="fa fa-shield"></i> Validación de Disponibilidad</h2>
+      <button class="btn-check-conflicts" (click)="checkConflicts()" [disabled]="checkingConflicts">
+        <i class="fa" [ngClass]="checkingConflicts ? 'fa-spinner fa-spin' : 'fa-search'"></i>
+        {{ checkingConflicts ? 'Verificando...' : 'Verificar disponibilidad de recursos' }}
+      </button>
+
+      <!-- OK -->
+      <div class="conflict-ok" *ngIf="conflictResult?.viable">
+        <div class="conflict-header"><i class="fa fa-check-circle"></i> Fechas disponibles</div>
+        <div class="occ-bars">
+          <div class="occ-bar-row" *ngFor="let m of conflictResult!.maquinas">
+            <span class="occ-name">{{ m.nombre }}</span>
+            <div class="occ-track"><div class="occ-fill" [ngClass]="occ_class(m)" [style.width.%]="m.porcentaje"></div></div>
+            <span class="occ-pct">{{ m.porcentaje }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Conflict -->
+      <div class="conflict-warn" *ngIf="conflictResult && !conflictResult.viable">
+        <div class="conflict-header">
+          <i class="fa fa-exclamation-triangle"></i>
+          Ocupación demasiado alta — {{ conflictResult.ocupacion_maxima }}% en algunas máquinas
+        </div>
+        <div class="occ-bars">
+          <div class="occ-bar-row" *ngFor="let m of conflictResult.maquinas">
+            <span class="occ-name">{{ m.nombre }}</span>
+            <div class="occ-track">
+              <div class="occ-fill" [ngClass]="occ_class(m)" [style.width.%]="m.porcentaje"></div>
+            </div>
+            <span class="occ-pct" [ngClass]="occ_class(m)">{{ m.porcentaje }}%
+              <i class="fa fa-warning" *ngIf="m.estado === 'saturada'"></i>
+            </span>
+          </div>
+        </div>
+
+        <div class="conflict-items">
+          <p class="conflict-sub">Conflictos detectados:</p>
+          <ul>
+            <li *ngFor="let c of conflictResult.conflictos">
+              <i class="fa fa-times-circle"></i>
+              <strong>{{ c.recurso_nombre }}</strong> ocupada por {{ c.proyecto_nombre }}
+              ({{ c.ocupado_desde }} al {{ c.ocupado_hasta }})
+            </li>
+          </ul>
+        </div>
+
+        <div class="conflict-suggestions">
+          <p class="conflict-sub">Sugerencias de fechas alternativas:</p>
+          <div class="suggestion-card" *ngFor="let s of conflictResult.sugerencias" [ngClass]="viab_class(s)">
+            <div class="sugg-left">
+              <i class="fa" [ngClass]="viab_icon(s)"></i>
+              <div>
+                <strong>{{ formatDate(s.fecha_inicio) }} — {{ formatDate(s.fecha_fin) }}</strong>
+                <span>Ocupación máx: {{ s.ocupacion_max }}% •
+                  {{ s.viabilidad === 'optima' ? 'Sin conflictos' : s.viabilidad === 'alta' ? 'Muy viable' : 'Viable' }}
+                </span>
+              </div>
+            </div>
+            <button class="btn-apply-sugg" (click)="applySuggestion(s)">Aplicar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-nav">
+      <button class="btn-cancel" (click)="cancel()"><i class="fa fa-times"></i> Cancelar</button>
+      <div class="next-with-msg">
+        <p class="conflict-block-msg" *ngIf="conflictResult !== null && !conflictResult.viable">
+          <i class="fa fa-exclamation-circle"></i> Resuelve los conflictos antes de continuar
+        </p>
+        <button class="btn-next"
+                (click)="setSection('materia_prima')"
+                [disabled]="conflictResult !== null && !conflictResult.viable">
+          Siguiente: Materia Prima <i class="fa fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MATERIA PRIMA ══ -->
+  <div class="section-body" *ngIf="activeSection === 'materia_prima'">
+    <div class="form-section">
+      <div class="section-title-row">
+        <h2 class="section-title"><i class="fa fa-cubes"></i> Materia Prima</h2>
+        <span class="section-total">Total: {{ formatCOP(sectionTotal('materia_prima')) }}</span>
+      </div>
+      <div class="budget-table-wrap">
+        <table class="budget-table">
+          <thead><tr>
+            <th class="col-mueble">Mueble</th>
+            <th class="col-desc">Descripción del recurso</th>
+            <th class="col-obs">Observaciones (presentación física)</th>
+            <th class="col-price">Precio / Unidad</th>
+            <th class="col-qty">Cant.</th>
+            <th class="col-total">V/Uni (Total)</th>
+            <th class="col-del"></th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let r of budget.materia_prima">
+              <td><select class="mueble-sel" [(ngModel)]="r.id_mueble">
+                <option [ngValue]="null">—</option>
+                <option *ngFor="let m of muebles" [ngValue]="m.tempId">{{ m.nombre }}</option>
+              </select></td>
+              <td>
+                <div class="sugg-wrap">
+                  <input type="text" [ngModel]="r.nombre"
+                         (ngModelChange)="r.nombre = $event; searchRecurso(r, 'materia_prima')"
+                         (focus)="positionSugg($event)" (blur)="hideSugg(r)"
+                         placeholder="Ej: Lámina de MDF 12mm">
+                  <div class="sugg-drop" *ngIf="r._showSugg"
+                       [style.top.px]="suggPos.top" [style.left.px]="suggPos.left" [style.width.px]="suggPos.width">
+                    <div class="sugg-searching" *ngIf="r._searching"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>
+                    <ng-container *ngIf="!r._searching">
+                      <div class="sugg-item" *ngFor="let s of r._sugg" (mousedown)="selectSugerencia(r, s)">
+                        <i class="fa fa-check-circle sugg-icon"></i> {{ s.nombre }}
+                      </div>
+                      <div class="sugg-empty" *ngIf="!r._sugg?.length">
+                        <i class="fa fa-plus-circle"></i> Nuevo: <strong>{{ r.nombre }}</strong> (se creará al guardar)
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </td>
+              <td><input type="text" [(ngModel)]="r.observaciones" placeholder="5,5mm de 183x244"></td>
+              <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
+              <td><button class="btn-del-row" (click)="removeResourceRow('materia_prima', r.id)"><i class="fa fa-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="btn-add-row" (click)="addResourceRow('materia_prima')"><i class="fa fa-plus"></i> Agregar ítem</button>
+    </div>
+    <div class="section-nav">
+      <button class="btn-prev" (click)="setSection('general')"><i class="fa fa-arrow-left"></i> Anterior</button>
+      <button class="btn-next" (click)="setSection('proveedores')">Siguiente: Proveedores <i class="fa fa-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ══ PROVEEDORES ══ -->
+  <div class="section-body" *ngIf="activeSection === 'proveedores'">
+    <div class="form-section">
+      <div class="section-title-row">
+        <h2 class="section-title"><i class="fa fa-truck"></i> Proveedores</h2>
+        <span class="section-total">Total: {{ formatCOP(sectionTotal('proveedores')) }}</span>
+      </div>
+      <div class="budget-table-wrap">
+        <table class="budget-table">
+          <thead><tr>
+            <th class="col-mueble">Mueble</th>
+            <th class="col-desc">Descripción</th>
+            <th class="col-obs">Observaciones</th>
+            <th class="col-price">Precio / Unidad</th>
+            <th class="col-qty">Cant.</th>
+            <th class="col-total">Total</th>
+            <th class="col-del"></th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let r of budget.proveedores">
+              <td><select class="mueble-sel" [(ngModel)]="r.id_mueble">
+                <option [ngValue]="null">—</option>
+                <option *ngFor="let m of muebles" [ngValue]="m.tempId">{{ m.nombre }}</option>
+              </select></td>
+              <td>
+                <div class="sugg-wrap">
+                  <input type="text" [ngModel]="r.nombre"
+                         (ngModelChange)="r.nombre = $event; searchRecurso(r, 'proveedores')"
+                         (focus)="positionSugg($event)" (blur)="hideSugg(r)"
+                         placeholder="Ej: Estructura metálica blanca">
+                  <div class="sugg-drop" *ngIf="r._showSugg"
+                       [style.top.px]="suggPos.top" [style.left.px]="suggPos.left" [style.width.px]="suggPos.width">
+                    <div class="sugg-searching" *ngIf="r._searching"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>
+                    <ng-container *ngIf="!r._searching">
+                      <div class="sugg-item" *ngFor="let s of r._sugg" (mousedown)="selectSugerencia(r, s)">
+                        <i class="fa fa-check-circle sugg-icon"></i> {{ s.nombre }}
+                      </div>
+                      <div class="sugg-empty" *ngIf="!r._sugg?.length">
+                        <i class="fa fa-plus-circle"></i> Nuevo: <strong>{{ r.nombre }}</strong> (se creará al guardar)
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </td>
+              <td><input type="text" [(ngModel)]="r.observaciones" placeholder="Notas del proveedor"></td>
+              <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
+              <td><button class="btn-del-row" (click)="removeResourceRow('proveedores', r.id)"><i class="fa fa-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="btn-add-row" (click)="addResourceRow('proveedores')"><i class="fa fa-plus"></i> Agregar proveedor</button>
+    </div>
+    <div class="section-nav">
+      <button class="btn-prev" (click)="setSection('materia_prima')"><i class="fa fa-arrow-left"></i> Anterior</button>
+      <button class="btn-next" (click)="setSection('carpinteria')">Siguiente: Carpintería <i class="fa fa-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ══ CARPINTERÍA ══ -->
+  <div class="section-body" *ngIf="activeSection === 'carpinteria'">
+    <div class="form-section">
+      <div class="section-title-row">
+        <h2 class="section-title"><i class="fa fa-wrench"></i> Carpintería</h2>
+        <span class="section-total">Total: {{ formatCOP(sectionTotal('carpinteria')) }}</span>
+      </div>
+      <p class="section-hint">Especifique el tipo de material, dimensiones y precio de cada ítem de carpintería.</p>
+      <div class="budget-table-wrap">
+        <div class="table-scroll">
+        <table class="budget-table carp-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="col-mueble">Mueble</th>
+              <th rowspan="2" class="col-desc">Descripción</th>
+              <th rowspan="2">Cant.</th>
+              <th colspan="9" class="group-header">Material</th>
+              <th colspan="3" class="group-header">Dimensiones (cm)</th>
+              <th rowspan="2" class="col-price">Precio/u</th>
+              <th rowspan="2" class="col-total">Total</th>
+              <th rowspan="2" class="col-del"></th>
+            </tr>
+            <tr>
+              <th>Lam.</th><th>MDF</th><th>Mad.</th><th>Ench.</th><th>Form.</th>
+              <th>Chap.</th><th>Tap.</th><th>P.Cat</th><th>P.PU</th>
+              <th>Ancho</th><th>Alto</th><th>Fondo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of budget.carpinteria">
+              <td><select class="mueble-sel" [(ngModel)]="r.id_mueble">
+                <option [ngValue]="null">—</option>
+                <option *ngFor="let m of muebles" [ngValue]="m.tempId">{{ m.nombre }}</option>
+              </select></td>
+              <td>
+                <div class="sugg-wrap">
+                  <input type="text" [ngModel]="r.nombre"
+                         (ngModelChange)="r.nombre = $event; searchRecurso(r, 'carpinteria')"
+                         (focus)="positionSugg($event)" (blur)="hideSugg(r)"
+                         placeholder="Ej: Cabezote">
+                  <div class="sugg-drop" *ngIf="r._showSugg"
+                       [style.top.px]="suggPos.top" [style.left.px]="suggPos.left" [style.width.px]="suggPos.width">
+                    <div class="sugg-searching" *ngIf="r._searching"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>
+                    <ng-container *ngIf="!r._searching">
+                      <div class="sugg-item" *ngFor="let s of r._sugg" (mousedown)="selectSugerencia(r, s)">
+                        <i class="fa fa-check-circle sugg-icon"></i> {{ s.nombre }}
+                      </div>
+                      <div class="sugg-empty" *ngIf="!r._sugg?.length">
+                        <i class="fa fa-plus-circle"></i> Nuevo: <strong>{{ r.nombre }}</strong> (se creará al guardar)
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </td>
+              <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onCarpChange(r)" min="1" style="width:60px"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.laminado"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.mdf"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.madera"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.enchapado"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.formica"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.chapilla"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.tapiz"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.pintura_cat"></td>
+              <td class="check-cell"><input type="checkbox" [(ngModel)]="r.pintura_pu"></td>
+              <td><input type="number" [(ngModel)]="r.ancho" min="0" style="width:60px"></td>
+              <td><input type="number" [(ngModel)]="r.alto" min="0" style="width:60px"></td>
+              <td><input type="number" [(ngModel)]="r.fondo" min="0" style="width:60px"></td>
+              <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onCarpChange(r)" min="0" style="width:90px"></td>
+              <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
+              <td><button class="btn-del-row" (click)="removeCarpRow(r.id)"><i class="fa fa-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+        </div><!-- /table-scroll -->
+      </div><!-- /budget-table-wrap -->
+      <button class="btn-add-row" (click)="addCarpRow()"><i class="fa fa-plus"></i> Agregar ítem de carpintería</button>
+    </div>
+    <div class="section-nav">
+      <button class="btn-prev" (click)="setSection('proveedores')"><i class="fa fa-arrow-left"></i> Anterior</button>
+      <button class="btn-next" (click)="setSection('impresiones')">Siguiente: Impresiones <i class="fa fa-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ══ IMPRESIONES ══ -->
+  <div class="section-body" *ngIf="activeSection === 'impresiones'">
+    <div class="form-section">
+      <div class="section-title-row">
+        <h2 class="section-title"><i class="fa fa-print"></i> Impresiones</h2>
+        <span class="section-total">Total: {{ formatCOP(sectionTotal('impresiones')) }}</span>
+      </div>
+      <p class="section-hint">Especifique dimensiones, valores de tinta (m²), tipo de sustrato y materiales por ítem.</p>
+
+      <!-- Precios de sección editables -->
+      <div class="imp-precios">
+        <label>$ Sustrato GEN
+          <input type="number" [(ngModel)]="impPrecios.sustrato_gen" (ngModelChange)="recalcAllImp()" min="0">
+        </label>
+        <label>$ Sustrato ESP
+          <input type="number" [(ngModel)]="impPrecios.sustrato_esp" (ngModelChange)="recalcAllImp()" min="0">
+        </label>
+        <label>$ CMYK
+          <input type="number" [(ngModel)]="impPrecios.precio_cmyk" (ngModelChange)="recalcAllImp()" min="0">
+        </label>
+        <label>$ CL/W
+          <input type="number" [(ngModel)]="impPrecios.precio_clw" (ngModelChange)="recalcAllImp()" min="0">
+        </label>
+      </div>
+
+      <div class="budget-table-wrap">
+        <div class="table-scroll">
+          <table class="budget-table imp-table" style="min-width:max-content">
+            <thead>
+              <tr>
+                <th class="col-mueble">Mueble</th>
+                <th>Descripción</th>
+                <th>Proveedor</th>
+                <th>Cant.</th>
+                <th>CMYK UV</th><th>CL/W UV</th>
+                <th>Lam.M</th><th>Lam.B</th><th>Floor</th>
+                <th>PS</th><th>PP</th><th>PVC</th><th>Acr.</th><th>PET-G</th><th>Maulet</th><th>Otros</th>
+                <th>Ancho(m)</th><th>Alto(m)</th><th>Cal.</th>
+                <th>C</th><th>M</th><th>Y</th><th>K</th><th>CL</th><th>W</th>
+                <th>M²Vinilo</th>
+                <th class="col-price">Precio/u</th>
+                <th class="col-total">Total</th>
+                <th class="col-del"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let r of budget.impresiones">
+                <td><select class="mueble-sel" [(ngModel)]="r.id_mueble">
+                  <option [ngValue]="null">—</option>
+                  <option *ngFor="let m of muebles" [ngValue]="m.tempId">{{ m.nombre }}</option>
+                </select></td>
+                <td>
+                  <div class="sugg-wrap">
+                    <input type="text" [ngModel]="r.nombre"
+                           (ngModelChange)="r.nombre = $event; searchRecurso(r, 'impresiones')"
+                           (focus)="positionSugg($event)" (blur)="hideSugg(r)"
+                           placeholder="Ej: Laterales" style="min-width:110px">
+                    <div class="sugg-drop" *ngIf="r._showSugg"
+                         [style.top.px]="suggPos.top" [style.left.px]="suggPos.left" [style.width.px]="suggPos.width">
+                      <div class="sugg-searching" *ngIf="r._searching"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>
+                      <ng-container *ngIf="!r._searching">
+                        <div class="sugg-item" *ngFor="let s of r._sugg" (mousedown)="selectSugerencia(r, s)">
+                          <i class="fa fa-check-circle sugg-icon"></i> {{ s.nombre }}
+                        </div>
+                        <div class="sugg-empty" *ngIf="!r._sugg?.length">
+                          <i class="fa fa-plus-circle"></i> Nuevo: <strong>{{ r.nombre }}</strong> (se creará al guardar)
+                        </div>
+                      </ng-container>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <select [(ngModel)]="r.proveedor" (ngModelChange)="calcImpRow(r)" style="width:70px">
+                    <option value="GEN">GEN</option>
+                    <option value="ESP">ESP</option>
+                  </select>
+                </td>
+                <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="calcImpRow(r)" min="0" style="width:50px"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.cmyk_uv"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.cl_w_uv"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.laminado_mate"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.laminado_brillante"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.laminado_floor_graphic"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.poliestireno"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.polipropileno"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.pvc"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.acrilico"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.pet_g"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.maulet"></td>
+                <td class="check-cell"><input type="checkbox" [(ngModel)]="r.otros"></td>
+                <td><input type="number" [(ngModel)]="r.ancho_m" (ngModelChange)="calcImpRow(r)" step="0.01" min="0" style="width:65px"></td>
+                <td><input type="number" [(ngModel)]="r.alto_m"  (ngModelChange)="calcImpRow(r)" step="0.01" min="0" style="width:65px"></td>
+                <td><input type="number" [(ngModel)]="r.calibre" min="0" style="width:50px"></td>
+                <td><input type="number" [(ngModel)]="r.c"     (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td><input type="number" [(ngModel)]="r.m"     (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td><input type="number" [(ngModel)]="r.y"     (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td><input type="number" [(ngModel)]="r.k"     (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td><input type="number" [(ngModel)]="r.cl"    (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td><input type="number" [(ngModel)]="r.w_ink" (ngModelChange)="calcImpRow(r)" step="0.0001" min="0" style="width:55px"></td>
+                <td class="total-cell">{{ r.m2_vinilo.toFixed(4) }}</td>
+                <td class="total-cell">{{ formatCOP(r.precio_unitario) }}</td>
+                <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
+                <td><button class="btn-del-row" (click)="removeImpRow(r.id)"><i class="fa fa-trash"></i></button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div><!-- /table-scroll -->
+      </div><!-- /budget-table-wrap -->
+      <button class="btn-add-row" (click)="addImpRow()"><i class="fa fa-plus"></i> Agregar ítem de impresión</button>
+    </div>
+    <div class="section-nav">
+      <button class="btn-prev" (click)="setSection('carpinteria')"><i class="fa fa-arrow-left"></i> Anterior</button>
+      <button class="btn-next" (click)="setSection('mano_de_obra')">Siguiente: Mano de Obra <i class="fa fa-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ══ MANO DE OBRA ══ -->
+  <div class="section-body" *ngIf="activeSection === 'mano_de_obra'">
+    <div class="form-section">
+      <div class="section-title-row">
+        <h2 class="section-title"><i class="fa fa-users"></i> Mano de Obra</h2>
+        <span class="section-total">Total: {{ formatCOP(sectionTotal('mano_de_obra')) }}</span>
+      </div>
+      <div class="budget-table-wrap">
+        <table class="budget-table">
+          <thead><tr>
+            <th class="col-mueble">Mueble</th>
+            <th class="col-desc">Concepto</th>
+            <th class="col-price">Precio / Unidad</th>
+            <th class="col-qty">Cantidad</th>
+            <th class="col-total">Total</th>
+            <th class="col-del"></th>
+          </tr></thead>
+          <tbody>
+            <tr *ngFor="let r of budget.mano_de_obra">
+              <td><select class="mueble-sel" [(ngModel)]="r.id_mueble">
+                <option [ngValue]="null">—</option>
+                <option *ngFor="let m of muebles" [ngValue]="m.tempId">{{ m.nombre }}</option>
+              </select></td>
+              <td>
+                <div class="sugg-wrap">
+                  <input type="text" [ngModel]="r.nombre"
+                         (ngModelChange)="r.nombre = $event; searchRecurso(r, 'mano_de_obra')"
+                         (focus)="positionSugg($event)" (blur)="hideSugg(r)"
+                         placeholder="Ej: Armado / Ensamble h/H">
+                  <div class="sugg-drop" *ngIf="r._showSugg"
+                       [style.top.px]="suggPos.top" [style.left.px]="suggPos.left" [style.width.px]="suggPos.width">
+                    <div class="sugg-searching" *ngIf="r._searching"><i class="fa fa-spinner fa-spin"></i> Buscando...</div>
+                    <ng-container *ngIf="!r._searching">
+                      <div class="sugg-item" *ngFor="let s of r._sugg" (mousedown)="selectSugerencia(r, s)">
+                        <i class="fa fa-check-circle sugg-icon"></i> {{ s.nombre }}
+                      </div>
+                      <div class="sugg-empty" *ngIf="!r._sugg?.length">
+                        <i class="fa fa-plus-circle"></i> Nuevo: <strong>{{ r.nombre }}</strong> (se creará al guardar)
+                      </div>
+                    </ng-container>
+                  </div>
+                </div>
+              </td>
+              <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onResourceChange(r)" min="0"></td>
+              <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
+              <td><button class="btn-del-row" (click)="removeResourceRow('mano_de_obra', r.id)"><i class="fa fa-trash"></i></button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="btn-add-row" (click)="addResourceRow('mano_de_obra')"><i class="fa fa-plus"></i> Agregar concepto</button>
+    </div>
+    <div class="section-nav">
+      <button class="btn-prev" (click)="setSection('impresiones')"><i class="fa fa-arrow-left"></i> Anterior</button>
+      <button class="btn-next" (click)="setSection('resumen')">Ver Resumen <i class="fa fa-arrow-right"></i></button>
+    </div>
+  </div>
+
+  <!-- ══ RESUMEN ══ -->
+  <div class="section-body" *ngIf="activeSection === 'resumen'">
+    <div class="form-section resumen-section">
+      <h2 class="section-title"><i class="fa fa-check-circle"></i> Resumen del Presupuesto</h2>
+
+      <div class="project-info-summary">
+        <div class="info-row"><span>Proyecto</span><strong>{{ form.nombre || '—' }}</strong></div>
+        <div class="info-row"><span>Centro Costos</span><strong>{{ form.centro_costos || '—' }}</strong></div>
+        <div class="info-row"><span>Fechas</span><strong>{{ formatDate(form.fecha_inicio) }} — {{ formatDate(form.fecha_fin) }}</strong></div>
+      </div>
+
+      <table class="resumen-table">
+        <thead><tr>
+          <th>Sección</th><th>Ítems</th><th class="right">Total</th>
+        </tr></thead>
+        <tbody>
+          <tr><td><i class="fa fa-cubes"></i> Materia Prima</td><td>{{ budget.materia_prima.length }}</td><td class="right">{{ formatCOP(sectionTotal('materia_prima')) }}</td></tr>
+          <tr><td><i class="fa fa-truck"></i> Proveedores</td><td>{{ budget.proveedores.length }}</td><td class="right">{{ formatCOP(sectionTotal('proveedores')) }}</td></tr>
+          <tr><td><i class="fa fa-wrench"></i> Carpintería</td><td>{{ budget.carpinteria.length }}</td><td class="right">{{ formatCOP(sectionTotal('carpinteria')) }}</td></tr>
+          <tr><td><i class="fa fa-print"></i> Impresiones</td><td>{{ budget.impresiones.length }}</td><td class="right">{{ formatCOP(sectionTotal('impresiones')) }}</td></tr>
+          <tr><td><i class="fa fa-users"></i> Mano de Obra</td><td>{{ budget.mano_de_obra.length }}</td><td class="right">{{ formatCOP(sectionTotal('mano_de_obra')) }}</td></tr>
+        </tbody>
+        <tfoot>
+          <tr class="grand-total-row">
+            <td colspan="2"><strong>TOTAL PRESUPUESTO</strong></td>
+            <td class="right grand-total-val">{{ formatCOP(grandTotal) }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="section-nav form-actions">
+      <button class="btn-prev" (click)="setSection('mano_de_obra')"><i class="fa fa-arrow-left"></i> Volver</button>
+      <button class="btn-cancel" (click)="cancel()"><i class="fa fa-times"></i> Cancelar</button>
+      <button class="btn-draft" (click)="save(false)" [disabled]="saving" *ngIf="!isEdit">
+        <i class="fa" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
+        {{ saving ? 'Guardando...' : 'Guardar Borrador' }}
+      </button>
+      <button class="btn-submit" (click)="save(true)" [disabled]="saving">
+        <i class="fa" [ngClass]="saving ? 'fa-spinner fa-spin' : (isEdit ? 'fa-check' : 'fa-paper-plane')"></i>
+        {{ saving ? 'Guardando...' : (isEdit ? 'Actualizar' : 'Enviar a Revisión') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Nuevo Cliente ══════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showClientModal" (click)="closeClientModal()">
+    <div class="modal-box-sm" (click)="$event.stopPropagation()">
+      <div class="modal-hdr">
+        <h3><i class="fa fa-building-o"></i> Nuevo Cliente</h3>
+        <button class="modal-cls" (click)="closeClientModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-bdy">
+        <div class="mf-group">
+          <label>Razón Social *</label>
+          <input type="text" [(ngModel)]="newClientForm.razon_social" placeholder="Ej: Bavaria S.A.">
+        </div>
+        <div class="mf-group">
+          <label>NIT / Identificación</label>
+          <input type="text" [(ngModel)]="newClientForm.identificacion" placeholder="900123456-7">
+        </div>
+        <div class="mf-group">
+          <label>Teléfono</label>
+          <input type="text" [(ngModel)]="newClientForm.telefono" placeholder="6017001234">
+        </div>
+        <div class="mf-group">
+          <label>Dirección</label>
+          <input type="text" [(ngModel)]="newClientForm.direccion" placeholder="Calle 94 #15-40, Bogotá">
+        </div>
+      </div>
+      <div class="modal-ftr">
+        <button class="btn-cancel-m" (click)="closeClientModal()">Cancelar</button>
+        <button class="btn-save-m" (click)="saveNewClient()">
+          <i class="fa fa-save"></i> Registrar Cliente
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: Nuevo Mueble ══════════════════════════════════════════════ -->
+  <div class="modal-overlay" *ngIf="showMuebleModal" (click)="closeMuebleModal()">
+    <div class="modal-box-sm" (click)="$event.stopPropagation()">
+      <div class="modal-hdr">
+        <h3><i class="fa fa-th-large"></i> {{ editingMuebleTempId !== null ? 'Editar Mueble' : 'Agregar Mueble' }}</h3>
+        <button class="modal-cls" (click)="closeMuebleModal()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-bdy">
+        <div class="mf-group">
+          <label>Nombre del mueble *</label>
+          <input type="text" [(ngModel)]="newMuebleForm.nombre" placeholder="Ej: Cabezote central, Lateral izquierdo...">
+        </div>
+        <div class="mf-group">
+          <label>Fecha de entrega *</label>
+          <input type="date" [(ngModel)]="newMuebleForm.fecha_fin"
+                 [min]="form.fecha_inicio" [max]="form.fecha_fin">
+        </div>
+      </div>
+      <div class="modal-ftr">
+        <button class="btn-cancel-m" (click)="closeMuebleModal()">Cancelar</button>
+        <button class="btn-save-m" (click)="addMueble()">
+          <i class="fa fa-plus"></i> Agregar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
