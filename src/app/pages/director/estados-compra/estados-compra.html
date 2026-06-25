@@ -1,0 +1,651 @@
+<div class="ec-wrap">
+
+  <!-- Header -->
+  <div class="ec-header">
+    <div>
+      <h1><i class="fa fa-shopping-cart"></i> Estados de Compra</h1>
+      <span class="ec-sub">Seguimiento de pedidos por proyecto</span>
+    </div>
+    <button class="btn-nuevo" (click)="openModal()">
+      <i class="fa fa-plus"></i> Registrar Pedido
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card stat-total">
+      <div class="stat-icon"><i class="fa fa-list-alt"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Total Pedidos</span>
+      </div>
+    </div>
+    <div class="stat-card stat-solicitud">
+      <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.solicitud }}</span>
+        <span class="stat-label">Solicitud Pedido</span>
+      </div>
+    </div>
+    <div class="stat-card stat-parcial">
+      <div class="stat-icon"><i class="fa fa-hourglass-half"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.parcial }}</span>
+        <span class="stat-label">Parcialmente Recibido</span>
+      </div>
+    </div>
+    <div class="stat-card stat-completo">
+      <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.completo }}</span>
+        <span class="stat-label">Recibido Completo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fa fa-search"></i>
+      <input type="text" placeholder="Buscar por proyecto, recurso o proveedor..."
+             [(ngModel)]="filterSearch" (ngModelChange)="applyFilters()">
+    </div>
+    <select [(ngModel)]="filterEstado" (ngModelChange)="applyFilters()" class="filter-select">
+      <option value="">Todos los estados</option>
+      <option value="4">Solicitud Pedido</option>
+      <option value="3">Pedido en Bodega Incompleto</option>
+      <option value="2">Pedido en Bodega Completo</option>
+      <option value="1">Compra Realizada</option>
+      <option value="5">Inhabilitado</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div class="ec-loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando pedidos...
+  </div>
+
+  <!-- Empty -->
+  <div class="ec-empty" *ngIf="!loading && !gruposFiltrados.length">
+    <i class="fa fa-shopping-cart"></i>
+    <p>No se encontraron pedidos.</p>
+  </div>
+
+  <!-- Grupos por proyecto -->
+  <div class="ec-list" *ngIf="!loading && gruposFiltrados.length">
+    <div class="proyecto-card" *ngFor="let g of gruposFiltrados">
+
+      <div class="proyecto-card__header" (click)="toggleGrupo(g)">
+        <div class="proyecto-card__left">
+          <i class="fa" [ngClass]="g.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+          <div class="proyecto-card__info">
+            <span class="proyecto-card__name">{{ g.nombre_proyecto }}</span>
+            <span class="proyecto-card__meta">
+              <i class="fa fa-tag"></i> {{ g.centro_costos }}
+              &nbsp;·&nbsp;
+              <i class="fa fa-circle estado-dot" [ngClass]="'dot-' + g.estado_proyecto"></i>
+              {{ estadoProyectoLabel(g.estado_proyecto) }}
+            </span>
+          </div>
+        </div>
+        <div class="proyecto-card__badge">
+          <i class="fa fa-shopping-cart"></i> {{ g.pedidos.length }} pedido{{ g.pedidos.length !== 1 ? 's' : '' }}
+        </div>
+      </div>
+
+      <div class="pedidos-table-wrap" *ngIf="g.expanded">
+        <table class="pedidos-table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Recursos</th>
+              <th>Detalle</th>
+              <th>Valor Pedido</th>
+              <th>F. Solicitada</th>
+              <th>F. Requerida</th>
+              <th>F. Compra</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of g.pedidos">
+              <td class="td-proveedor">{{ p.proveedor }}</td>
+              <td class="td-recursos">
+                <div class="recurso-tag" *ngFor="let item of p.items">
+                  <div class="recurso-tag__name">
+                    <i class="fa fa-cube"></i> {{ labelRecursoItem(item) }}
+                  </div>
+                  <div class="recurso-tag__nums">
+                    <span class="rt-qty">{{ item.cantidad }} uds.</span>
+                    <span class="rt-sep">×</span>
+                    <span class="rt-unit">{{ fmtMoney(item.valor_unitario) }}</span>
+                    <span class="rt-sep">=</span>
+                    <span class="rt-sub">{{ fmtMoney(item.cantidad * item.valor_unitario) }}</span>
+                  </div>
+                  <div class="recurso-tag__obs" *ngIf="item.observacion">
+                    <i class="fa fa-comment-o"></i> {{ item.observacion }}
+                  </div>
+                </div>
+                <span class="no-items" *ngIf="!p.items?.length">—</span>
+              </td>
+              <td class="td-detalle">{{ p.detalle || '—' }}</td>
+              <td class="td-money">{{ fmtMoney(p.valor) }}</td>
+              <td class="td-fecha">{{ fmtFechaSolicitud(p.fecha_solicitud) }}</td>
+              <td class="td-fecha">{{ fmtFecha(p.fecha_requerida) }}</td>
+              <td class="td-fecha">{{ fmtFecha(p.fecha_compra) }}</td>
+              <td>
+                <span class="estado-badge" [ngClass]="estadoClass(p.id_estado_pedido)">{{ p.estado }}</span>
+              </td>
+              <td class="td-actions">
+                <button class="btn-hist-row" (click)="openHistorial(p)" title="Ver historial de entregas">
+                  <i class="fa fa-history"></i>
+                </button>
+                <button class="btn-edit-row" (click)="openEditModal(p)" title="Actualizar pedido">
+                  <i class="fa fa-pencil"></i>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Paginación -->
+  <div class="pagination" *ngIf="!loading && totalPages > 1">
+    <button class="page-btn" (click)="goPage(page - 1)" [disabled]="page === 1">
+      <i class="fa fa-chevron-left"></i>
+    </button>
+    <span class="page-info">Página {{ page }} de {{ totalPages }}</span>
+    <button class="page-btn" (click)="goPage(page + 1)" [disabled]="page === totalPages">
+      <i class="fa fa-chevron-right"></i>
+    </button>
+  </div>
+
+</div>
+
+<!-- ── Modal Registrar Pedido ──────────────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showModal" (click)="closeModal()">
+  <div class="modal-box modal-box--lg" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2><i class="fa fa-shopping-cart"></i> Registrar Pedido</h2>
+      <button class="modal-close" (click)="closeModal()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="modal-body">
+
+      <!-- Proyecto (autocomplete) -->
+      <div class="form-group autocomplete-wrap">
+        <label><i class="fa fa-briefcase"></i> Proyecto</label>
+        <div class="autocomplete-input-box">
+          <i class="fa fa-search ac-icon"></i>
+          <input type="text"
+                 class="form-control"
+                 [class.is-invalid]="submitted && formErrors['proyecto']"
+                 placeholder="Buscar proyecto aprobado..."
+                 [(ngModel)]="proyectoSearch"
+                 (input)="onProyectoSearchInput()"
+                 (focus)="showProyectoDropdown = true"
+                 (blur)="blurProyecto()">
+          <i class="fa fa-times ac-clear" *ngIf="proyectoSearch"
+             (mousedown)="proyectoSearch=''; form.id_proyecto=null; recursos=[]; form.items=[]; proyectosFiltrados=proyectos"></i>
+        </div>
+        <div class="autocomplete-dropdown" *ngIf="showProyectoDropdown && proyectosFiltrados.length">
+          <div class="ac-item" *ngFor="let p of proyectosFiltrados" (mousedown)="selectProyecto(p)">
+            <span class="ac-name">{{ p.nombre }}</span>
+            <span class="ac-meta">{{ p.centro_costos }}</span>
+          </div>
+        </div>
+        <div class="autocomplete-dropdown ac-empty" *ngIf="showProyectoDropdown && !proyectosFiltrados.length">
+          <span>No se encontraron proyectos aprobados</span>
+        </div>
+        <span class="field-error" *ngIf="submitted && formErrors['proyecto']">
+          <i class="fa fa-exclamation-circle"></i> {{ formErrors['proyecto'] }}
+        </span>
+      </div>
+
+      <!-- Proveedor -->
+      <div class="form-group">
+        <label><i class="fa fa-truck"></i> Proveedor</label>
+        <input type="text" [(ngModel)]="form.proveedor" class="form-control"
+               [class.is-invalid]="submitted && formErrors['proveedor']"
+               placeholder="Nombre del proveedor">
+        <span class="field-error" *ngIf="submitted && formErrors['proveedor']">
+          <i class="fa fa-exclamation-circle"></i> {{ formErrors['proveedor'] }}
+        </span>
+      </div>
+
+      <!-- Fechas -->
+      <div class="form-row">
+        <div class="form-group">
+          <label><i class="fa fa-calendar"></i> Fecha de solicitud</label>
+          <input type="date" [(ngModel)]="form.fecha_solicitud" class="form-control"
+                 [class.is-invalid]="submitted && (formErrors['fecha_solicitud'] || formErrors['fecha_rango'])">
+          <span class="field-error" *ngIf="submitted && formErrors['fecha_solicitud']">
+            <i class="fa fa-exclamation-circle"></i> {{ formErrors['fecha_solicitud'] }}
+          </span>
+        </div>
+        <div class="form-group">
+          <label><i class="fa fa-calendar-check-o"></i> Fecha requerida</label>
+          <input type="date" [(ngModel)]="form.fecha_requerida" class="form-control"
+                 [class.is-invalid]="submitted && (formErrors['fecha_requerida'] || formErrors['fecha_rango'])">
+          <span class="field-error" *ngIf="submitted && formErrors['fecha_requerida']">
+            <i class="fa fa-exclamation-circle"></i> {{ formErrors['fecha_requerida'] }}
+          </span>
+        </div>
+      </div>
+      <span class="field-error field-error--full" *ngIf="submitted && formErrors['fecha_rango']">
+        <i class="fa fa-exclamation-circle"></i> {{ formErrors['fecha_rango'] }}
+      </span>
+
+      <!-- Detalle -->
+      <div class="form-group">
+        <label>
+          <i class="fa fa-align-left"></i> Detalle <span class="label-optional">(opcional)</span>
+          <span class="detalle-lock-hint" *ngIf="form.extras.length > 0">
+            <i class="fa fa-lock"></i> bloqueado por valores extra
+          </span>
+        </label>
+        <textarea *ngIf="form.extras.length === 0"
+                  [(ngModel)]="form.detalle"
+                  class="form-control" rows="2"
+                  placeholder="Descripción o nota del pedido..."></textarea>
+        <textarea *ngIf="form.extras.length > 0"
+                  [ngModel]="combinedDetalle"
+                  disabled
+                  class="form-control form-control--locked" rows="3"></textarea>
+      </div>
+
+      <!-- ── Recursos del pedido ── -->
+      <div class="items-section" [class.items-section--error]="submitted && formErrors['items']">
+        <div class="items-section__header">
+          <span class="items-section__title">
+            <i class="fa fa-list"></i> Recursos del pedido
+            <span class="field-error field-error--inline" *ngIf="submitted && formErrors['items']">
+              — {{ formErrors['items'] }}
+            </span>
+          </span>
+          <button type="button" class="btn-add-item"
+                  (click)="addItem()"
+                  [disabled]="!form.id_proyecto || loadingRecursos || !recursos.length">
+            <i class="fa fa-plus"></i> Agregar recurso
+          </button>
+        </div>
+
+        <!-- Sin proyecto seleccionado -->
+        <div class="items-hint" *ngIf="!form.id_proyecto">
+          <i class="fa fa-info-circle"></i> Selecciona un proyecto para elegir recursos
+        </div>
+
+        <!-- Cargando recursos -->
+        <div class="items-hint" *ngIf="form.id_proyecto && loadingRecursos">
+          <i class="fa fa-spinner fa-spin"></i> Cargando recursos...
+        </div>
+
+        <!-- Sin recursos en el proyecto -->
+        <div class="items-hint items-hint--warn" *ngIf="form.id_proyecto && !loadingRecursos && !recursos.length">
+          <i class="fa fa-exclamation-triangle"></i> Este proyecto no tiene recursos asignados
+        </div>
+
+        <!-- Sin ítems aún -->
+        <div class="items-hint" *ngIf="form.id_proyecto && !loadingRecursos && recursos.length && form.items.length === 0">
+          <i class="fa fa-arrow-up"></i> Haz clic en "Agregar recurso" para empezar
+        </div>
+
+        <!-- Tabla de ítems -->
+        <div class="items-table-wrap" *ngIf="form.items.length > 0">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th class="th-num">Cantidad</th>
+                <th class="th-num">Valor unitario</th>
+                <th>Observación <span class="label-optional">(opcional)</span></th>
+                <th class="th-action"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of form.items; let i = index"
+                  [class.tr-error]="submitted && (formErrors['item_r_'+i] || formErrors['item_c_'+i] || formErrors['item_v_'+i])">
+                <td class="td-item-select">
+                  <select [(ngModel)]="item.id_detalle_recurso" class="form-control form-control--sm"
+                          [class.is-invalid]="submitted && formErrors['item_r_'+i]">
+                    <option [ngValue]="null" disabled>Seleccionar recurso</option>
+                    <option *ngFor="let r of recursos" [ngValue]="r.id_detalle_recurso">{{ r.nombre }}</option>
+                  </select>
+                </td>
+                <td class="td-item-num">
+                  <input type="number" [(ngModel)]="item.cantidad" class="form-control form-control--sm"
+                         [class.is-invalid]="submitted && formErrors['item_c_'+i]"
+                         placeholder="0" min="1">
+                </td>
+                <td class="td-item-num">
+                  <input type="number" [(ngModel)]="item.valor_unitario" class="form-control form-control--sm"
+                         [class.is-invalid]="submitted && formErrors['item_v_'+i]"
+                         placeholder="0" min="0">
+                </td>
+                <td class="td-item-obs">
+                  <input type="text" [(ngModel)]="item.observacion" class="form-control form-control--sm"
+                         placeholder="Nota adicional...">
+                </td>
+                <td class="td-item-del">
+                  <button type="button" class="btn-del-item" (click)="removeItem(i)"
+                          title="Eliminar recurso">
+                    <i class="fa fa-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Valor total (calculado) -->
+      <div class="valor-section">
+
+        <!-- Base de ítems -->
+        <div class="valor-row">
+          <span class="valor-row__label"><i class="fa fa-cubes"></i> Subtotal recursos</span>
+          <span class="valor-row__amount">{{ fmtMoney(baseValor) }}</span>
+        </div>
+
+        <!-- Extras -->
+        <div class="extras-list" *ngIf="form.extras.length">
+          <div class="extra-row" *ngFor="let e of form.extras; let i = index">
+            <input type="text" [(ngModel)]="e.motivo" class="form-control form-control--sm extra-motivo"
+                   [class.is-invalid]="submitted && formErrors['extra_m_'+i]"
+                   placeholder="Motivo del valor extra (obligatorio)">
+            <input type="number" [(ngModel)]="e.monto" class="form-control form-control--sm extra-monto"
+                   [class.is-invalid]="submitted && formErrors['extra_v_'+i]"
+                   placeholder="0" min="0">
+            <button type="button" class="btn-del-item" (click)="removeExtra(i)" title="Eliminar">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Botón agregar extra -->
+        <button type="button" class="btn-add-extra" (click)="addExtra()">
+          <i class="fa fa-plus-circle"></i> Agregar valor extra
+        </button>
+
+        <!-- Separador + Total -->
+        <div class="valor-total-row" *ngIf="form.extras.length">
+          <span class="valor-total-row__label"><i class="fa fa-plus"></i> Extras</span>
+          <span class="valor-total-row__amount extra-sum">
+            + {{ fmtMoney(calculatedValor - baseValor) }}
+          </span>
+        </div>
+        <div class="valor-total-row valor-total-row--main">
+          <span class="valor-total-row__label"><i class="fa fa-dollar"></i> Valor total del pedido</span>
+          <span class="valor-total-row__amount">{{ fmtMoney(calculatedValor) }}</span>
+        </div>
+
+
+      </div>
+
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancelar" (click)="closeModal()" [disabled]="saving">Cancelar</button>
+      <button class="btn-guardar" (click)="submitForm()" [disabled]="saving || !isFormValid">
+        <i class="fa" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+        {{ saving ? 'Guardando...' : 'Registrar Pedido' }}
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal Historial de Entregas ───────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showHistorialModal" (click)="closeHistorial()">
+  <div class="modal-box modal-box--lg" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2><i class="fa fa-history"></i> Historial de entregas — Pedido #{{ historialPedido?.id }}</h2>
+      <button class="modal-close" (click)="closeHistorial()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="modal-body" *ngIf="historialPedido">
+
+      <!-- Resumen del pedido -->
+      <div class="pedido-resumen">
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-briefcase"></i> Proyecto</span>
+          <span class="pr-value">{{ historialPedido.nombre_proyecto }}</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-truck"></i> Proveedor</span>
+          <span class="pr-value">{{ historialPedido.proveedor }}</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-tag"></i> Estado</span>
+          <span class="pr-value">
+            <span class="estado-badge" [ngClass]="estadoClass(historialPedido.id_estado_pedido)">
+              {{ historialPedido.estado }}
+            </span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Barra de progreso de recepción -->
+      <div class="hist-progreso">
+        <div class="hist-progreso__header">
+          <span class="hist-progreso__label">
+            <i class="fa fa-cubes"></i> Recibido
+            <strong>{{ historialPedido.cantidad_recibida }}</strong> de
+            <strong>{{ historialPedido.cantidad_solicitada }}</strong> unidades
+          </span>
+          <span class="hist-progreso__pct" [class.pct-full]="historialProgreso === 100">
+            {{ historialProgreso }}%
+          </span>
+        </div>
+        <div class="hist-progreso__bar">
+          <div class="hist-progreso__fill"
+               [style.width.%]="historialProgreso"
+               [class.fill-completo]="historialProgreso === 100"
+               [class.fill-parcial]="historialProgreso > 0 && historialProgreso < 100">
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="hist-loading" *ngIf="historialLoading">
+        <i class="fa fa-spinner fa-spin"></i> Cargando entregas...
+      </div>
+
+      <!-- Sin entregas -->
+      <div class="hist-empty" *ngIf="!historialLoading && !showEntregaForm && historialEntradas.length === 0">
+        <i class="fa fa-inbox"></i>
+        <p>Este pedido aún no tiene entregas registradas.</p>
+      </div>
+
+      <!-- Cards de entregas -->
+      <div class="hist-cards" *ngIf="!historialLoading && historialEntradas.length > 0">
+        <div class="hist-card" *ngFor="let h of historialEntradas; let i = index">
+
+          <div class="hist-card__header">
+            <div class="hist-card__left">
+              <span class="hist-card__num">Entrega #{{ i + 1 }}</span>
+              <span class="hist-card__fecha"><i class="fa fa-calendar"></i> {{ fmtFecha(h.fecha_recibido) }}</span>
+              <span class="hist-card__total">{{ h.cantidad_recibida }} uds. recibidas</span>
+            </div>
+            <span class="hist-card__obs" *ngIf="h.observaciones">
+              <i class="fa fa-comment-o"></i> {{ h.observaciones }}
+            </span>
+          </div>
+
+          <table class="hist-items-table">
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th class="th-num">Recibido</th>
+                <th class="th-num">Pedido</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of h.items">
+                <td class="td-recurso-name">
+                  <i class="fa fa-cube"></i> {{ labelHistoricoItem(item) }}
+                </td>
+                <td class="td-num">
+                  <span class="qty-badge">{{ item.cantidad_recibida }}</span>
+                </td>
+                <td class="td-num td-pedida">{{ item.cantidad_pedida }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+        </div>
+      </div>
+
+      <!-- Formulario registrar entrega -->
+      <div class="entrega-form-wrap" *ngIf="showEntregaForm">
+        <div class="entrega-form-title">
+          <i class="fa fa-plus-circle"></i> Registrar nueva entrega
+          <button class="entrega-form-close" (click)="showEntregaForm = false" title="Cancelar">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label><i class="fa fa-calendar"></i> Fecha de entrega</label>
+            <input type="date" [(ngModel)]="entregaForm.fecha_recibido" class="form-control">
+          </div>
+          <div class="form-group">
+            <label><i class="fa fa-comment"></i> Observaciones <span class="label-optional">(opcional)</span></label>
+            <input type="text" [(ngModel)]="entregaForm.observaciones" class="form-control"
+                   placeholder="Notas sobre la entrega...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label><i class="fa fa-list"></i> Cantidades recibidas por recurso</label>
+          <table class="items-table entrega-items-table">
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th class="th-num">Pedido</th>
+                <th class="th-num">Cant. recibida</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let item of entregaForm.items">
+                <td class="td-recurso-name"><i class="fa fa-cube"></i> {{ item.nombre_recurso }}</td>
+                <td class="td-num td-pedida">{{ item.cantidad_pedida }} uds.</td>
+                <td class="td-item-num">
+                  <input type="number" [(ngModel)]="item.cantidad_recibida"
+                         class="form-control form-control--sm" min="0" placeholder="0">
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="entrega-form-actions">
+          <button class="btn-cancelar" (click)="showEntregaForm = false" [disabled]="savingEntrega">
+            Cancelar
+          </button>
+          <button class="btn-guardar" (click)="submitEntrega()" [disabled]="savingEntrega">
+            <i class="fa" [ngClass]="savingEntrega ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+            {{ savingEntrega ? 'Guardando...' : 'Registrar Entrega' }}
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="modal-footer modal-footer--space">
+      <button class="btn-add-entrega" (click)="showEntregaForm = !showEntregaForm"
+              *ngIf="!showEntregaForm" [disabled]="historialLoading">
+        <i class="fa fa-plus"></i> Registrar Entrega
+      </button>
+      <div class="footer-actions">
+        <button class="btn-guardar" (click)="closeHistorial()">Cerrar</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal Actualizar Pedido ────────────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showEditModal" (click)="closeEditModal()">
+  <div class="modal-box" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2><i class="fa fa-pencil"></i> Actualizar Pedido #{{ editingPedido?.id }}</h2>
+      <button class="modal-close" (click)="closeEditModal()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="modal-body" *ngIf="editingPedido">
+
+      <!-- Resumen del pedido (solo lectura) -->
+      <div class="pedido-resumen">
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-briefcase"></i> Proyecto</span>
+          <span class="pr-value">{{ editingPedido.nombre_proyecto }}</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-truck"></i> Proveedor</span>
+          <span class="pr-value">{{ editingPedido.proveedor }}</span>
+        </div>
+        <div class="pr-row">
+          <span class="pr-label"><i class="fa fa-dollar"></i> Valor total</span>
+          <span class="pr-value pr-value--money">{{ fmtMoney(editingPedido.valor) }}</span>
+        </div>
+        <div class="pr-items">
+          <span class="pr-label"><i class="fa fa-list"></i> Recursos</span>
+          <div class="pr-item" *ngFor="let item of editingPedido.items">
+            <i class="fa fa-cube"></i> {{ labelRecursoItem(item) }}
+            <span class="pr-item-nums">{{ item.cantidad }} uds. × {{ fmtMoney(item.valor_unitario) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-divider"></div>
+
+      <!-- Estado actual (solo lectura) -->
+      <div class="form-group">
+        <label><i class="fa fa-tag"></i> Estado actual</label>
+        <div class="estado-readonly">
+          <span class="estado-badge" [ngClass]="estadoClass(editingPedido.id_estado_pedido)">
+            {{ editingPedido.estado }}
+          </span>
+          <span class="estado-readonly__hint" *ngIf="editingPedido.id_estado_pedido !== 1">
+            <i class="fa fa-info-circle"></i> Se actualiza automáticamente al registrar la fecha de compra
+          </span>
+        </div>
+      </div>
+
+      <!-- Fecha de compra -->
+      <div class="form-group">
+        <label>
+          <i class="fa fa-calendar-check-o"></i> Fecha de compra
+        </label>
+        <input type="date" [(ngModel)]="updateForm.fecha_compra" class="form-control">
+        <span class="field-hint" *ngIf="updateForm.fecha_compra">
+          <i class="fa fa-check-circle"></i> El pedido pasará a estado <strong>Compra Realizada</strong>
+        </span>
+      </div>
+
+    </div>
+
+    <div class="modal-footer modal-footer--space">
+      <button class="btn-inhabilitar" (click)="confirmarInhabilitar()" [disabled]="updating">
+        <i class="fa fa-ban"></i> Inhabilitar
+      </button>
+      <div class="footer-actions">
+        <button class="btn-cancelar" (click)="closeEditModal()" [disabled]="updating">Cancelar</button>
+        <button class="btn-guardar" (click)="submitUpdate()" [disabled]="updating">
+          <i class="fa" [ngClass]="updating ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+          {{ updating ? 'Guardando...' : 'Guardar cambios' }}
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>

@@ -8,6 +8,7 @@ import { Approvals } from './approvals/approvals';
 import { GanttGeneral }        from '../../shared/components/gantt-general/gantt-general';
 import { PlantillasFases }     from '../../shared/components/plantillas-fases/plantillas-fases';
 import { DirectorEvidencias }  from './evidencias/evidencias';
+import { EstadosCompra }       from './estados-compra/estados-compra';
 
 const routes: Routes = [
   { path: '',                            redirectTo: 'home', pathMatch: 'full' },
@@ -19,6 +20,7 @@ const routes: Routes = [
   { path: 'evidencias',                  component: DirectorEvidencias },
   { path: 'vista-general',               component: GanttGeneral },
   { path: 'plantillas/:proyectoId',      component: PlantillasFases },
+  { path: 'estados-compra',             component: EstadosCompra },
 ];
 
 @NgModule({
