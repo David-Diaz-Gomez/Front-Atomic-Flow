@@ -151,6 +151,32 @@ export class ProjectDetail implements OnInit {
     return map[estado] ?? 'state-pending';
   }
 
+  // getEstadoLabel/'tbadge-'+estado es compartido con el estado del proyecto, no se puede
+  // sobrecargar aquí. El motivo del bloqueo se explica en el tooltip (getTareaTooltip), no
+  // con texto ni color distinto en el badge: visualmente debe verse igual que "Pendiente".
+  getTareaBadgeLabel(t: any): string {
+    if (t.estado === 'bloqueada') return 'Bloqueada';
+    return this.getEstadoLabel(t.estado);
+  }
+  getTareaBadgeClass(t: any): string {
+    if (t.estado === 'bloqueada') return 'tbadge-pendiente';
+    return 'tbadge-' + t.estado;
+  }
+  getTareaTooltip(t: any): string {
+    if (t?.estado !== 'bloqueada') return '';
+    return t.bloqueada_por_movimiento ? 'Reprogramar fechas' : 'Esperando predecesora';
+  }
+  // Mismo criterio que el candado del Gantt: violeta para dependencia normal, rojo para
+  // movimiento, neutro si tiene depende_de pero no está bloqueada (ya se cumplió).
+  lockClass(t: any): string {
+    if (t?.estado === 'bloqueada') return t.bloqueada_por_movimiento ? 'lock-move' : 'lock-dep';
+    return 'lock-neutral';
+  }
+  dependenciaNombre(t: any, fase: any): string {
+    const dep = (fase?.tareas ?? []).find((x: any) => x.id === t.depende_de);
+    return dep?.nombre ?? `tarea #${t.depende_de}`;
+  }
+
   get totalRecursos(): number { return this.totalRecursosValue; }
 
   private toMs(val: any): number {
@@ -505,10 +531,16 @@ export class ProjectDetail implements OnInit {
 
   get taskDateMin(): string { return (this.taskFase?.fecha_inicio ?? this.project?.fecha_inicio ?? '').substring(0, 10); }
   get taskDateMax(): string { return (this.taskFase?.fecha_fin    ?? this.project?.fecha_fin    ?? '').substring(0, 10); }
-  taskForm: { nombre: string; descripcion: string; id_tipo_tarea: number; fecha_inicio: string; fecha_fin: string } =
-    { nombre: '', descripcion: '', id_tipo_tarea: 2, fecha_inicio: '', fecha_fin: '' };
+  taskForm: { nombre: string; descripcion: string; id_tipo_tarea: number; fecha_inicio: string; fecha_fin: string; depende_de: number | null } =
+    { nombre: '', descripcion: '', id_tipo_tarea: 2, fecha_inicio: '', fecha_fin: '', depende_de: null };
 
   tiposTarea: any[] = [];
+
+  // Tareas de la misma fase que pueden usarse como predecesora (regla de negocio:
+  // una tarea solo puede depender de otra de su misma fase), excluyendo la propia en edición.
+  tareasParaDependencia(fase: any, excludeId: number | null = null): any[] {
+    return (fase?.tareas ?? []).filter((t: any) => t.id !== excludeId);
+  }
 
   openNewTask(fase: any): void {
     this.editingTaskId = null;
@@ -516,7 +548,7 @@ export class ProjectDetail implements OnInit {
     this.taskFaseName  = fase.nombre;
     this.taskFase      = fase;
     this.taskForm = {
-      nombre: '', descripcion: '', id_tipo_tarea: 2,
+      nombre: '', descripcion: '', id_tipo_tarea: 2, depende_de: null,
       fecha_inicio: (fase.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:    (fase.fecha_fin    ?? '').substring(0, 10),
     };
@@ -533,6 +565,7 @@ export class ProjectDetail implements OnInit {
       id_tipo_tarea: tarea.id_tipo_tarea ?? 2,
       fecha_inicio: (tarea.fecha_inicio ?? '').substring(0, 10),
       fecha_fin: (tarea.fecha_fin ?? '').substring(0, 10),
+      depende_de: tarea.depende_de ?? null,
     };
     this.showTaskModal = true;
   }
@@ -561,6 +594,21 @@ export class ProjectDetail implements OnInit {
     this.doSaveTask();
   }
 
+  quitarDependencia(fase: any, tarea: any): void {
+    void Swal.fire({
+      title: `¿Quitar dependencia de "${tarea.nombre}"?`, icon: 'warning',
+      text: `Dejará de depender de "${this.dependenciaNombre(tarea, fase)}".`,
+      showCancelButton: true, confirmButtonText: 'Quitar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626'
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.projectSvc.updateTarea(fase.id, tarea.id, { depende_de: null }).subscribe({
+        next: () => this.loadProject(this.project.id),
+        error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo quitar la dependencia', 'error'),
+      });
+    });
+  }
+
   private doSaveTask(): void {
     if (!this.project || this.taskFaseId === null) return;
     const body = {
@@ -569,15 +617,15 @@ export class ProjectDetail implements OnInit {
       id_tipo_tarea: this.taskForm.id_tipo_tarea,
       fecha_inicio: `${this.taskForm.fecha_inicio} 07:00:00`,
       fecha_fin:    `${this.taskForm.fecha_fin} 18:00:00`,
+      depende_de: this.taskForm.depende_de,
     };
 
     const faseId = this.taskFaseId!;
     if (this.editingTaskId !== null) {
       this.projectSvc.updateTarea(faseId, this.editingTaskId, body).subscribe({
-        next: () => {
-          void Swal.fire({ icon: 'success', title: 'Tarea actualizada', timer: 1500 });
+        next: (resp: any) => {
           this.closeTaskModal();
-          this.loadProject(this.project.id);
+          this.notifyHijasAfectadas(resp);
         },
         error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo actualizar la tarea', 'error'),
       });
@@ -591,6 +639,34 @@ export class ProjectDetail implements OnInit {
         error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo crear la tarea', 'error'),
       });
     }
+  }
+
+  // Tras editar fechas, el backend resetea recursos y bloquea a las hijas directas
+  // (no las mueve solo). Se avisa de inmediato con los nombres; la lista recién
+  // recargada las marca con el badge "Bloqueada" (pasa el mouse para ver el motivo).
+  private notifyHijasAfectadas(resp: any): void {
+    const hijas: any[] = resp?.hijas_afectadas ?? [];
+    const reconciliacion = resp?.reconciliacion_recursos;
+    this.loadProject(this.project.id);
+
+    const hayReconciliacion = !!(reconciliacion?.reasignados?.length || reconciliacion?.no_disponibles?.length);
+
+    if (hijas.length === 0 && !hayReconciliacion) {
+      void Swal.fire({ icon: 'success', title: 'Tarea actualizada', timer: 1500 });
+      return;
+    }
+
+    let html = '<p>Tarea actualizada correctamente.</p>';
+    if (hijas.length > 0) {
+      html += `<p><b>${hijas.length} tarea(s) dependiente(s)</b> perdieron sus operarios/maquinaria y quedaron bloqueadas porque esta tarea cambió de fecha:</p>`;
+      html += '<ul style="text-align:left">' + hijas.map(h => `<li>${h.nombre}</li>`).join('') + '</ul>';
+      html += '<p>Búscalas en la lista (badge "Bloqueada") y ajusta sus fechas una por una.</p>';
+    }
+    if (reconciliacion?.no_disponibles?.length) {
+      html += `<p><b>${reconciliacion.no_disponibles.length} recurso(s)</b> ya no estaban disponibles tras reprogramar y deben reasignarse manualmente.</p>`;
+    }
+
+    void Swal.fire({ icon: 'warning', title: 'Tareas dependientes afectadas', html, confirmButtonText: 'Entendido' });
   }
 
   deleteTask(faseId: number, tarea: any): void {

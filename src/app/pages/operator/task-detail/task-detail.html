@@ -14,6 +14,18 @@
 
   <!-- ── Alerta de acción principal ────────────────────────────────────── -->
 
+  <!-- Bloqueada por dependencia: se avisa de una vez, sin esperar a que falle "Iniciar" -->
+  <div class="action-banner banner-blocked" *ngIf="task.estado === 'bloqueada'">
+    <div class="banner-text">
+      <i class="fa fa-lock"></i>
+      <div>
+        <strong>Tarea bloqueada</strong>
+        <p *ngIf="task.bloqueada_por_movimiento">Su tarea predecesora cambió de fecha. Espera a que el coordinador la reprograme.</p>
+        <p *ngIf="!task.bloqueada_por_movimiento">Debe esperar a que se complete "{{ task.dependencia_nombre || 'la tarea predecesora' }}" antes de poder iniciar esta.</p>
+      </div>
+    </div>
+  </div>
+
   <!-- Iniciar tarea -->
   <div class="action-banner banner-start" *ngIf="canStart">
     <div class="banner-text">

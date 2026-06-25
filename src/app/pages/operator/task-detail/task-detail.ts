@@ -210,6 +210,9 @@ export class OpTaskDetail implements OnInit {
 
   // ── Labels ────────────────────────────────────────────────────────────────
   estadoLabel(e: string): string {
+    if (e === 'bloqueada') {
+      return this.task?.bloqueada_por_movimiento ? 'Bloqueada: reprogramando' : 'Bloqueada: esperando predecesora';
+    }
     const m: Record<string, string> = {
       pendiente:'Pendiente', asignada:'Asignada', en_progreso:'En Progreso',
       completada:'Completada', en_revision:'En Revisión'
@@ -217,7 +220,10 @@ export class OpTaskDetail implements OnInit {
     return m[e] ?? e;
   }
 
-  estadoBadge(e: string): string { return `badge-${e}`; }
+  estadoBadge(e: string): string {
+    if (e === 'bloqueada') return this.task?.bloqueada_por_movimiento ? 'badge-blocked-move' : 'badge-blocked-dep';
+    return `badge-${e}`;
+  }
 
   evEstadoLabel(e: string): string {
     return e === 'aprobada' ? 'Aprobada' : e === 'rechazada' ? 'Rechazada' : 'Pendiente revisión';

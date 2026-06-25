@@ -78,8 +78,9 @@
                   <div class="gantt-grid-bg" *ngFor="let day of ganttDays"
                        [class.today-col]="isTodayMarker(day)" [class.weekend-col]="isWeekend(day)"
                        [style.width.px]="cellWidth"></div>
-                  <div class="gantt-bar task-bar" [ngClass]="getGanttBarClass(t.estado)"
-                       [ngStyle]="getGanttBarStyle(t)" [title]="t.nombre + ' — ' + getEstadoLabel(t.estado)">
+                  <div class="gantt-bar task-bar" [ngClass]="getTareaBadgeClass(t)"
+                       [ngStyle]="getGanttBarStyle(t)" [title]="t.nombre + ' — ' + getTareaBadgeLabel(t) + (t.depende_de ? ' · Depende de: ' + dependenciaNombre(t, fase) : '')">
+                    <i class="fa fa-lock task-dep-lock" [ngClass]="getLockClass(t)" *ngIf="t.depende_de"></i>
                     <span>{{ t.nombre }}</span>
                   </div>
                 </div>
@@ -104,6 +105,8 @@
           <span class="legend-item"><span class="legend-dot bar-progress"></span> En Progreso</span>
           <span class="legend-item"><span class="legend-dot bar-assigned"></span> Asignada</span>
           <span class="legend-item"><span class="legend-dot bar-pending"></span> Pendiente</span>
+          <span class="legend-item"><i class="fa fa-lock legend-lock lock-dep"></i> Bloqueada (esperando predecesora)</span>
+          <span class="legend-item"><i class="fa fa-lock legend-lock lock-move"></i> Bloqueada (reprogramar fechas)</span>
           <span class="legend-hint"><i class="fa fa-mouse-pointer"></i> Clic en tarea para ver horario</span>
         </div>
       </div>

@@ -24,6 +24,8 @@ interface Tarea {
   tipo: string;
   horario?: TareaHorario;
   horarioLoading?: boolean;
+  depende_de?: number | null;
+  bloqueada_por_movimiento?: boolean;
 }
 interface Fase {
   id: number; nombre: string; color: string;
@@ -251,7 +253,34 @@ export class Gantt implements OnInit {
       maquinarias:  (t.maquinarias ?? t.equipos ?? []).map((m: any) =>
                       typeof m === 'string' ? m : (m.nombre ?? '')),
       tipo:         t.tipo ?? t.tipo_tarea ?? '',
+      depende_de:   t.depende_de ?? null,
+      bloqueada_por_movimiento: Boolean(t.bloqueada_por_movimiento),
     };
+  }
+
+  // El bloqueo ya no se indica con el color de la barra (así se puede seguir viendo si la
+  // tarea tiene recursos o no, igual que cualquier otra); el candado es el único indicador
+  // de bloqueo, y su color distingue el motivo (ver getLockClass).
+  getTareaBadgeClass(t: Tarea): string {
+    if (t.estado === 'bloqueada') {
+      return (t.operarios?.length || t.maquinarias?.length) ? 'bar-assigned' : 'bar-pending';
+    }
+    return BAR_CLASSES[t.estado] ?? 'bar-pending';
+  }
+  getTareaBadgeLabel(t: Tarea): string {
+    if (t.estado === 'bloqueada') return t.bloqueada_por_movimiento ? 'Bloqueada: reprogramar' : 'Bloqueada: esperando predecesora';
+    return t.estado;
+  }
+  // Violeta = bloqueada por dependencia (solo espera a que termine la predecesora);
+  // rojo = bloqueada por movimiento (perdió recursos, hay que reprogramarla); sin color
+  // especial si solo tiene depende_de pero no está bloqueada (la dependencia ya se cumplió).
+  getLockClass(t: Tarea): string {
+    if (t.estado === 'bloqueada') return t.bloqueada_por_movimiento ? 'lock-move' : 'lock-dep';
+    return 'lock-neutral';
+  }
+  dependenciaNombre(t: Tarea, fase: Fase): string {
+    const dep = fase?.tareas?.find(x => x.id === t.depende_de);
+    return dep?.nombre ?? `tarea #${t.depende_de}`;
   }
 
   /** Extrae listas únicas de máquinas y operarios del proyecto cargado. */
@@ -692,14 +721,39 @@ export class Gantt implements OnInit {
     const { fase_id, tarea_id, fecha_inicio, fecha_fin } = this.dateEdit;
 
     this.projectSvc.rescheduleTarea(fase_id, tarea_id, { fecha_inicio, fecha_fin }).subscribe({
-      next: () => {
+      next: (resp: any) => {
         if (!this.panelTask || !this.dateEdit) return;
-        this.panelTask.fecha_inicio = this.dateEdit.fecha_inicio;
-        this.panelTask.fecha_fin    = this.dateEdit.fecha_fin;
-        this.buildPanelDays(this.panelTask);
-        this.buildGanttDays();
+        const nombreTarea = this.panelTask.nombre;
+        const hijas: any[] = resp?.hijas_afectadas ?? [];
+        const reconciliacion = resp?.reconciliacion_recursos;
+        const hayReconciliacion = !!(reconciliacion?.reasignados?.length || reconciliacion?.no_disponibles?.length);
         this.dateEdit = null;
-        void Swal.fire({ icon: 'success', title: 'Fechas actualizadas', text: `"${this.panelTask.nombre}" reprogramada.`, timer: 1800 });
+
+        if (hijas.length === 0 && !hayReconciliacion) {
+          if (this.selectedProjectId) this.loadProjectFull(this.selectedProjectId);
+          void Swal.fire({ icon: 'success', title: 'Fechas actualizadas', text: `"${nombreTarea}" reprogramada.`, timer: 1800 });
+          this.cdr.detectChanges();
+          return;
+        }
+
+        // El sistema no mueve a las hijas por su cuenta: se bloquean y pierden recursos
+        // hasta que se reprogramen una por una (mismo flujo que en project-detail).
+        // Se cierra el panel (showPanel Y panelTask, no solo panelTask) antes del reload:
+        // el grid reserva una columna para el panel mientras showPanel siga en true, aunque
+        // el panel mismo ya no se renderice, dejando un hueco sin expandir en el Gantt.
+        this.showPanel = false;
+        this.panelTask = null;
+        if (this.selectedProjectId) this.loadProjectFull(this.selectedProjectId);
+        let html = `<p>"${nombreTarea}" reprogramada correctamente.</p>`;
+        if (hijas.length > 0) {
+          html += `<p><b>${hijas.length} tarea(s) dependiente(s)</b> perdieron sus operarios/maquinaria y quedaron bloqueadas:</p>`;
+          html += '<ul style="text-align:left">' + hijas.map(h => `<li>${h.nombre}</li>`).join('') + '</ul>';
+          html += '<p>Búscalas en el Gantt (barra roja "Bloqueada: reprogramar") y ajusta sus fechas una por una.</p>';
+        }
+        if (reconciliacion?.no_disponibles?.length) {
+          html += `<p><b>${reconciliacion.no_disponibles.length} recurso(s)</b> ya no estaban disponibles y deben reasignarse manualmente.</p>`;
+        }
+        void Swal.fire({ icon: 'warning', title: 'Tareas dependientes afectadas', html, confirmButtonText: 'Entendido' });
         this.cdr.detectChanges();
       },
       error: err => {

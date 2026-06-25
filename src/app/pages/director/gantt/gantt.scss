@@ -149,6 +149,15 @@ $panel-w: 400px;
     &.bar-assigned { background: #f59e0b; color: #000; }
     &.bar-pending  { background: #e2e8f0; color: #64748b; }
     &.bar-blocked  { background: #ef4444; color: #fff; }
+    // El candado es el único indicador de bloqueo (no el color de la barra): violeta para
+    // dependencia normal, rojo para movimiento, neutro si solo tiene dependencia sin bloquear.
+    .task-dep-lock {
+      font-size: 0.7rem; margin-right: 3px; flex-shrink: 0;
+      text-shadow: 0 0 2px rgba(0,0,0,0.35);
+      &.lock-dep     { color: #8b5cf6; }
+      &.lock-move    { color: #ef4444; }
+      &.lock-neutral { color: rgba(255,255,255,0.7); }
+    }
   }
 
   .gantt-legend {
@@ -237,6 +246,10 @@ $panel-w: 400px;
       &.occ-proj1    { background: rgba(141,198,63,0.7); }
       &.occ-proj2    { background: rgba(59,130,246,0.6); }
       &.occ-proj3    { background: rgba(245,158,11,0.6); }
+    }
+    .legend-lock { font-size: 0.78rem;
+      &.lock-dep  { color: #8b5cf6; }
+      &.lock-move { color: #ef4444; }
     }
   }
 

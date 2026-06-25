@@ -530,6 +530,9 @@
       }
       .task-info { flex: 1;
         .task-name { font-size: 0.86rem; font-weight: 600; color: var(--text-dark); display: block; margin-bottom: 2px; }
+        .task-dep-lock { font-size: 0.7rem; margin-left: 5px; cursor: help;
+          &.lock-dep { color: #8b5cf6; } &.lock-move { color: #dc2626; } &.lock-neutral { color: #9ca3af; }
+        }
         .task-meta { font-size: 0.73rem; color: var(--text-muted); display: block; margin-bottom: 5px; }
         .task-assign-tags { display: flex; flex-wrap: wrap; gap: 5px;
           .assign-tag {
@@ -625,6 +628,7 @@
     }
     textarea { resize: vertical; }
   }
+  .mform-hint { font-size: 0.72rem; color: var(--text-muted); }
   .mform-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
   // ── Phase insumo selector ──────────────────────────────────────────────────

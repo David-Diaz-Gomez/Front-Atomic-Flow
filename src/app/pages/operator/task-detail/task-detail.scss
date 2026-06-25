@@ -37,6 +37,8 @@
   &.badge-en_progreso { background: rgba(59,130,246,.12); color: #2563eb; }
   &.badge-completada  { background: rgba(0,168,89,.12); color: var(--atomo-green-dark); }
   &.badge-en_revision { background: rgba(139,92,246,.12); color: #7c3aed; }
+  &.badge-blocked-dep { background: rgba(245,158,11,.15); color: #b45309; }
+  &.badge-blocked-move { background: rgba(220,38,38,.12); color: #dc2626; }
 }
 
 // ── Action banners ─────────────────────────────────────────────────────────
@@ -78,6 +80,14 @@
   strong { color: #1d4ed8; }
   p { color: #4b72b4; }
   .btn-evidence { background: #3b82f6; color: #fff; }
+}
+
+.banner-blocked {
+  background: rgba(220,38,38,.07);
+  border: 1px solid rgba(220,38,38,.2);
+  > .banner-text > i { color: #dc2626; }
+  strong { color: #991b1b; }
+  p { color: #b45309; }
 }
 
 .banner-review {

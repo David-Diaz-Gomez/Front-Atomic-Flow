@@ -426,7 +426,9 @@ export class CoordProjectDetail implements OnInit {
     const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
     if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
     task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
-    if (!task.operarios.length && !task.maquinarias?.length) task.estado = 'pendiente';
+    // El backend nunca cambia el estado al quitar un recurso; si la tarea está bloqueada
+    // (por dependencia o por movimiento), debe seguir bloqueada sin importar sus recursos.
+    if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
     this.cdr.detectChanges();
   }
 
@@ -434,7 +436,7 @@ export class CoordProjectDetail implements OnInit {
     const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
     if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
     task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
-    if (!task.operarios?.length && !task.maquinarias.length) task.estado = 'pendiente';
+    if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
     this.cdr.detectChanges();
   }
 
@@ -477,13 +479,19 @@ export class CoordProjectDetail implements OnInit {
   showNewTaskModal = false;
   newTaskFase: any = null;
   tiposTarea: { id: number; nombre: string }[] = [];
-  taskForm = { nombre: '', descripcion: '', id_tipo_tarea: null as number | null, fecha_inicio: '', fecha_fin: '' };
+  taskForm = { nombre: '', descripcion: '', id_tipo_tarea: null as number | null, fecha_inicio: '', fecha_fin: '', depende_de: null as number | null };
   taskSaving = false;
+
+  // Tareas de la misma fase que pueden usarse como predecesora (regla de negocio:
+  // una tarea solo puede depender de otra de su misma fase), excluyendo la propia en edición.
+  tareasParaDependencia(fase: any, excludeId: number | null = null): any[] {
+    return (fase?.tareas ?? []).filter((t: any) => t.id !== excludeId);
+  }
 
   openNewTask(fase: any): void {
     this.newTaskFase = fase;
     this.taskForm = {
-      nombre: '', descripcion: '', id_tipo_tarea: null,
+      nombre: '', descripcion: '', id_tipo_tarea: null, depende_de: null,
       fecha_inicio: String(fase.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:    String(fase.fecha_fin    ?? '').substring(0, 10),
     };
@@ -506,26 +514,34 @@ export class CoordProjectDetail implements OnInit {
   showEditTaskModal = false;
   editTask: any = null;
   editTaskFase: any = null;
-  editForm = { nombre: '', descripcion: '', id_tipo_tarea: null as number | null, fecha_inicio: '', fecha_fin: '' };
+  editForm = { nombre: '', descripcion: '', id_tipo_tarea: null as number | null, fecha_inicio: '', fecha_fin: '', depende_de: null as number | null };
   editSaving = false;
 
   openEditTask(task: any, fase: any): void {
     this.editTask = task;
     this.editTaskFase = fase;
-    const tipoId = typeof task.tipo_tarea === 'string'
+    const resolveTipoId = () => typeof task.tipo_tarea === 'string'
       ? (this.tiposTarea.find(t => t.nombre === task.tipo_tarea)?.id ?? null)
       : (task.id_tipo_tarea ?? null);
     this.editForm = {
       nombre:        task.nombre ?? '',
       descripcion:   task.descripcion ?? '',
-      id_tipo_tarea: tipoId,
+      id_tipo_tarea: resolveTipoId(),
       fecha_inicio:  String(task.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:     String(task.fecha_fin    ?? '').substring(0, 10),
+      depende_de:    task.depende_de ?? null,
     };
     this.showEditTaskModal = true;
     if (!this.tiposTarea.length) {
+      // La primera vez que se abre este modal, tiposTarea aún no cargó: si task.tipo_tarea
+      // venía como string, resolveTipoId() no lo encuentra y queda null (botón deshabilitado
+      // hasta la próxima apertura). Se recalcula apenas la lista termine de cargar.
       this.catalogSvc.getTiposTarea().subscribe({
-        next: (d: any[]) => { this.tiposTarea = d.map(t => ({ id: t.id, nombre: t.nombre ?? String(t) })); this.cdr.detectChanges(); },
+        next: (d: any[]) => {
+          this.tiposTarea = d.map(t => ({ id: t.id, nombre: t.nombre ?? String(t) }));
+          if (this.editForm.id_tipo_tarea === null) this.editForm.id_tipo_tarea = resolveTipoId();
+          this.cdr.detectChanges();
+        },
         error: () => {},
       });
     }
@@ -543,20 +559,46 @@ export class CoordProjectDetail implements OnInit {
       id_tipo_tarea: this.editForm.id_tipo_tarea,
       fecha_inicio:  this.editForm.fecha_inicio || null,
       fecha_fin:     this.editForm.fecha_fin    || null,
+      depende_de:    this.editForm.depende_de,
     }).subscribe({
-      next: () => {
+      next: (resp: any) => {
         this.editSaving = false;
-        const tipoNombre = this.tiposTarea.find(t => t.id === this.editForm.id_tipo_tarea)?.nombre ?? this.editTask.tipo_tarea;
-        Object.assign(this.editTask, {
-          nombre:        this.editForm.nombre,
-          descripcion:   this.editForm.descripcion  || null,
-          tipo_tarea:    tipoNombre,
-          fecha_inicio:  this.editForm.fecha_inicio,
-          fecha_fin:     this.editForm.fecha_fin,
-        });
-        void Swal.fire({ icon: 'success', title: 'Tarea actualizada', timer: 1400, showConfirmButton: false });
+        const editedTask = this.editTask;
+        const hijas: any[] = resp?.hijas_afectadas ?? [];
+        const reconciliacion = resp?.reconciliacion_recursos;
+        const hayReconciliacion = !!(reconciliacion?.reasignados?.length || reconciliacion?.no_disponibles?.length);
+        // Cambiar fecha_inicio/fecha_fin/depende_de puede recalcular el estado de ESTA tarea
+        // (p.ej. de "bloqueada por movimiento" a "esperando predecesora") sin que eso se
+        // refleje como hijas_afectadas ni reconciliacion_recursos en la respuesta — esos campos
+        // solo cubren efectos sobre OTRAS tareas. Por eso, si se tocó alguno de esos campos,
+        // se recarga siempre en vez de confiar en el parche local (Object.assign).
+        const fechasOdependenciaCambiaron =
+          this.editForm.fecha_inicio !== String(editedTask.fecha_inicio ?? '').substring(0, 10) ||
+          this.editForm.fecha_fin    !== String(editedTask.fecha_fin    ?? '').substring(0, 10) ||
+          this.editForm.depende_de   !== (editedTask.depende_de ?? null);
         this.closeEditTask();
-        this.cdr.detectChanges();
+
+        if (hijas.length === 0 && !hayReconciliacion && !fechasOdependenciaCambiaron) {
+          const tipoNombre = this.tiposTarea.find(t => t.id === this.editForm.id_tipo_tarea)?.nombre ?? editedTask.tipo_tarea;
+          Object.assign(editedTask, {
+            nombre: this.editForm.nombre, descripcion: this.editForm.descripcion || null, tipo_tarea: tipoNombre,
+            fecha_inicio: this.editForm.fecha_inicio, fecha_fin: this.editForm.fecha_fin, depende_de: this.editForm.depende_de,
+            estado: resp?.estado ?? editedTask.estado, bloqueada_por_movimiento: resp?.bloqueada_por_movimiento ?? false,
+          });
+          void Swal.fire({ icon: 'success', title: 'Tarea actualizada', timer: 1400, showConfirmButton: false });
+          this.cdr.detectChanges();
+          return;
+        }
+
+        // Se tocaron fechas/dependencia, o hubo efectos sobre otras tareas (hijas bloqueadas /
+        // recursos reconciliados): se recarga el proyecto para que estados, badges y
+        // asignaciones queden frescos (incluye el calendario de ocupación al reabrir "Asignar").
+        this.loadAll(this.project.id);
+        if (hijas.length > 0 || hayReconciliacion) {
+          this.notifyHijasAfectadas(hijas, reconciliacion);
+        } else {
+          void Swal.fire({ icon: 'success', title: 'Tarea actualizada', timer: 1400, showConfirmButton: false });
+        }
       },
       error: (err: any) => {
         this.editSaving = false;
@@ -564,6 +606,23 @@ export class CoordProjectDetail implements OnInit {
         this.cdr.detectChanges();
       },
     });
+  }
+
+  // Tras editar fechas, el backend resetea recursos y bloquea a las hijas directas
+  // (no las mueve solo). Se avisa de inmediato con los nombres; la lista recién
+  // recargada las marca con el badge "Bloqueada" (pasa el mouse para ver el motivo).
+  private notifyHijasAfectadas(hijas: any[], reconciliacion: any): void {
+    let html = '<p>Tarea actualizada correctamente.</p>';
+    if (hijas.length > 0) {
+      html += `<p><b>${hijas.length} tarea(s) dependiente(s)</b> perdieron sus operarios/maquinaria y quedaron bloqueadas porque esta tarea cambió de fecha:</p>`;
+      html += '<ul style="text-align:left">' + hijas.map(h => `<li>${h.nombre}</li>`).join('') + '</ul>';
+      html += '<p>Búscalas en la lista (badge "Bloqueada") y ajusta sus fechas una por una.</p>';
+    }
+    if (reconciliacion?.no_disponibles?.length) {
+      html += `<p><b>${reconciliacion.no_disponibles.length} recurso(s)</b> ya no estaban disponibles tras reprogramar y deben reasignarse manualmente.</p>`;
+    }
+
+    void Swal.fire({ icon: 'warning', title: 'Tareas dependientes afectadas', html, confirmButtonText: 'Entendido' });
   }
 
   // ── Subir evidencia ───────────────────────────────────────────────────────
@@ -636,6 +695,7 @@ export class CoordProjectDetail implements OnInit {
       id_tipo_tarea:   this.taskForm.id_tipo_tarea,
       fecha_inicio:    this.taskForm.fecha_inicio || null,
       fecha_fin:       this.taskForm.fecha_fin    || null,
+      depende_de:      this.taskForm.depende_de,
     }).subscribe({
       next: (nueva: any) => {
         this.taskSaving = false;
@@ -684,13 +744,32 @@ export class CoordProjectDetail implements OnInit {
     if (!s) return ''; const p = s.split(/[-T]/);
     return `${parseInt(p[2] ?? '1', 10)} ${MONTHS[parseInt(p[1] ?? '1', 10) - 1] ?? ''}`;
   }
-  estadoLabel(e: string): string {
+  estadoLabel(t: any): string {
+    const e = t?.estado ?? t;
+    if (e === 'bloqueada') return 'Bloqueada';
     const m: Record<string, string> = { pendiente: 'Pendiente', asignada: 'Asignada', en_progreso: 'En Progreso', completada: 'Completada', en_revision: 'En Revisión' };
     return m[e] ?? e;
   }
-  estadoBadge(e: string): string {
+  estadoBadge(t: any): string {
+    const e = t?.estado ?? t;
+    // Mismo color que "Pendiente": el motivo del bloqueo se explica en el tooltip, no con un color de alarma.
+    if (e === 'bloqueada') return 'tbadge-pending';
     const m: Record<string, string> = { pendiente: 'tbadge-pending', asignada: 'tbadge-assigned', en_progreso: 'tbadge-progress', completada: 'tbadge-done', en_revision: 'tbadge-review' };
     return m[e] ?? 'tbadge-pending';
+  }
+  estadoTooltip(t: any): string {
+    if (t?.estado !== 'bloqueada') return '';
+    return t.bloqueada_por_movimiento ? 'Reprogramar fechas' : 'Esperando predecesora';
+  }
+  // Mismo criterio que el candado del Gantt: violeta para dependencia normal, rojo para
+  // movimiento, neutro si tiene depende_de pero no está bloqueada (ya se cumplió).
+  lockClass(t: any): string {
+    if (t?.estado === 'bloqueada') return t.bloqueada_por_movimiento ? 'lock-move' : 'lock-dep';
+    return 'lock-neutral';
+  }
+  dependenciaNombre(t: any, fase: any): string {
+    const dep = (fase?.tareas ?? []).find((x: any) => x.id === t.depende_de);
+    return dep?.nombre ?? `tarea #${t.depende_de}`;
   }
   hourLabel(h: number): string { return `${h}:00`; }
 }

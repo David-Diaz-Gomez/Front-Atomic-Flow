@@ -55,14 +55,19 @@
               <div class="task-top">
                 <div class="task-dot" [ngClass]="'dot-' + t.estado"></div>
                 <div class="task-info">
-                  <span class="task-name">{{ t.nombre }}</span>
+                  <span class="task-name">
+                    {{ t.nombre }}
+                    <i class="fa fa-lock task-dep-lock" [ngClass]="lockClass(t)" *ngIf="t.depende_de" [title]="'Depende de: ' + dependenciaNombre(t, fase)"></i>
+                  </span>
                   <span class="task-meta">{{ t.tipo_tarea }} &bull; {{ formatDate(t.fecha_inicio) }} — {{ formatDate(t.fecha_fin) }}</span>
                 </div>
-                <span class="task-badge" [ngClass]="estadoBadge(t.estado)">{{ estadoLabel(t.estado) }}</span>
+                <span class="task-badge" [ngClass]="estadoBadge(t)" [title]="estadoTooltip(t)">{{ estadoLabel(t) }}</span>
                 <button class="btn-edit-task" (click)="openEditTask(t, fase); $event.stopPropagation()" *ngIf="t.estado !== 'completada'">
                   <i class="fa fa-pencil"></i>
                 </button>
-                <button class="btn-assign" (click)="openAssign(t, fase)" *ngIf="t.estado !== 'completada'">
+                <button class="btn-assign" (click)="openAssign(t, fase)"
+                        *ngIf="t.estado !== 'completada'" [disabled]="t.bloqueada_por_movimiento"
+                        [title]="t.bloqueada_por_movimiento ? 'Reprograma las fechas de esta tarea antes de asignar recursos' : ''">
                   <i class="fa fa-plus"></i> Asignar
                 </button>
                 <button class="btn-evidencia" (click)="openEvidModal(t)">
@@ -573,6 +578,14 @@
           <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
         </select>
       </div>
+      <div class="mform-group">
+        <label>Depende de</label>
+        <select [(ngModel)]="editForm.depende_de" class="mform-input">
+          <option [ngValue]="null">— Sin dependencia —</option>
+          <option *ngFor="let tp of tareasParaDependencia(editTaskFase, editTask?.id)" [ngValue]="tp.id">{{ tp.nombre }}</option>
+        </select>
+        <small class="mform-hint">Solo puede depender de otra tarea de la misma fase. Quedará bloqueada hasta que esa tarea termine.</small>
+      </div>
       <div class="mform-row">
         <div class="mform-group">
           <label>Fecha inicio *</label>
@@ -620,6 +633,14 @@
           <option [ngValue]="null">— Seleccionar tipo * —</option>
           <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
         </select>
+      </div>
+      <div class="mform-group">
+        <label>Depende de</label>
+        <select [(ngModel)]="taskForm.depende_de" class="mform-input">
+          <option [ngValue]="null">— Sin dependencia —</option>
+          <option *ngFor="let tp of tareasParaDependencia(newTaskFase)" [ngValue]="tp.id">{{ tp.nombre }}</option>
+        </select>
+        <small class="mform-hint">Solo puede depender de otra tarea de la misma fase. Nacerá bloqueada hasta que esa tarea termine.</small>
       </div>
       <div class="mform-row">
         <div class="mform-group">

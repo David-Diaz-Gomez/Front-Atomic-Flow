@@ -75,11 +75,20 @@ $row-height: 34px; $label-width: 200px; $cell-border: 1px solid #f0f0f0; $panel-
   .gantt-bar{position:absolute;top:5px;height:24px;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:.68rem;font-weight:bold;white-space:nowrap;overflow:hidden;transition:.1s;
     &.fase-bar{top:7px;height:20px;background:transparent;border:2px solid;opacity:.85;}
     &.bar-done{background:#00A859;color:#fff;}&.bar-progress{background:#3b82f6;color:#fff;}&.bar-assigned{background:#f59e0b;color:#fff;}&.bar-pending{background:#d1d5db;color:#6b7280;}&.bar-blocked{background:#ef4444;color:#fff;}
+    // El candado es el único indicador de bloqueo (no el color de la barra): violeta para
+    // dependencia normal, rojo para movimiento, neutro si solo tiene dependencia sin bloquear.
+    .task-dep-lock{font-size:.68rem;margin-right:3px;flex-shrink:0;text-shadow:0 0 2px rgba(0,0,0,.35);
+      &.lock-dep{color:#8b5cf6;}&.lock-move{color:#ef4444;}&.lock-neutral{color:rgba(255,255,255,.7);}
+    }
   }
 
   .gantt-legend{padding:10px 18px;display:flex;flex-wrap:wrap;gap:12px;background:#f8fafa;border-top:$cell-border;
     .legend-item{display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--text-muted);}
-    .legend-dot{width:14px;height:8px;border-radius:3px;}
+    .legend-dot{width:14px;height:8px;border-radius:3px;
+      &.bar-done{background:#00A859;}&.bar-progress{background:#3b82f6;}&.bar-assigned{background:#f59e0b;}
+      &.bar-pending{background:#d1d5db;}
+    }
+    .legend-lock{font-size:.78rem;&.lock-dep{color:#8b5cf6;}&.lock-move{color:#ef4444;}}
   }
 
   // ── Calendar with hour-level occupancy ───────────────────────────────────────
@@ -114,12 +123,13 @@ $row-height: 34px; $label-width: 200px; $cell-border: 1px solid #f0f0f0; $panel-
   // ── Task panel ───────────────────────────────────────────────────────────────
   .task-panel{background:#fff;border-radius:14px;box-shadow:0 4px 24px rgba(0,0,0,.1);display:flex;flex-direction:column;height:fit-content;max-height:85vh;overflow-y:auto;position:sticky;top:20px;}
   .task-panel-header{padding:16px 18px;background:linear-gradient(135deg,var(--atomo-gradient));display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-shrink:0;
-    h3{font-size:.95rem;font-weight:bold;color:#000;margin:0 0 6px;}
+    h3{font-size:.95rem;font-weight:bold;color:#000;margin:0 0 6px;.task-dep-lock{font-size:.75rem;color:#4c1d95;margin-left:5px;cursor:help;}}
     .panel-close{background:rgba(0,0,0,.1);border:none;border-radius:8px;width:30px;height:30px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:#000;transition:.2s;flex-shrink:0;&:hover{background:rgba(0,0,0,.2);}}
   }
   .task-badge{display:inline-block;font-size:.68rem;font-weight:bold;padding:3px 9px;border-radius:20px;
     &.tbadge-done{background:rgba(0,168,89,.15);color:#00A859;}&.tbadge-progress{background:rgba(59,130,246,.1);color:#3b82f6;}
     &.tbadge-assigned{background:rgba(245,158,11,.1);color:#d97706;}&.tbadge-pending{background:rgba(209,213,219,.3);color:#6b7280;}
+    &.tbadge-blocked-dep{background:rgba(139,92,246,.15);color:#6d28d9;}&.tbadge-blocked-move{background:rgba(220,38,38,.12);color:#dc2626;}
   }
   .task-meta{padding:12px 18px;display:flex;flex-direction:column;gap:5px;border-bottom:$cell-border;
     .meta-item{display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--text-dark);i{color:var(--atomo-green-dark);font-size:.75rem;width:13px;}}

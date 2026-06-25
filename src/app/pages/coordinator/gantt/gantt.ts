@@ -97,6 +97,8 @@ export class CoordGantt implements OnInit {
             fecha_fin:    (t.fecha_fin    ?? '').substring(0, 10),
             operarios:   (t.operarios   ?? []).map((o: any) => typeof o === 'string' ? o : `${o.nombre ?? ''} ${o.apellido ?? ''}`.trim()),
             maquinarias: (t.maquinarias ?? []).map((m: any) => typeof m === 'string' ? m : (m.nombre ?? '')),
+            depende_de: t.depende_de ?? null,
+            bloqueada_por_movimiento: Boolean(t.bloqueada_por_movimiento),
           })),
         }));
         const idx = this.projects.findIndex(p => p.id === id);
@@ -165,6 +167,20 @@ export class CoordGantt implements OnInit {
     return { left: `${off * this.cellWidth}px`, width: `${w * this.cellWidth - 4}px` };
   }
   getBarClass(estado: string): string { return BAR_CLASSES[estado] ?? 'bar-pending'; }
+  // El bloqueo ya no se indica con el color de la barra (así se sigue viendo si la tarea
+  // tiene recursos o no); el candado es el único indicador de bloqueo (ver getLockClass).
+  getTareaBarClass(t: any): string {
+    if (t.estado === 'bloqueada') return (t.operarios?.length || t.maquinarias?.length) ? 'bar-assigned' : 'bar-pending';
+    return this.getBarClass(t.estado);
+  }
+  getLockClass(t: any): string {
+    if (t.estado === 'bloqueada') return t.bloqueada_por_movimiento ? 'lock-move' : 'lock-dep';
+    return 'lock-neutral';
+  }
+  dependenciaNombre(t: any): string {
+    const dep = (this.selectedProject?.fases ?? []).flatMap((f: any) => f.tareas ?? []).find((x: any) => x.id === t.depende_de);
+    return dep?.nombre ?? `tarea #${t.depende_de}`;
+  }
 
   // ── Panel de tarea ────────────────────────────────────────────────────────
   openPanel(task: any, faseName: string): void {
@@ -340,11 +356,15 @@ export class CoordGantt implements OnInit {
   weekDayLabel(d: Date): string { return DAYS_SHORT[d.getDay()] ?? ''; }
   panelDayLabel(d: Date): string { return `${DAYS_SHORT[d.getDay()]??''} ${d.getDate()} ${this.monthLabel(d)}`; }
 
-  estadoLabel(e: string): string {
+  estadoLabel(t: any): string {
+    const e = t?.estado ?? t;
+    if (e === 'bloqueada') return t?.bloqueada_por_movimiento ? 'Bloqueada: reprogramar' : 'Bloqueada: esperando predecesora';
     const l: Record<string,string> = { completada:'Completada', en_progreso:'En Progreso', asignada:'Asignada', pendiente:'Pendiente' };
     return l[e] ?? e;
   }
-  estadoBadge(e: string): string {
+  estadoBadge(t: any): string {
+    const e = t?.estado ?? t;
+    if (e === 'bloqueada') return t?.bloqueada_por_movimiento ? 'tbadge-blocked-move' : 'tbadge-blocked-dep';
     const m: Record<string,string> = { completada:'tbadge-done', en_progreso:'tbadge-progress', asignada:'tbadge-assigned', pendiente:'tbadge-pending' };
     return m[e] ?? 'tbadge-pending';
   }
