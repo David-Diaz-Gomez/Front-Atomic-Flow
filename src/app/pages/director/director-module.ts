@@ -11,6 +11,7 @@ import { ProjectDetail }      from './project-detail/project-detail';
 import { Gantt }              from './gantt/gantt';
 import { Approvals }          from './approvals/approvals';
 import { DirectorEvidencias } from './evidencias/evidencias';
+import { EstadosCompra }      from './estados-compra/estados-compra';
 
 @NgModule({
   declarations: [
@@ -20,6 +21,7 @@ import { DirectorEvidencias } from './evidencias/evidencias';
     Gantt,
     Approvals,
     DirectorEvidencias,
+    EstadosCompra,
   ],
   imports: [
     CommonModule,
