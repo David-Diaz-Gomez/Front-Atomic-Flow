@@ -131,7 +131,7 @@ export class OpTaskDetail implements OnInit {
 
     const fd = new FormData();
     fd.append('descripcion', this.evDescripcion);
-    if (this.evFile) fd.append('evidencias', this.evFile);
+    if (this.evFile) fd.append('imagen', this.evFile);
 
     this.projectSvc.subirEvidencias(this.task.id, fd).subscribe({
       next: () => {
