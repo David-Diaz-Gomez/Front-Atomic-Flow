@@ -10,16 +10,31 @@
 
   <!-- Filtro general -->
   <div class="filters-bar filters-general">
-    <div class="filter-field">
+    <div class="filter-field proyecto-field">
       <label>Proyecto</label>
-      <select [(ngModel)]="filtroProyecto" class="filter-select">
-        <option [ngValue]="''">Todos los proyectos</option>
-        <option *ngFor="let p of proyectosFiltrados" [ngValue]="p.id">{{ p.nombre }}</option>
-      </select>
+      <div class="proyecto-autocomplete">
+        <input type="text" class="filter-select"
+          [(ngModel)]="filtroProyectoText"
+          (ngModelChange)="onProyectoTextChange($event)"
+          (focus)="showProyectoDropdown = true"
+          (blur)="onProyectoBlur()"
+          placeholder="Todos los proyectos"
+          autocomplete="off">
+        <button class="proyecto-clear" *ngIf="filtroProyectoText" (mousedown)="clearProyecto()">
+          <i class="fa fa-times"></i>
+        </button>
+        <div class="proyecto-dropdown" *ngIf="showProyectoDropdown && proyectosBusqueda.length > 0">
+          <div class="proyecto-option"
+            *ngFor="let p of proyectosBusqueda"
+            (mousedown)="selectProyecto(p)">
+            {{ p.nombre }}
+          </div>
+        </div>
+      </div>
     </div>
     <div class="filter-field">
       <label>Estado</label>
-      <select [(ngModel)]="filtroEstado" class="filter-select">
+      <select [(ngModel)]="filtroEstado" (ngModelChange)="onEstadoChange()" class="filter-select">
         <option value="">Todos</option>
         <option value="activo">Activos</option>
         <option value="finalizado">Finalizados</option>
@@ -27,11 +42,11 @@
     </div>
     <div class="filter-field">
       <label>Desde</label>
-      <input type="date" class="filter-date" [(ngModel)]="filtroFechaInicio">
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaInicio" (ngModelChange)="onFilterChange()">
     </div>
     <div class="filter-field">
       <label>Hasta</label>
-      <input type="date" class="filter-date" [(ngModel)]="filtroFechaFin">
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaFin" (ngModelChange)="onFilterChange()">
     </div>
   </div>
 
@@ -40,7 +55,6 @@
     <h2 class="section-title">Estado General</h2>
 
     <div class="section-grid section-grid-1">
-
       <div class="kpi-block">
         <div class="stats-row">
           <div class="stat-card stat-ok">
@@ -91,7 +105,6 @@
           </span>
         </div>
       </div>
-
     </div>
   </section>
 
@@ -99,34 +112,112 @@
   <section class="dash-section">
     <h2 class="section-title">Ocupación de Recursos</h2>
 
-    <div class="filters-bar filters-section">
+    <!-- Filtro de tipo + pestañas en la misma fila -->
+    <div class="ocupacion-toolbar">
       <div class="filter-field">
-        <label>Operario</label>
-        <select [(ngModel)]="filtroOperario" class="filter-select">
-          <option [ngValue]="''">Todos los operarios</option>
-          <option *ngFor="let o of operarios" [ngValue]="o.id">{{ o.nombre }} {{ o.apellido }}</option>
+        <label>Tipo de recurso</label>
+        <select [(ngModel)]="tipoRecurso" (ngModelChange)="onTipoChange()" class="filter-select">
+          <option value="operarios">Operarios</option>
+          <option value="maquinaria">Maquinaria</option>
         </select>
       </div>
-      <div class="filter-field">
-        <label>Maquinaria</label>
-        <select [(ngModel)]="filtroMaquinaria" class="filter-select">
-          <option [ngValue]="''">Toda la maquinaria</option>
-          <option *ngFor="let m of maquinarias" [ngValue]="m.id">{{ m.nombre }}</option>
-        </select>
+
+      <div class="tab-group">
+        <button class="tab-btn" [class.active]="activeTab === 'grafico'" (click)="setTab('grafico')">
+          <i class="fa fa-pie-chart"></i> Por Proyecto
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'ranking'" (click)="setTab('ranking')">
+          <i class="fa fa-trophy"></i> Ranking
+        </button>
       </div>
     </div>
 
-    <div class="section-grid section-grid-1">
+    <!-- ─── TAB: Gráfico de torta ─── -->
+    <div class="section-grid section-grid-1" *ngIf="activeTab === 'grafico'">
       <div class="chart-card chart-card-wide">
         <div class="chart-card-header">
-          <h3>Ocupación por Hora</h3>
-          <span class="chart-type-tag">Gráfico de torta — número y porcentaje</span>
+          <h3>Horas por Proyecto — {{ tipoRecurso === 'maquinaria' ? 'Maquinaria' : 'Operarios' }}</h3>
+          <span class="chart-sub" *ngIf="tipoRecurso === 'operarios'">
+            <i class="fa fa-info-circle"></i> Tiempo real: asignación → entrega de evidencia
+          </span>
         </div>
-        <div class="chart-placeholder">
-          <i class="fa fa-clock-o"></i>
-          <p>Gráfico pendiente de implementación</p>
-          <span>Mostrará horas ocupadas vs. disponibles por operario/maquinaria en el rango de fechas filtrado.</span>
+
+        <div class="chart-loading" *ngIf="loadingOcupacion">
+          <i class="fa fa-spinner fa-spin"></i> Cargando datos...
         </div>
+
+        <div class="chart-empty" *ngIf="!loadingOcupacion && ocupacionData.length === 0">
+          <i class="fa fa-pie-chart"></i>
+          <p>Sin datos para los filtros seleccionados</p>
+          <span>No hay registros de horas para {{ tipoRecurso === 'maquinaria' ? 'maquinaria' : 'operarios' }} en el rango indicado.</span>
+        </div>
+
+        <div class="canvas-wrap" *ngIf="!loadingOcupacion && ocupacionData.length > 0">
+          <canvas #ocupacionChart></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Ranking ─── -->
+    <div class="section-grid section-grid-1" *ngIf="activeTab === 'ranking'">
+      <div class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <h3>Top {{ tipoRecurso === 'maquinaria' ? 'Maquinaria' : 'Operarios' }} por Horas</h3>
+          <span class="chart-sub" *ngIf="tipoRecurso === 'operarios'">
+            <i class="fa fa-info-circle"></i> Tiempo real: asignación → entrega de evidencia
+          </span>
+        </div>
+
+        <div class="chart-loading" *ngIf="loadingRanking">
+          <i class="fa fa-spinner fa-spin"></i> Cargando ranking...
+        </div>
+
+        <ng-container *ngIf="!loadingRanking">
+          <!-- Toolbar de búsqueda y orden -->
+          <div class="ranking-toolbar" *ngIf="rankingData.length > 0">
+            <div class="ranking-search-wrap">
+              <i class="fa fa-search"></i>
+              <input type="text" class="ranking-search-input"
+                [(ngModel)]="rankingSearch"
+                placeholder="Buscar {{ tipoRecurso === 'operarios' ? 'operario' : 'maquinaria' }}...">
+              <button class="ranking-clear" *ngIf="rankingSearch" (click)="rankingSearch = ''">
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+            <button class="sort-btn" (click)="toggleSortDir()" title="Cambiar orden">
+              <i class="fa" [class.fa-sort-amount-desc]="rankingSortDir === 'desc'" [class.fa-sort-amount-asc]="rankingSortDir === 'asc'"></i>
+              {{ rankingSortDir === 'desc' ? 'Mayor a menor' : 'Menor a mayor' }}
+            </button>
+          </div>
+
+          <div class="chart-empty" *ngIf="rankingData.length === 0">
+            <i class="fa fa-trophy"></i>
+            <p>Sin datos para los filtros seleccionados</p>
+          </div>
+
+          <div class="chart-empty" *ngIf="rankingData.length > 0 && rankingFiltered.length === 0">
+            <i class="fa fa-search"></i>
+            <p>Sin resultados para "{{ rankingSearch }}"</p>
+          </div>
+
+        <div class="ranking-list" *ngIf="rankingFiltered.length > 0">
+          <div class="ranking-row" *ngFor="let item of rankingFiltered; let i = index">
+            <div class="ranking-pos">
+              <span class="pos-badge" [class.top3]="i < 3">{{ i + 1 }}</span>
+            </div>
+            <div class="ranking-info">
+              <div class="ranking-name">{{ item.nombre }}</div>
+              <div class="ranking-bar-wrap">
+                <div class="ranking-bar" [style.width]="rankingBarWidth(item.total_horas)" [style.background]="rankingColor(i)"></div>
+              </div>
+            </div>
+            <div class="ranking-stats">
+              <span class="ranking-horas">{{ item.total_horas | number:'1.1-1' }} h</span>
+              <span class="ranking-tareas">{{ item.total_tareas }} tarea{{ item.total_tareas !== 1 ? 's' : '' }}</span>
+            </div>
+          </div>
+        </div>
+        </ng-container>
       </div>
     </div>
   </section>
@@ -139,18 +230,30 @@
       <div class="chart-card chart-card-wide">
         <div class="chart-card-header">
           <h3>Por Proyecto</h3>
-          <span class="chart-type-tag">Gráfico de barras agrupadas</span>
+          <div class="presupuesto-legend">
+            <span class="legend-dot" style="background:#a5b4fc"></span> Proyectado
+            <span class="legend-dot" style="background:#fdba74; margin-left:12px"></span> Real
+          </div>
         </div>
-        <div class="chart-placeholder">
+
+        <div class="chart-loading" *ngIf="loadingPresupuesto">
+          <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+        </div>
+
+        <div class="chart-empty" *ngIf="!loadingPresupuesto && presupuestoData.length === 0">
           <i class="fa fa-bar-chart"></i>
-          <p>Gráfico pendiente de implementación</p>
-          <span>Una barra por proyecto: presupuesto proyectado (detalle_recurso) vs. gasto real (pedidos recibidos).</span>
+          <p>Sin datos de presupuesto para los filtros seleccionados</p>
+          <span>Agrega recursos proyectados o pedidos de compra a los proyectos para ver el comparativo.</span>
+        </div>
+
+        <div class="canvas-wrap canvas-bar" *ngIf="!loadingPresupuesto && presupuestoData.length > 0">
+          <canvas #presupuestoChart></canvas>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ── Sección 4: Avance por fases — solo con proyecto seleccionado ── -->
+  <!-- ── Sección 4: Avance por fases ── -->
   <section class="dash-section" *ngIf="proyectoSeleccionado as proy">
     <h2 class="section-title">Avance por Fases — {{ proy.nombre }}</h2>
 

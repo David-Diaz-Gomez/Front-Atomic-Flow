@@ -217,6 +217,53 @@ export class Api {
     );
   }
 
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
+  private analyticsParams(tipo: string, filters: { id_proyecto?: number; estado?: string; fecha_inicio?: string; fecha_fin?: string }): HttpParams {
+    let params = tipo ? new HttpParams().set('tipo', tipo) : new HttpParams();
+    if (filters.id_proyecto) params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.estado)      params = params.set('estado', filters.estado);
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)   params = params.set('fecha_fin', filters.fecha_fin);
+    return params;
+  }
+
+  getOcupacionRecursos(tipo: 'operarios' | 'maquinaria', filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_proyecto: number; nombre_proyecto: string; total_horas: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/ocupacion`, { params: this.analyticsParams(tipo, filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getPresupuesto(filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_proyecto: number; nombre_proyecto: string; presupuesto_proyectado: number; gasto_real: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/presupuesto`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getRankingRecursos(tipo: 'operarios' | 'maquinaria', filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_recurso: number; nombre: string; total_horas: number; total_tareas: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/ranking`, { params: this.analyticsParams(tipo, filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   // ── Vista General / Plantillas ────────────────────────────────────────────
 
   getVistaGeneralProyectos(): Observable<any[]> {
