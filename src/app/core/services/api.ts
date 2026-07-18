@@ -243,7 +243,8 @@ export class Api {
   getMenuForRole(roleId: number): any[] {
     const menus: any = {
       1: [
-        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/home' },
+        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/reports' },
+        { title: 'Proyectos',      icon: 'fa-briefcase',    route: '/dashboard/admin/home' },
         { title: 'Usuarios',       icon: 'fa-users',        route: '/dashboard/admin/users' },
         { title: 'Vista General',  icon: 'fa-globe',        route: '/dashboard/admin/vista-general' },
       ],

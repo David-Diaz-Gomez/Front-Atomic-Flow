@@ -1,1 +1,177 @@
-<p>reports works!</p>
+<div class="reports-page">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="page-title">
+      <h1><i class="fa fa-bar-chart"></i> Dashboard General</h1>
+      <span class="subtitle">Analítica y control de proyectos, recursos y presupuesto</span>
+    </div>
+  </div>
+
+  <!-- Filtro general -->
+  <div class="filters-bar filters-general">
+    <div class="filter-field">
+      <label>Proyecto</label>
+      <select [(ngModel)]="filtroProyecto" class="filter-select">
+        <option [ngValue]="''">Todos los proyectos</option>
+        <option *ngFor="let p of proyectosFiltrados" [ngValue]="p.id">{{ p.nombre }}</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>Estado</label>
+      <select [(ngModel)]="filtroEstado" class="filter-select">
+        <option value="">Todos</option>
+        <option value="activo">Activos</option>
+        <option value="finalizado">Finalizados</option>
+      </select>
+    </div>
+    <div class="filter-field">
+      <label>Desde</label>
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaInicio">
+    </div>
+    <div class="filter-field">
+      <label>Hasta</label>
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaFin">
+    </div>
+  </div>
+
+  <!-- ── Sección 1: Estado general de tareas y proyectos ── -->
+  <section class="dash-section">
+    <h2 class="section-title">Estado General</h2>
+
+    <div class="section-grid section-grid-1">
+
+      <div class="kpi-block">
+        <div class="stats-row">
+          <div class="stat-card stat-ok">
+            <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ kpis.completadas.valor }} <small>({{ kpis.completadas.pct }}%)</small></span>
+              <span class="stat-label">Tareas Completadas</span>
+            </div>
+          </div>
+          <div class="stat-card stat-pending">
+            <div class="stat-icon"><i class="fa fa-hourglass-half"></i></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ kpis.noCompletadas.valor }} <small>({{ kpis.noCompletadas.pct }}%)</small></span>
+              <span class="stat-label">Tareas No Completadas</span>
+            </div>
+          </div>
+          <div class="stat-card stat-warning">
+            <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ kpis.conRetraso.valor }} <small>({{ kpis.conRetraso.pct }}%)</small></span>
+              <span class="stat-label">Entregadas con Retraso</span>
+            </div>
+          </div>
+          <div class="stat-card stat-blocked">
+            <div class="stat-icon"><i class="fa fa-ban"></i></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ kpis.bloqueadas.valor }} <small>({{ kpis.bloqueadas.pct }}%)</small></span>
+              <span class="stat-label">Tareas Bloqueadas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-card-header">
+          <h3>Estados de Proyectos</h3>
+          <span class="chart-type-tag">Gráfico de torta</span>
+        </div>
+        <div class="chart-placeholder">
+          <i class="fa fa-pie-chart"></i>
+          <p>Gráfico pendiente de implementación</p>
+          <span>
+            Tres segmentos: <code>en_produccion</code>, <code>pausado</code> y <code>finalizado</code>.
+            Vista previa —
+            {{ proyectosPorEstado.en_produccion.label }} {{ proyectosPorEstado.en_produccion.valor }} ({{ proyectosPorEstado.en_produccion.pct }}%),
+            {{ proyectosPorEstado.pausado.label }} {{ proyectosPorEstado.pausado.valor }} ({{ proyectosPorEstado.pausado.pct }}%),
+            {{ proyectosPorEstado.finalizado.label }} {{ proyectosPorEstado.finalizado.valor }} ({{ proyectosPorEstado.finalizado.pct }}%).
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Sección 2: Ocupación de recursos ── -->
+  <section class="dash-section">
+    <h2 class="section-title">Ocupación de Recursos</h2>
+
+    <div class="filters-bar filters-section">
+      <div class="filter-field">
+        <label>Operario</label>
+        <select [(ngModel)]="filtroOperario" class="filter-select">
+          <option [ngValue]="''">Todos los operarios</option>
+          <option *ngFor="let o of operarios" [ngValue]="o.id">{{ o.nombre }} {{ o.apellido }}</option>
+        </select>
+      </div>
+      <div class="filter-field">
+        <label>Maquinaria</label>
+        <select [(ngModel)]="filtroMaquinaria" class="filter-select">
+          <option [ngValue]="''">Toda la maquinaria</option>
+          <option *ngFor="let m of maquinarias" [ngValue]="m.id">{{ m.nombre }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-grid section-grid-1">
+      <div class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <h3>Ocupación por Hora</h3>
+          <span class="chart-type-tag">Gráfico de torta — número y porcentaje</span>
+        </div>
+        <div class="chart-placeholder">
+          <i class="fa fa-clock-o"></i>
+          <p>Gráfico pendiente de implementación</p>
+          <span>Mostrará horas ocupadas vs. disponibles por operario/maquinaria en el rango de fechas filtrado.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Sección 3: Presupuesto proyectado vs. real ── -->
+  <section class="dash-section">
+    <h2 class="section-title">Presupuesto Proyectado vs. Real</h2>
+
+    <div class="section-grid section-grid-1">
+      <div class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <h3>Por Proyecto</h3>
+          <span class="chart-type-tag">Gráfico de barras agrupadas</span>
+        </div>
+        <div class="chart-placeholder">
+          <i class="fa fa-bar-chart"></i>
+          <p>Gráfico pendiente de implementación</p>
+          <span>Una barra por proyecto: presupuesto proyectado (detalle_recurso) vs. gasto real (pedidos recibidos).</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Sección 4: Avance por fases — solo con proyecto seleccionado ── -->
+  <section class="dash-section" *ngIf="proyectoSeleccionado as proy">
+    <h2 class="section-title">Avance por Fases — {{ proy.nombre }}</h2>
+
+    <div class="section-grid section-grid-1">
+      <div class="chart-card chart-card-wide">
+        <div class="chart-card-header">
+          <h3>Fases del proyecto</h3>
+          <span class="chart-type-tag">Barras horizontales apiladas</span>
+        </div>
+        <div class="chart-placeholder">
+          <i class="fa fa-tasks"></i>
+          <p>Gráfico pendiente de implementación</p>
+          <span>Una barra por fase con el % de avance según el estado de sus tareas.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="empty-hint" *ngIf="!proyectoSeleccionado">
+    <i class="fa fa-info-circle"></i>
+    Selecciona un proyecto en el filtro general para ver su avance por fases.
+  </div>
+
+</div>
