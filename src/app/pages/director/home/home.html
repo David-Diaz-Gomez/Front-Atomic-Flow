@@ -85,7 +85,7 @@
              [alt]="p.nombre" (error)="$any($event.target).src='/assets/img/project-default.png'">
         <div class="card-image-overlay">
           <span class="estado-badge" [ngClass]="getEstadoClass(p.estado)">{{ getEstadoLabel(p.estado) }}</span>
-          <span class="badge-cc" *ngIf="p.centro_costos">{{ p.centro_costos }}</span>
+          <span class="badge-cc" *ngIf="p.codigo || p.id">{{ p.codigo || ('#' + p.id) }}</span>
         </div>
         <a *ngIf="p.link_trello" [href]="p.link_trello" target="_blank" class="trello-link" title="Ver en Trello">
           <i class="fa fa-trello"></i>

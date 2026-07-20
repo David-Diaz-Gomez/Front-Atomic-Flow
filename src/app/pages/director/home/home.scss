@@ -176,6 +176,18 @@
         letter-spacing: 0.5px;
       }
 
+      .badge-cc {
+        background: #fff;
+        color: #1e293b;
+        font-size: 0.68rem;
+        font-weight: 700;
+        padding: 3px 9px;
+        border-radius: 20px;
+        letter-spacing: 0.4px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+        white-space: nowrap;
+      }
+
       .estado-badge {
         font-size: 0.72rem;
         font-weight: bold;

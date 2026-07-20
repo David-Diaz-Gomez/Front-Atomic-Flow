@@ -72,16 +72,67 @@
   <!-- Borradores (pedidos con recurso pendiente de aprobación) -->
   <div class="borradores-section" *ngIf="!loading && borradores.length">
     <div class="borradores-header">
-      <i class="fa fa-clock-o"></i> Pedidos en Borrador — esperando aprobación de recurso
+      <i class="fa fa-clock-o"></i> Pedidos en Borrador — completa el precio antes de confirmar
       <span class="borradores-count">{{ borradores.length }}</span>
     </div>
     <div class="borrador-item" *ngFor="let b of borradores">
       <div class="borrador-info">
         <span class="borrador-id">#{{ b.id }}</span>
-        <span class="borrador-prov">{{ b.proveedor || 'Sin proveedor' }}</span>
+        <span class="borrador-prov">{{ b.proveedor !== 'Pendiente' ? b.proveedor : 'Sin proveedor' }}</span>
         <span class="borrador-fecha">Solicitado: {{ fmtFechaSolicitud(b.fecha_solicitud) }}</span>
+        <span class="borrador-recursos" *ngIf="b.items?.length">
+          <i class="fa fa-cube"></i>
+          <span *ngFor="let it of b.items; let last = last">{{ it.nombre_recurso || it.nombre_recurso_libre }}<span *ngIf="!last">, </span></span>
+        </span>
       </div>
-      <span class="estado-badge badge-borrador">Borrador</span>
+      <div class="borrador-actions">
+        <span class="estado-badge badge-borrador">Borrador</span>
+        <button class="btn-confirmar-borrador" (click)="openConfirmBorrador(b)" title="Completar y confirmar como Solicitud Pedido">
+          <i class="fa fa-check"></i> Confirmar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal confirmar borrador -->
+  <div class="modal-overlay" *ngIf="showConfirmBorradorModal" (click)="closeConfirmBorrador()">
+    <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h3><i class="fa fa-check-circle"></i> Confirmar pedido #{{ confirmingBorrador?.id }}</h3>
+        <button class="modal-close" (click)="closeConfirmBorrador()"><i class="fa fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="mform-group">
+          <label>Proveedor *</label>
+          <input type="text" [(ngModel)]="confirmBorradorForm.proveedor" placeholder="Nombre del proveedor"
+                 [class.field-invalid]="!confirmBorradorForm.proveedor.trim()">
+        </div>
+        <div class="mform-row">
+          <div class="mform-group">
+            <label>Valor unitario *</label>
+            <input type="number" [(ngModel)]="confirmBorradorForm.valor_unitario" min="1"
+                   [class.field-invalid]="confirmBorradorForm.valor_unitario <= 0">
+          </div>
+          <div class="mform-group">
+            <label>Cantidad</label>
+            <input type="number" [(ngModel)]="confirmBorradorForm.cantidad" min="1" [readonly]="true">
+          </div>
+        </div>
+        <div class="mform-group">
+          <label>Fecha requerida *</label>
+          <input type="date" [(ngModel)]="confirmBorradorForm.fecha_requerida"
+                 [class.field-invalid]="!confirmBorradorForm.fecha_requerida">
+        </div>
+        <div class="confirm-total" *ngIf="confirmBorradorForm.valor_unitario > 0">
+          Total: <strong>{{ confirmBorradorForm.valor_unitario * confirmBorradorForm.cantidad | number:'1.0-0' }}</strong>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" (click)="closeConfirmBorrador()">Cancelar</button>
+        <button class="btn-primary" (click)="submitConfirmBorrador()" [disabled]="confirmingBorrador$">
+          <i class="fa fa-paper-plane"></i> {{ confirmingBorrador$ ? 'Guardando...' : 'Confirmar como Solicitud' }}
+        </button>
+      </div>
     </div>
   </div>
 

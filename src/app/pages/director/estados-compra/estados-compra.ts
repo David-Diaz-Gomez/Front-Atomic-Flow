@@ -155,6 +155,12 @@ export class EstadosCompra implements OnInit {
     fecha_compra: '',
   };
 
+  // ── Confirmar borrador ────────────────────────────────────────────────────
+  showConfirmBorradorModal = false;
+  confirmingBorrador: Pedido | null = null;
+  confirmingBorrador$ = false;
+  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '' };
+
   // ── Estado badge menú ─────────────────────────────────────────────────────
   openEstadoMenuId: number | null = null;
 
@@ -746,6 +752,51 @@ export class EstadosCompra implements OnInit {
     });
   }
 
+  // ── Confirmar borrador ────────────────────────────────────────────────────
+  openConfirmBorrador(b: Pedido): void {
+    this.confirmingBorrador = b;
+    const cantTotal = b.cantidad_solicitada || 1;
+    this.confirmBorradorForm = {
+      proveedor:      b.proveedor !== 'Pendiente' ? b.proveedor : '',
+      valor_unitario: b.valor > 0 ? Math.round(b.valor / cantTotal) : 0,
+      cantidad:       cantTotal,
+      fecha_requerida: b.fecha_requerida ? b.fecha_requerida.substring(0, 10) : '',
+    };
+    this.showConfirmBorradorModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeConfirmBorrador(): void {
+    this.showConfirmBorradorModal = false;
+    this.confirmingBorrador = null;
+  }
+
+  submitConfirmBorrador(): void {
+    if (!this.confirmingBorrador) return;
+    const f = this.confirmBorradorForm;
+    if (!f.proveedor.trim() || !f.fecha_requerida || f.valor_unitario <= 0) {
+      this.cdr.detectChanges();
+      return;
+    }
+    this.confirmingBorrador$ = true;
+    const valor = f.valor_unitario * f.cantidad;
+    this.api.updatePedido(this.confirmingBorrador.id, {
+      proveedor:       f.proveedor.trim(),
+      valor,
+      fecha_requerida: f.fecha_requerida,
+      id_estado_pedido: 4,
+    }).subscribe({
+      next: () => {
+        this.confirmingBorrador$ = false;
+        this.showConfirmBorradorModal = false;
+        this.confirmingBorrador = null;
+        this.load();
+        this.cdr.detectChanges();
+      },
+      error: () => { this.confirmingBorrador$ = false; this.cdr.detectChanges(); },
+    });
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private dateToInt(dateStr: string): number {
@@ -853,7 +904,7 @@ export class EstadosCompra implements OnInit {
       fecha_solicitud: this.dateToInt(this.form.fecha_solicitud || hoy),
       fecha_requerida: this.form.fecha_requerida || hoy,
       proveedor: this.form.proveedor || 'Pendiente',
-      valor: 0,
+      valor: (f.precio_unitario ?? 0) * (f.cantidad ?? 1),
       id_estado_pedido: 6,  // Borrador
       items: [{ nombre_recurso_libre: f.nombre, cantidad: f.cantidad!, valor_unitario: f.precio_unitario!, id_detalle_recurso: null }],
     };

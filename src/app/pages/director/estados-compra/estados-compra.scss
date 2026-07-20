@@ -299,10 +299,30 @@
 }
 
 .borrador-info {
-  display: flex; align-items: center; gap: 12px; font-size: 13px;
+  display: flex; align-items: center; gap: 12px; font-size: 13px; flex-wrap: wrap;
   .borrador-id  { font-weight: 700; color: #92400e; }
   .borrador-prov { color: #475569; }
   .borrador-fecha { font-size: 11px; color: #94a3b8; }
+  .borrador-recursos { font-size: 11px; color: #64748b; display: flex; align-items: center; gap: 4px; }
+}
+
+.borrador-actions {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+
+.btn-confirmar-borrador {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 14px; background: #059669; color: white;
+  border: none; border-radius: 7px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+  &:hover { background: #047857; }
+  i { font-size: 10px; }
+}
+
+.confirm-total {
+  background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;
+  padding: 8px 14px; font-size: 14px; color: #166534;
+  strong { color: #15803d; margin-left: 4px; }
 }
 
 .badge-borrador {
