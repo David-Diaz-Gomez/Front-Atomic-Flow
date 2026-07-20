@@ -49,6 +49,14 @@ export class ProjectDetail implements OnInit, OnDestroy {
   solicitudesPendientes: any[] = [];
   loadingSolicitudes = false;
 
+  // Quick-order modal (abre desde recursos sin navegar)
+  showQuickOrderModal = false;
+  quickOrderRecurso: { id: number; nombre: string; nombre_proveedor: string | null; precio_unitario: number; cantidad: number } | null = null;
+  quickOrderForm = { proveedor: '', cantidad: 1, valor_unitario: 0, fecha_requerida: '', fecha_solicitud: '' };
+  quickOrderSaving = false;
+  quickOrderErrors: Record<string, string> = {};
+  orderedResourceIds = new Set<number>();  // recursos con al menos un pedido en esta sesión
+
   constructor(
     private router: Router,
     private route: ActivatedRoute,
@@ -271,12 +279,55 @@ export class ProjectDetail implements OnInit, OnDestroy {
   }
 
   onPedirRecurso(r: { id: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number }): void {
-    const proyectoId = this.project?.id;
-    if (!proyectoId) return;
-    this.router.navigate(['/dashboard/director/estados-compra'], {
-      queryParams: { abrirPedido: proyectoId },
-      state: { recurso: { id_detalle_recurso: r.id, nombre: r.nombre, nombre_proveedor: r.nombre_proveedor ?? null, precio_unitario: r.precio_unitario, cantidad: r.cantidad } }
+    const today = this.todayStr();
+    const requerida = this.addDays(today, 3);
+    this.quickOrderRecurso = { id: r.id, nombre: r.nombre, nombre_proveedor: r.nombre_proveedor ?? null, precio_unitario: r.precio_unitario, cantidad: r.cantidad };
+    this.quickOrderForm = { proveedor: r.nombre_proveedor ?? '', cantidad: r.cantidad || 1, valor_unitario: r.precio_unitario || 0, fecha_requerida: requerida, fecha_solicitud: today };
+    this.quickOrderErrors = {};
+    this.showQuickOrderModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeQuickOrder(): void { this.showQuickOrderModal = false; this.quickOrderRecurso = null; this.cdr.detectChanges(); }
+
+  submitQuickOrder(): void {
+    this.quickOrderErrors = {};
+    const f = this.quickOrderForm;
+    if (!f.proveedor.trim()) this.quickOrderErrors['proveedor'] = 'El proveedor es obligatorio';
+    if (!f.cantidad || f.cantidad <= 0) this.quickOrderErrors['cantidad'] = 'Cantidad inválida';
+    if (!f.fecha_requerida) this.quickOrderErrors['fecha_requerida'] = 'Fecha requerida obligatoria';
+    if (Object.keys(this.quickOrderErrors).length) { this.cdr.detectChanges(); return; }
+
+    const r = this.quickOrderRecurso!;
+    const valor = Number(f.cantidad) * Number(f.valor_unitario);
+    const fechaSolicitudInt = Number(f.fecha_solicitud.replace(/-/g, ''));
+
+    this.quickOrderSaving = true;
+    this.api.createPedido({
+      fecha_requerida:  f.fecha_requerida,
+      fecha_solicitud:  fechaSolicitudInt,
+      proveedor:        f.proveedor.trim(),
+      valor,
+      items: [{ id_detalle_recurso: r.id, cantidad: Number(f.cantidad), valor_unitario: Number(f.valor_unitario) }],
+    }).subscribe({
+      next: () => {
+        this.quickOrderSaving = false;
+        this.orderedResourceIds.add(r.id);
+        this.showQuickOrderModal = false;
+        this.quickOrderRecurso = null;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.quickOrderSaving = false; this.cdr.detectChanges(); },
     });
+  }
+
+  private todayStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  private addDays(dateStr: string, days: number): string {
+    const d = new Date(dateStr); d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
 
   // ── Task display helpers (API returns objects, template expects strings) ──

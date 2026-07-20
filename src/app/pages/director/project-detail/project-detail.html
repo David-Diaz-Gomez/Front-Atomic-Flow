@@ -534,3 +534,62 @@
   <p>{{ error }}</p>
   <button class="btn-outline" (click)="goBack()"><i class="fa fa-arrow-left"></i> Volver</button>
 </div>
+
+<!-- ══ QUICK ORDER MODAL ════════════════════════════════════════════════════ -->
+<div class="modal-overlay qo-overlay" *ngIf="showQuickOrderModal" (click)="closeQuickOrder()">
+  <div class="qo-modal" (click)="$event.stopPropagation()">
+    <div class="qo-modal__header">
+      <div>
+        <span class="qo-tag">Solicitud de pedido</span>
+        <h3>{{ quickOrderRecurso?.nombre }}</h3>
+        <span class="qo-sub" *ngIf="orderedResourceIds.has(quickOrderRecurso?.id || 0)">
+          <i class="fa fa-check-circle"></i> Ya tiene pedidos anteriores — puedes agregar más
+        </span>
+      </div>
+      <button class="modal-close" (click)="closeQuickOrder()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="qo-modal__body">
+      <div class="qo-field">
+        <label>Proveedor *</label>
+        <input type="text" [(ngModel)]="quickOrderForm.proveedor" placeholder="Nombre del proveedor"
+               [class.field-error]="quickOrderErrors['proveedor']">
+        <span class="err-msg" *ngIf="quickOrderErrors['proveedor']">{{ quickOrderErrors['proveedor'] }}</span>
+      </div>
+      <div class="qo-row">
+        <div class="qo-field">
+          <label>Cantidad *</label>
+          <input type="number" [(ngModel)]="quickOrderForm.cantidad" min="1"
+                 [class.field-error]="quickOrderErrors['cantidad']">
+          <span class="err-msg" *ngIf="quickOrderErrors['cantidad']">{{ quickOrderErrors['cantidad'] }}</span>
+        </div>
+        <div class="qo-field">
+          <label>Valor unitario</label>
+          <input type="number" [(ngModel)]="quickOrderForm.valor_unitario" min="0">
+        </div>
+      </div>
+      <div class="qo-row">
+        <div class="qo-field">
+          <label>Fecha de solicitud</label>
+          <input type="date" [(ngModel)]="quickOrderForm.fecha_solicitud">
+        </div>
+        <div class="qo-field">
+          <label>Fecha requerida *</label>
+          <input type="date" [(ngModel)]="quickOrderForm.fecha_requerida"
+                 [class.field-error]="quickOrderErrors['fecha_requerida']">
+          <span class="err-msg" *ngIf="quickOrderErrors['fecha_requerida']">{{ quickOrderErrors['fecha_requerida'] }}</span>
+        </div>
+      </div>
+      <div class="qo-total">
+        Total estimado: <strong>{{ (quickOrderForm.cantidad * quickOrderForm.valor_unitario) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
+      </div>
+    </div>
+
+    <div class="qo-modal__footer">
+      <button class="btn-cancel-modal" (click)="closeQuickOrder()">Cancelar</button>
+      <button class="btn-qo-submit" (click)="submitQuickOrder()" [disabled]="quickOrderSaving">
+        <i class="fa fa-paper-plane"></i> {{ quickOrderSaving ? 'Enviando...' : 'Registrar pedido' }}
+      </button>
+    </div>
+  </div>
+</div>
