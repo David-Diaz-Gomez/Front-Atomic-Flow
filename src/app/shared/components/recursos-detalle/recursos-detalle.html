@@ -54,8 +54,9 @@
           <td class="center">{{ r.cantidad }}</td>
           <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
           <td *ngIf="mostrarPedido" class="td-pedido-btn">
-            <button class="btn-pedido-row" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
+            <button class="btn-pedido-row" [class.btn-pedido-row--ordered]="orderedIds.has(r.id)" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
               <i class="fa fa-shopping-cart"></i> Pedir
+              <span class="ordered-dot" *ngIf="orderedIds.has(r.id)" title="Ya tiene pedidos registrados"><i class="fa fa-check"></i></span>
             </button>
           </td>
         </tr>
@@ -88,8 +89,9 @@
           <td class="center">{{ r.cantidad }}</td>
           <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
           <td *ngIf="mostrarPedido" class="td-pedido-btn">
-            <button class="btn-pedido-row" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
+            <button class="btn-pedido-row" [class.btn-pedido-row--ordered]="orderedIds.has(r.id)" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
               <i class="fa fa-shopping-cart"></i> Pedir
+              <span class="ordered-dot" *ngIf="orderedIds.has(r.id)" title="Ya tiene pedidos registrados"><i class="fa fa-check"></i></span>
             </button>
           </td>
         </tr>

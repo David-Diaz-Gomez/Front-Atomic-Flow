@@ -891,7 +891,28 @@
   padding: 10px 14px;
   font-size: 14px;
   color: #475569;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
   strong { color: #0052cc; margin-left: 4px; }
+  &--warn { background: #fff7ed; border: 1px solid #fed7aa; strong { color: #c2410c; } }
+  .qo-limit { font-size: 12px; color: #94a3b8; }
+}
+
+.qo-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #92400e;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  i { color: #f97316; }
+  strong { color: #c2410c; }
 }
 
 .btn-qo-submit {

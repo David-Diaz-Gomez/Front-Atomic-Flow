@@ -34,6 +34,7 @@ export class RecursosDetalle implements OnChanges {
   @Input() recursos: any = null;
   @Input() mostrarPrecios = true;
   @Input() mostrarPedido = false;
+  @Input() orderedIds: Set<number> = new Set();
   @Output() pedirRecurso = new EventEmitter<{ id: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number }>();
 
   budget: Budget = EMPTY_BUDGET();

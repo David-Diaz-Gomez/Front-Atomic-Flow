@@ -300,6 +300,7 @@
       [recursos]="rawRecursos"
       [mostrarPrecios]="true"
       [mostrarPedido]="canManagePhases"
+      [orderedIds]="orderedResourceIds"
       (pedirRecurso)="onPedirRecurso($event)">
     </app-recursos-detalle>
   </div>
@@ -580,8 +581,20 @@
           <span class="err-msg" *ngIf="quickOrderErrors['fecha_requerida']">{{ quickOrderErrors['fecha_requerida'] }}</span>
         </div>
       </div>
-      <div class="qo-total">
-        Total estimado: <strong>{{ (quickOrderForm.cantidad * quickOrderForm.valor_unitario) | currency:'COP':'symbol-narrow':'1.0-0':'es-CO' }}</strong>
+      <div class="qo-total" [class.qo-total--warn]="quickOrderExcede > 0">
+        <span>Total estimado: <strong>{{ quickOrderTotal }}</strong></span>
+        <span class="qo-limit">Presupuesto: {{ quickOrderLimiteStr }}</span>
+      </div>
+      <div class="qo-warning" *ngIf="quickOrderExcede > 0">
+        <i class="fa fa-exclamation-triangle"></i>
+        Excede el presupuesto en <strong>{{ quickOrderExcedeStr }}</strong>. Añade una justificación.
+      </div>
+      <div class="qo-field" *ngIf="quickOrderExcede > 0">
+        <label>Justificación *</label>
+        <textarea [(ngModel)]="quickOrderForm.observacion" rows="2" placeholder="Motivo del excedente..."
+                  [class.field-error]="quickOrderErrors['observacion']"
+                  style="resize:vertical;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;color:#1e293b;outline:none;font-family:inherit"></textarea>
+        <span class="err-msg" *ngIf="quickOrderErrors['observacion']">{{ quickOrderErrors['observacion'] }}</span>
       </div>
     </div>
 

@@ -52,7 +52,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
   // Quick-order modal (abre desde recursos sin navegar)
   showQuickOrderModal = false;
   quickOrderRecurso: { id: number; nombre: string; nombre_proveedor: string | null; precio_unitario: number; cantidad: number } | null = null;
-  quickOrderForm = { proveedor: '', cantidad: 1, valor_unitario: 0, fecha_requerida: '', fecha_solicitud: '' };
+  quickOrderForm = { proveedor: '', cantidad: 1, valor_unitario: 0, fecha_requerida: '', fecha_solicitud: '', observacion: '' };
   quickOrderSaving = false;
   quickOrderErrors: Record<string, string> = {};
   orderedResourceIds = new Set<number>();  // recursos con al menos un pedido en esta sesión
@@ -97,6 +97,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
         this.loadProjectInsumos(id);
         this.loadProjectMuebles(id);
         this.loadSolicitudes(id);
+        this.loadExistingPedidos(id);
       },
       error: () => {
         this.error = 'No se pudo cargar el proyecto.';
@@ -278,11 +279,34 @@ export class ProjectDetail implements OnInit, OnDestroy {
     });
   }
 
+  get quickOrderTotal(): string {
+    const total = (Number(this.quickOrderForm.cantidad) || 0) * (Number(this.quickOrderForm.valor_unitario) || 0);
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total);
+  }
+
+  get quickOrderLimite(): number {
+    const r = this.quickOrderRecurso;
+    return r ? r.precio_unitario * r.cantidad : 0;
+  }
+
+  get quickOrderExcede(): number {
+    const total = (Number(this.quickOrderForm.cantidad) || 0) * (Number(this.quickOrderForm.valor_unitario) || 0);
+    return Math.max(0, total - this.quickOrderLimite);
+  }
+
+  get quickOrderLimiteStr(): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(this.quickOrderLimite);
+  }
+
+  get quickOrderExcedeStr(): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(this.quickOrderExcede);
+  }
+
   onPedirRecurso(r: { id: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number }): void {
     const today = this.todayStr();
     const requerida = this.addDays(today, 3);
     this.quickOrderRecurso = { id: r.id, nombre: r.nombre, nombre_proveedor: r.nombre_proveedor ?? null, precio_unitario: r.precio_unitario, cantidad: r.cantidad };
-    this.quickOrderForm = { proveedor: r.nombre_proveedor ?? '', cantidad: r.cantidad || 1, valor_unitario: r.precio_unitario || 0, fecha_requerida: requerida, fecha_solicitud: today };
+    this.quickOrderForm = { proveedor: r.nombre_proveedor ?? '', cantidad: r.cantidad || 1, valor_unitario: r.precio_unitario || 0, fecha_requerida: requerida, fecha_solicitud: today, observacion: '' };
     this.quickOrderErrors = {};
     this.showQuickOrderModal = true;
     this.cdr.detectChanges();
@@ -296,6 +320,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
     if (!f.proveedor.trim()) this.quickOrderErrors['proveedor'] = 'El proveedor es obligatorio';
     if (!f.cantidad || f.cantidad <= 0) this.quickOrderErrors['cantidad'] = 'Cantidad inválida';
     if (!f.fecha_requerida) this.quickOrderErrors['fecha_requerida'] = 'Fecha requerida obligatoria';
+    if (this.quickOrderExcede > 0 && !f.observacion.trim()) this.quickOrderErrors['observacion'] = 'Justifica el excedente del presupuesto';
     if (Object.keys(this.quickOrderErrors).length) { this.cdr.detectChanges(); return; }
 
     const r = this.quickOrderRecurso!;
@@ -307,6 +332,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
       fecha_requerida:  f.fecha_requerida,
       fecha_solicitud:  fechaSolicitudInt,
       proveedor:        f.proveedor.trim(),
+      detalle:          f.observacion.trim() || null,
       valor,
       items: [{ id_detalle_recurso: r.id, cantidad: Number(f.cantidad), valor_unitario: Number(f.valor_unitario) }],
     }).subscribe({
@@ -368,6 +394,21 @@ export class ProjectDetail implements OnInit, OnDestroy {
   }
 
   // ── Insumos disponibles del proyecto (para selector en delegación/fase) ───
+  private loadExistingPedidos(id: number): void {
+    this.api.getPedidosByProject(id).subscribe({
+      next: (res: any) => {
+        const pedidos: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        for (const pedido of pedidos) {
+          for (const item of (pedido.items ?? pedido.detalles ?? [])) {
+            if (item.id_detalle_recurso) this.orderedResourceIds.add(item.id_detalle_recurso);
+          }
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
   private loadProjectInsumos(id: number): void {
     this.projectSvc.getProjectResources(id).subscribe({
       next: raw => {
