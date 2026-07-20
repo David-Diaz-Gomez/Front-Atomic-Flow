@@ -96,40 +96,58 @@
 
   <!-- Modal confirmar borrador -->
   <div class="modal-overlay" *ngIf="showConfirmBorradorModal" (click)="closeConfirmBorrador()">
-    <div class="modal-box modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-box modal-box--sm" (click)="$event.stopPropagation()">
       <div class="modal-header">
-        <h3><i class="fa fa-check-circle"></i> Confirmar pedido #{{ confirmingBorrador?.id }}</h3>
+        <h2><i class="fa fa-check-circle"></i> Confirmar pedido #{{ confirmingBorrador?.id }}</h2>
         <button class="modal-close" (click)="closeConfirmBorrador()"><i class="fa fa-times"></i></button>
       </div>
       <div class="modal-body">
-        <div class="mform-group">
+
+        <div class="form-group">
           <label>Proveedor *</label>
-          <input type="text" [(ngModel)]="confirmBorradorForm.proveedor" placeholder="Nombre del proveedor"
-                 [class.field-invalid]="!confirmBorradorForm.proveedor.trim()">
+          <input type="text" class="form-control" [(ngModel)]="confirmBorradorForm.proveedor"
+                 placeholder="Nombre del proveedor"
+                 [class.is-invalid]="!confirmBorradorForm.proveedor.trim()">
         </div>
-        <div class="mform-row">
-          <div class="mform-group">
-            <label>Valor unitario *</label>
-            <input type="number" [(ngModel)]="confirmBorradorForm.valor_unitario" min="1"
-                   [class.field-invalid]="confirmBorradorForm.valor_unitario <= 0">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>
+              Valor unitario *
+              <span class="detalle-lock-hint" *ngIf="confirmBorradorForm.valor_aprobado_unitario > 0">
+                <i class="fa fa-lock"></i> máx. {{ confirmBorradorForm.valor_aprobado_unitario | number:'1.0-0' }}
+              </span>
+            </label>
+            <input type="number" class="form-control" [(ngModel)]="confirmBorradorForm.valor_unitario" min="1"
+                   [class.is-invalid]="confirmBorradorForm.valor_unitario <= 0 || (confirmBorradorForm.valor_aprobado_unitario > 0 && confirmBorradorForm.valor_unitario > confirmBorradorForm.valor_aprobado_unitario)">
+            <span class="field-error"
+                  *ngIf="confirmBorradorForm.valor_aprobado_unitario > 0 && confirmBorradorForm.valor_unitario > confirmBorradorForm.valor_aprobado_unitario">
+              <i class="fa fa-exclamation-triangle"></i>
+              Excede el presupuesto aprobado ({{ confirmBorradorForm.valor_aprobado_unitario | number:'1.0-0' }})
+            </span>
           </div>
-          <div class="mform-group">
+          <div class="form-group">
             <label>Cantidad</label>
-            <input type="number" [(ngModel)]="confirmBorradorForm.cantidad" min="1" [readonly]="true">
+            <input type="number" class="form-control" [(ngModel)]="confirmBorradorForm.cantidad" min="1" [attr.readonly]="true">
           </div>
         </div>
-        <div class="mform-group">
+
+        <div class="form-group">
           <label>Fecha requerida *</label>
-          <input type="date" [(ngModel)]="confirmBorradorForm.fecha_requerida"
-                 [class.field-invalid]="!confirmBorradorForm.fecha_requerida">
+          <input type="date" class="form-control" [(ngModel)]="confirmBorradorForm.fecha_requerida"
+                 [class.is-invalid]="!confirmBorradorForm.fecha_requerida">
         </div>
-        <div class="confirm-total" *ngIf="confirmBorradorForm.valor_unitario > 0">
+
+        <div class="confirm-total" *ngIf="confirmBorradorForm.valor_unitario > 0"
+             [class.confirm-total--warn]="confirmBorradorForm.valor_aprobado_unitario > 0 && confirmBorradorForm.valor_unitario > confirmBorradorForm.valor_aprobado_unitario">
           Total: <strong>{{ confirmBorradorForm.valor_unitario * confirmBorradorForm.cantidad | number:'1.0-0' }}</strong>
         </div>
+
       </div>
       <div class="modal-footer">
-        <button class="btn-cancel" (click)="closeConfirmBorrador()">Cancelar</button>
-        <button class="btn-primary" (click)="submitConfirmBorrador()" [disabled]="confirmingBorrador$">
+        <button class="btn-cancelar" (click)="closeConfirmBorrador()">Cancelar</button>
+        <button class="btn-guardar" (click)="submitConfirmBorrador()"
+                [disabled]="confirmingBorrador$ || !confirmBorradorForm.proveedor.trim() || !confirmBorradorForm.fecha_requerida || confirmBorradorForm.valor_unitario <= 0 || (confirmBorradorForm.valor_aprobado_unitario > 0 && confirmBorradorForm.valor_unitario > confirmBorradorForm.valor_aprobado_unitario)">
           <i class="fa fa-paper-plane"></i> {{ confirmingBorrador$ ? 'Guardando...' : 'Confirmar como Solicitud' }}
         </button>
       </div>

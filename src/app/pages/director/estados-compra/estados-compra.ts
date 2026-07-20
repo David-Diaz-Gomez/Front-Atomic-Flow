@@ -159,7 +159,7 @@ export class EstadosCompra implements OnInit {
   showConfirmBorradorModal = false;
   confirmingBorrador: Pedido | null = null;
   confirmingBorrador$ = false;
-  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '' };
+  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '', valor_aprobado_unitario: 0 };
 
   // ── Estado badge menú ─────────────────────────────────────────────────────
   openEstadoMenuId: number | null = null;
@@ -756,11 +756,13 @@ export class EstadosCompra implements OnInit {
   openConfirmBorrador(b: Pedido): void {
     this.confirmingBorrador = b;
     const cantTotal = b.cantidad_solicitada || 1;
+    const aprobado = b.valor > 0 ? Math.round(b.valor / cantTotal) : 0;
     this.confirmBorradorForm = {
       proveedor:      b.proveedor !== 'Pendiente' ? b.proveedor : '',
-      valor_unitario: b.valor > 0 ? Math.round(b.valor / cantTotal) : 0,
+      valor_unitario: aprobado,
       cantidad:       cantTotal,
       fecha_requerida: b.fecha_requerida ? b.fecha_requerida.substring(0, 10) : '',
+      valor_aprobado_unitario: aprobado,
     };
     this.showConfirmBorradorModal = true;
     this.cdr.detectChanges();
@@ -775,6 +777,10 @@ export class EstadosCompra implements OnInit {
     if (!this.confirmingBorrador) return;
     const f = this.confirmBorradorForm;
     if (!f.proveedor.trim() || !f.fecha_requerida || f.valor_unitario <= 0) {
+      this.cdr.detectChanges();
+      return;
+    }
+    if (f.valor_aprobado_unitario > 0 && f.valor_unitario > f.valor_aprobado_unitario) {
       this.cdr.detectChanges();
       return;
     }
