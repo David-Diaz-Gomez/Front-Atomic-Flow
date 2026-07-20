@@ -17,7 +17,7 @@ export interface Mueble {
 
 // ── Interfaces de presupuesto ───────────────────────────────────────────────
 export interface ResourceRow {
-  id: number; nombre: string; observaciones: string;
+  id: number; nombre: string; observaciones: string; nombre_proveedor?: string;
   precio_unitario: number; cantidad: number; valor_total: number;
   detalle_id?: number; id_recurso?: number;
   id_mueble?: number | null;
@@ -101,14 +101,14 @@ export class ProjectForm implements OnInit {
   saving = false;
 
   form: {
-    nombre: string; descripcion: string; centro_costos: string;
+    nombre: string; codigo: string; descripcion: string; centro_costos: string;
     fecha_inicio: string; fecha_fin: string;
     id_cliente: number | null;
     id_coordinador: number | null;
     id_director_revision: number | null;
     link_trello: string;
   } = {
-    nombre: '', descripcion: '', centro_costos: '',
+    nombre: '', codigo: '', descripcion: '', centro_costos: '',
     fecha_inicio: '', fecha_fin: '',
     id_cliente: null, id_coordinador: null, id_director_revision: null,
     link_trello: ''
@@ -167,8 +167,8 @@ export class ProjectForm implements OnInit {
 
   // Inline client creation
   showClientModal = false;
-  newClientForm: { razon_social: string; identificacion: string; telefono: string; direccion: string } =
-    { razon_social: '', identificacion: '', telefono: '', direccion: '' };
+  newClientForm: { nombre: string } = { nombre: '' };
+  clientSimilares: string[] = [];
 
   constructor(
     private router: Router,
@@ -242,6 +242,7 @@ export class ProjectForm implements OnInit {
         if (project) {
           this.form = {
             nombre:               project.nombre       ?? '',
+            codigo:               project.codigo       ?? '',
             descripcion:          project.descripcion  ?? '',
             centro_costos:        project.centro_costos ?? '',
             fecha_inicio:         this.toDateStr(project.fecha_inicio),
@@ -305,15 +306,16 @@ export class ProjectForm implements OnInit {
       for (const item of rawItems) {
         const nombre = item.recurso?.nombre ?? item.nombre ?? '';
         const base: ResourceRow = {
-          id:             item.id ?? item.id_detalle_recurso ?? Date.now(),
-          detalle_id:     item.id ?? item.id_detalle_recurso,
-          id_recurso:     item.recurso?.id ?? item.id_recurso,
+          id:               item.id ?? item.id_detalle_recurso ?? Date.now(),
+          detalle_id:       item.id ?? item.id_detalle_recurso,
+          id_recurso:       item.recurso?.id ?? item.id_recurso,
           nombre,
-          observaciones:  item.observaciones ?? '',
-          precio_unitario: item.valor_unitario ?? 0,
-          cantidad:        item.cantidad ?? 0,
-          valor_total:     item.valor_total ?? 0,
-          id_mueble:      item.id_mueble ?? item.mueble?.id ?? null,
+          observaciones:    item.observaciones ?? '',
+          nombre_proveedor: item.nombre_proveedor ?? '',
+          precio_unitario:  item.valor_unitario ?? 0,
+          cantidad:         item.cantidad ?? 0,
+          valor_total:      item.valor_total ?? 0,
+          id_mueble:        item.id_mueble ?? item.mueble?.id ?? null,
         };
 
         if (tipo === 'materia_prima') {
@@ -556,34 +558,47 @@ export class ProjectForm implements OnInit {
 
   // ── Client modal ──────────────────────────────────────────────────────────
   openClientModal(): void {
-    this.newClientForm = { razon_social: '', identificacion: '', telefono: '', direccion: '' };
+    this.newClientForm = { nombre: '' };
+    this.clientSimilares = [];
     this.showClientModal = true;
   }
-  closeClientModal(): void { this.showClientModal = false; }
+  closeClientModal(): void { this.showClientModal = false; this.clientSimilares = []; }
 
   saveNewClient(): void {
-    if (!this.newClientForm.razon_social) {
-      void Swal.fire('Atención', 'La razón social es obligatoria', 'warning'); return;
+    const nombre = this.newClientForm.nombre.trim();
+    if (!nombre) {
+      void Swal.fire('Atención', 'El nombre del cliente es obligatorio', 'warning'); return;
     }
-    this.catalogSvc.createCliente({
-      razon_social: this.newClientForm.razon_social,
-      identificacion: this.newClientForm.identificacion,
-      telefono: this.newClientForm.telefono,
-      direccion: this.newClientForm.direccion,
-      id_tipo_documento: 3, // NIT por defecto
-    }).subscribe({
-      next: newClient => {
-        this.clients = [...this.clients, newClient];
-        this.form.id_cliente = newClient.id;
-        void Swal.fire({ icon: 'success', title: 'Cliente creado', text: `"${newClient.razon_social}" fue registrado`, timer: 1800 });
+    this.catalogSvc.createCliente({ nombre }).subscribe({
+      next: (newClient: any) => {
+        const nombreMostrar = newClient.razon_social ?? newClient.nombre ?? '';
+        const id = newClient.id ?? newClient.insertId;
+        if (!id) {
+          void Swal.fire('Error', 'El cliente fue creado pero no se pudo seleccionar automáticamente. Recarga y búscalo en la lista.', 'warning');
+          this.closeClientModal();
+          this.cdr.detectChanges();
+          return;
+        }
+        const clienteNormalizado = { ...newClient, id, razon_social: nombreMostrar };
+        this.clients = [...this.clients, clienteNormalizado];
+        this.form.id_cliente = id;
+        const aviso = newClient.advertencia_similares?.length
+          ? `\n⚠ Nombre similar ya existe: ${newClient.advertencia_similares[0]}`
+          : '';
+        void Swal.fire({ icon: 'success', title: 'Cliente creado', text: `"${nombreMostrar}" fue registrado.${aviso}`, timer: 2500 });
         this.closeClientModal();
+        this.cdr.detectChanges();
       },
-      error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo crear el cliente', 'error'),
+      error: (err: any) => {
+        const msg = err.error?.message ?? 'No se pudo crear el cliente';
+        void Swal.fire('Error', msg, 'error');
+      },
     });
   }
 
   get selectedClientName(): string {
-    return this.clients.find(c => c.id === this.form.id_cliente)?.razon_social ?? '';
+    const c = this.clients.find(c => c.id === this.form.id_cliente);
+    return c?.razon_social ?? c?.nombre ?? '';
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -599,6 +614,7 @@ export class ProjectForm implements OnInit {
     const userId = this.apiSvc.getCurrentUserId();
     const projectBody: any = {
       nombre:               this.form.nombre,
+      codigo:               this.form.codigo || null,
       descripcion:          this.form.descripcion,
       centro_costos:        this.form.centro_costos,
       fecha_inicio:         this.form.fecha_inicio,
@@ -670,12 +686,13 @@ export class ProjectForm implements OnInit {
       proveedores: this.budget.proveedores
         .filter(r => r.nombre && r.cantidad > 0)
         .map(r => ({
-          id_recurso:     r.id_recurso || null,
-          nombre:         r.nombre,
-          cantidad:       r.cantidad,
-          valor_unitario: r.precio_unitario,
-          observaciones:  r.observaciones || null,
-          id_mueble_temp: r.id_mueble || null,
+          id_recurso:      r.id_recurso || null,
+          nombre:          r.nombre,
+          cantidad:        r.cantidad,
+          valor_unitario:  r.precio_unitario,
+          observaciones:   r.observaciones || null,
+          nombre_proveedor: r.nombre_proveedor || null,
+          id_mueble_temp:  r.id_mueble || null,
         })),
       carpinteria: this.budget.carpinteria
         .filter(r => r.nombre && r.cantidad > 0)
@@ -720,8 +737,10 @@ export class ProjectForm implements OnInit {
         .filter(r => r.nombre && r.cantidad > 0)
         .map(r => ({
           concepto:        r.nombre,
+          nombre:          r.nombre,
           precio_unitario: r.precio_unitario,
           cantidad:        r.cantidad,
+          observaciones:   r.observaciones || null,
           id_mueble_temp:  r.id_mueble || null,
         })),
     };

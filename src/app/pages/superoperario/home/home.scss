@@ -7,11 +7,16 @@
   flex-direction: column;
   gap: 20px;
   box-sizing: border-box;
+
+  @media (max-width: 991px) {
+    padding: 16px;
+    gap: 12px;
+  }
 }
 
 // ── Header ────────────────────────────────────────────────────────────────────
 .kiosko-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
   &__left {
     h1 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; i { color: #0052cc; } }
     .kiosko-date { font-size: 13px; color: #64748b; text-transform: capitalize; }
@@ -23,6 +28,12 @@
       font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all .15s;
       &.tab-active { background: white; color: #0052cc; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
     }
+  }
+
+  @media (max-width: 600px) {
+    flex-direction: column; align-items: flex-start;
+    &__left h1 { font-size: 16px; }
+    &__tabs button { padding: 6px 10px; font-size: 12px; }
   }
 }
 
@@ -41,6 +52,13 @@
   .session-badge { font-size: 12px; color: #16a34a; display: flex; align-items: center; gap: 4px; i { font-size: 8px; } }
   .session-task-count { margin-left: auto; font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 6px; }
   .btn-cerrar-sesion { padding: 8px 18px; background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; &:hover { background: #fecaca; } }
+
+  @media (max-width: 600px) {
+    .filter-row { flex-direction: column; align-items: stretch; }
+    .filter-session { flex-wrap: wrap; gap: 10px; }
+    .session-task-count { margin-left: 0; }
+    .f-select, .f-input { min-width: 0; width: 100%; }
+  }
 }
 
 // ── Body ──────────────────────────────────────────────────────────────────────
@@ -324,6 +342,29 @@
     .completada-msg { display: flex; align-items: center; gap: 8px; color: #16a34a; font-weight: 600; font-size: 15px; justify-content: center; padding: 12px; background: #f0fdf4; border-radius: 10px; i { font-size: 20px; } }
   }
 }
+
+// ── Announcement modal ────────────────────────────────────────────────────────
+.announcement-overlay {
+  position: fixed; inset: 0; z-index: 1200;
+  background: rgba(0, 30, 90, 0.93);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  animation: ann-fadein .35s ease;
+}
+.announcement-box {
+  text-align: center; color: white; padding: 48px 40px; max-width: 600px; width: 90%;
+  .ann-icon { font-size: 72px; margin-bottom: 20px; animation: ann-pulse 1.4s ease-in-out infinite; color: #93c5fd; }
+  .ann-label { font-size: 13px; letter-spacing: 5px; text-transform: uppercase; opacity: .65; margin-bottom: 12px; }
+  .ann-name { font-size: 52px; font-weight: 800; line-height: 1.1; margin-bottom: 24px; text-shadow: 0 2px 20px rgba(0,0,0,.4); }
+  .ann-tasks {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-bottom: 28px;
+    span { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.25); border-radius: 20px; padding: 5px 16px; font-size: 14px; }
+  }
+  .ann-queue { font-size: 13px; opacity: .55; margin-bottom: 16px; letter-spacing: 1px; }
+  .ann-hint { font-size: 12px; opacity: .35; letter-spacing: 2px; text-transform: uppercase; }
+}
+@keyframes ann-fadein { from { opacity: 0; transform: scale(.93); } to { opacity: 1; transform: scale(1); } }
+@keyframes ann-pulse  { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.12); opacity: .8; } }
 
 // ── Inactivity modal ──────────────────────────────────────────────────────────
 .inactivity-overlay { z-index: 1100; }

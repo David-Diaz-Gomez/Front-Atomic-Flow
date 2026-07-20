@@ -2,9 +2,10 @@ import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angu
 import { isPlatformBrowser } from '@angular/common';
 import Swal from 'sweetalert2';
 import { ProjectService } from '../../../shared/services/project.service';
+import { Api } from '../../../core/services/api';
 
 
-interface ResourceRow { id: number; nombre: string; observaciones: string; precio_unitario: number; cantidad: number; valor_total: number; mueble_nombre?: string | null; }
+interface ResourceRow { id: number; nombre: string; observaciones: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number; valor_total: number; mueble_nombre?: string | null; }
 interface CarpRow extends ResourceRow { laminado: boolean; mdf: boolean; madera: boolean; enchapado: boolean; formica: boolean; chapilla: boolean; tapiz: boolean; pintura_cat: boolean; pintura_pu: boolean; ancho: number; alto: number; fondo: number; }
 interface ImpRow extends ResourceRow { proveedor: string; laminado_mate: boolean; laminado_brillante: boolean; poliestireno: boolean; pet_g: boolean; acrilico: boolean; ancho: number; alto: number; ancho_m: number; alto_m: number; calibre: number; c: number; m: number; y: number; k: number; cl_w: number; m2_vinilo: number; }
 interface Budget { materia_prima: ResourceRow[]; proveedores: ResourceRow[]; carpinteria: CarpRow[]; impresiones: ImpRow[]; mano_de_obra: ResourceRow[]; }
@@ -34,6 +35,8 @@ const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
 })
 export class Approvals implements OnInit {
   projects: ReviewProject[] = [];
+  solicitudesRecurso: any[] = [];
+  loadingSolicitudes = false;
   loading = true;
   error = '';
 
@@ -45,6 +48,7 @@ export class Approvals implements OnInit {
 
   constructor(
     private projectSvc: ProjectService,
+    private api: Api,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
@@ -52,8 +56,44 @@ export class Approvals implements OnInit {
   ngOnInit(): void {
     if (isPlatformBrowser(this.platformId)) {
       this.loadProjects();
+      this.loadSolicitudesRecurso();
     }
   }
+
+  loadSolicitudesRecurso(): void {
+    this.loadingSolicitudes = true;
+    this.api.getAllSolicitudesPendientes().subscribe({
+      next: data => { this.solicitudesRecurso = data; this.loadingSolicitudes = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingSolicitudes = false; }
+    });
+  }
+
+  aprobarSolicitudRecurso(sol: any): void {
+    this.api.aprobarSolicitudRecurso(sol.id).subscribe({
+      next: () => { this.loadSolicitudesRecurso(); },
+      error: () => {}
+    });
+  }
+
+  rechazarSolicitudRecurso(sol: any): void {
+    void Swal.fire({
+      title: 'Rechazar solicitud', input: 'textarea',
+      inputPlaceholder: 'Motivo del rechazo (opcional)...',
+      showCancelButton: true, confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.api.rechazarSolicitudRecurso(sol.id, r.value ?? '').subscribe({
+        next: () => {
+          void Swal.fire({ icon: 'info', title: 'Solicitud rechazada', timer: 1500, showConfirmButton: false });
+          this.loadSolicitudesRecurso();
+        },
+        error: () => {}
+      });
+    });
+  }
+
+  get solicitudesCount(): number { return this.solicitudesRecurso.length; }
 
   loadProjects(): void {
     this.loading = true;
@@ -134,11 +174,12 @@ export class Approvals implements OnInit {
       const items = rawItems.map((r: any) => ({
         id:              r.id ?? r.id_detalle_recurso,
         nombre:          r.recurso?.nombre || r.nombre || r.observaciones || '',
-        observaciones:   r.observaciones ?? '',
-        precio_unitario: r.valor_unitario ?? 0,
-        cantidad:        r.cantidad ?? 0,
-        valor_total:     r.valor_total ?? 0,
-        mueble_nombre:   r.mueble?.nombre ?? null,
+        observaciones:    r.observaciones ?? '',
+        nombre_proveedor: r.nombre_proveedor ?? null,
+        precio_unitario:  r.valor_unitario ?? 0,
+        cantidad:         r.cantidad ?? 0,
+        valor_total:      r.valor_total ?? 0,
+        mueble_nombre:    r.mueble?.nombre ?? null,
         laminado:    r.laminado    ?? false, mdf:         r.mdf         ?? false,
         madera:      r.madera      ?? false, enchapado:   r.enchapado   ?? false,
         formica:     r.formica     ?? false, chapilla:    r.chapilla    ?? false,

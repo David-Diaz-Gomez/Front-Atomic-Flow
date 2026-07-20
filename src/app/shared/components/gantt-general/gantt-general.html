@@ -4,7 +4,7 @@
   <div class="gg-header">
     <div class="gg-header__left">
       <h1><i class="fa fa-bar-chart"></i> Vista General</h1>
-      <span class="gg-sub">Todos los proyectos — cronograma comprimido</span>
+      <span class="gg-sub">Todos los proyectos — cronograma y avance</span>
     </div>
   </div>
 
@@ -21,9 +21,12 @@
   <!-- GANTT -->
   <div class="gg-container" *ngIf="!loading && !error && projects.length">
 
-    <!-- Left pane (project names) -->
+    <!-- Left pane (project names + progress) -->
     <div class="gg-left">
-      <div class="gg-left__header">Proyecto</div>
+      <div class="gg-left__header">
+        <span>Proyecto</span>
+        <span class="gg-left__header-pct">Avance</span>
+      </div>
 
       <ng-container *ngFor="let p of projects">
         <!-- Project row -->
@@ -37,9 +40,17 @@
           <div class="project-name-cell">
             <div class="name-row">
               <span class="estado-dot" [style.background]="getEstadoColor(p.estado)" [title]="getEstadoLabel(p.estado)"></span>
-              <span class="project-name">{{ p.nombre }}</span>
+              <span class="project-name">{{ p.codigo ? '#' + p.codigo + ' ' : '' }}{{ p.nombre }}</span>
             </div>
             <span class="project-cliente">{{ p.cliente }}</span>
+            <!-- Progress bar -->
+            <div class="prog-bar" *ngIf="p.total_tareas > 0">
+              <div class="prog-bar__fill" [style.width.%]="pct(p.tareas_completadas, p.total_tareas)"></div>
+            </div>
+          </div>
+          <div class="pct-badge" [class.pct-badge--done]="pct(p.tareas_completadas, p.total_tareas) === 100">
+            <ng-container *ngIf="p.total_tareas > 0">{{ pct(p.tareas_completadas, p.total_tareas) }}%</ng-container>
+            <ng-container *ngIf="p.total_tareas === 0">—</ng-container>
           </div>
         </div>
 
@@ -53,8 +64,14 @@
           <div class="gg-row gg-row--fase" *ngFor="let f of p.fases">
             <div class="fase-indent">
               <i class="fa fa-code-fork"></i>
-              <span>{{ f.nombre }}</span>
+              <div class="fase-name-cell">
+                <span>{{ f.nombre }}</span>
+                <div class="prog-bar prog-bar--sm" *ngIf="f.total_tareas > 0">
+                  <div class="prog-bar__fill prog-bar__fill--fase" [style.width.%]="pct(f.tareas_completadas, f.total_tareas)"></div>
+                </div>
+              </div>
             </div>
+            <div class="pct-badge pct-badge--sm" *ngIf="f.total_tareas > 0">{{ pct(f.tareas_completadas, f.total_tareas) }}%</div>
           </div>
         </ng-container>
       </ng-container>
@@ -63,12 +80,27 @@
     <!-- Right pane (scrollable Gantt) -->
     <div class="gg-right" id="gg-scroll">
 
-      <!-- Month headers -->
+      <!-- Date labels row (dedicated row, no overflow clipping) -->
+      <div class="gg-date-labels-bar" [style.width.px]="ganttWidth + 16">
+        <div class="gg-date-label-item"
+             *ngFor="let dl of projectDateLines"
+             [style.left.px]="dl.left"
+             [class.gg-date-label-item--end]="dl.tipo === 'end'">
+          {{ dl.label }}
+        </div>
+      </div>
+
+      <!-- Month headers + date lines (only the dashed lines) -->
       <div class="gg-months" [style.width.px]="ganttWidth + 16">
         <div class="gg-month-cell"
              *ngFor="let m of ganttMonthHeaders"
              [style.width.px]="m.width">
           {{ m.label }}
+        </div>
+        <div class="gg-date-line"
+             *ngFor="let dl of projectDateLines"
+             [style.left.px]="dl.left"
+             [ngClass]="dl.tipo === 'end' ? 'gg-date-line--end' : 'gg-date-line--start'">
         </div>
       </div>
 
@@ -78,10 +110,13 @@
         <ng-container *ngFor="let p of projects">
           <!-- Project bar row -->
           <div class="gg-track-row gg-track-row--project">
-            <!-- Vertical month grid lines -->
+            <!-- Month grid lines -->
             <div class="gg-grid-line"
                  *ngFor="let m of ganttMonthHeaders"
                  [style.left.px]="m.left"></div>
+            <!-- Project date dotted lines -->
+            <div class="gg-proj-line gg-proj-line--start" [style.left.px]="dateLeft(p.fecha_inicio)"></div>
+            <div class="gg-proj-line gg-proj-line--end"   [style.left.px]="dateLeft(p.fecha_fin)"></div>
             <!-- Today marker -->
             <div class="gg-today-marker"></div>
             <!-- Project bar -->
@@ -91,7 +126,11 @@
                  [style.background]="getEstadoColor(p.estado)"
                  (click)="goToGantt(p.id)"
                  title="{{ p.nombre }} · {{ p.fecha_inicio }} – {{ p.fecha_fin }}">
-              <span>{{ p.nombre }}</span>
+              <!-- Progress fill inside bar -->
+              <div class="gg-bar__progress"
+                   *ngIf="p.total_tareas > 0"
+                   [style.width.%]="pct(p.tareas_completadas, p.total_tareas)"></div>
+              <span class="gg-bar__pct" *ngIf="p.total_tareas > 0">{{ pct(p.tareas_completadas, p.total_tareas) }}%</span>
             </div>
           </div>
 
@@ -112,16 +151,19 @@
               <div class="gg-bar gg-bar--fase"
                    [style.left]="getBarStyle(f.fecha_inicio, f.fecha_fin)['left']"
                    [style.width]="getBarStyle(f.fecha_inicio, f.fecha_fin)['width']"
+                   (click)="goToGantt(p.id)"
                    title="{{ f.nombre }} · {{ f.fecha_inicio }} – {{ f.fecha_fin }}">
-                <span>{{ f.nombre }}</span>
+                <div class="gg-bar__progress gg-bar__progress--fase"
+                     *ngIf="f.total_tareas > 0"
+                     [style.width.%]="pct(f.tareas_completadas, f.total_tareas)"></div>
+                <span class="gg-bar__pct" *ngIf="f.total_tareas > 0">{{ pct(f.tareas_completadas, f.total_tareas) }}%</span>
               </div>
-              <!-- Task ticks inside fase row -->
+              <!-- Task ticks -->
               <div class="gg-tarea-tick"
                    *ngFor="let t of f.tareas"
                    [class]="getTareaBarClass(t.estado)"
                    [style.left]="getBarStyle(t.fecha_inicio, t.fecha_fin)['left']"
                    [style.width]="getBarStyle(t.fecha_inicio, t.fecha_fin)['width']"
-                   (click)="goToGantt(p.id)"
                    title="{{ t.nombre }} ({{ t.estado }})">
               </div>
             </div>
@@ -145,7 +187,14 @@
       {{ item.label }}
     </div>
     <div class="legend-item">
-      <span class="legend-dot" style="background:#1e293b"></span> Haz clic en una barra para ir al Gantt del proyecto
+      <span class="legend-dot" style="background:#1e293b"></span> Clic en barra → Gantt del proyecto
+    </div>
+    <div class="legend-sep"></div>
+    <div class="legend-item">
+      <span class="legend-line legend-line--start"></span> Fecha inicio
+    </div>
+    <div class="legend-item">
+      <span class="legend-line legend-line--end"></span> Fecha fin
     </div>
   </div>
 

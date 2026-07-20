@@ -34,7 +34,8 @@ export class CoordGantt implements OnInit {
 
   weeklyOcc:          any[] = [];
   weeklyOperariosOcc: any[] = [];
-  projectColorMap = new Map<number, string>();
+  projectColorMap  = new Map<number, string>();
+  operarioColorMap = new Map<number, string>();
   muebleMarkers: { id: number; nombre: string; fecha_fin: string }[] = [];
 
   // Recursos (nombres) asignados a tareas del proyecto seleccionado
@@ -213,6 +214,8 @@ export class CoordGantt implements OnInit {
         this.weeklyOcc          = Array.isArray(maquinas) ? maquinas : ((maquinas as any)?.data ?? []);
         this.weeklyOperariosOcc = Array.isArray(operarios) ? operarios : ((operarios as any)?.data ?? []);
         this.buildProjectColorMap([...this.weeklyOcc, ...this.weeklyOperariosOcc]);
+        this.operarioColorMap.clear();
+        for (const op of this.weeklyOperariosOcc) { this.getOperarioColor(op.id_usuario ?? op.id ?? 0); }
         this.cdr.detectChanges();
       },
     });
@@ -231,19 +234,19 @@ export class CoordGantt implements OnInit {
       if (!found) return null;
       const items: any[] = found.bloques ?? found.tareas ?? [];
       if (!items.length) return null;
-      return {
-        fecha: found.fecha, horas_ocupadas: found.horas_ocupadas ?? 0,
-        bloques: items.map((b: any) => ({
-          nombre: b.nombre ?? '', proyecto_id: b.proyecto_id ?? 0, proyecto: b.proyecto ?? '',
-          hora_inicio: this.formatHora(b.hora_inicio ?? 7), hora_fin: this.formatHora(b.hora_fin ?? 18),
-          horas: b.horas ?? ((typeof b.hora_fin === 'number' ? b.hora_fin : this.timeToDecimal(b.hora_fin)) - (typeof b.hora_inicio === 'number' ? b.hora_inicio : this.timeToDecimal(b.hora_inicio))),
-        })),
-      };
+      const mapped = items.map((b: any) => ({
+        nombre: b.nombre ?? '', proyecto_id: b.proyecto_id ?? 0, proyecto: b.proyecto ?? '',
+        hora_inicio: this.formatHora(b.hora_inicio ?? 7), hora_fin: this.formatHora(b.hora_fin ?? 18),
+        horas: b.horas ?? ((typeof b.hora_fin === 'number' ? b.hora_fin : this.timeToDecimal(b.hora_fin)) - (typeof b.hora_inicio === 'number' ? b.hora_inicio : this.timeToDecimal(b.hora_inicio))),
+      }));
+      mapped.sort((a, b) => this.timeToDecimal(a.hora_inicio) - this.timeToDecimal(b.hora_inicio));
+      return { fecha: found.fecha, horas_ocupadas: found.horas_ocupadas ?? 0, bloques: mapped };
     }
     const blocks: any[] = dias[dateStr];
     if (!blocks?.length) return null;
-    return { fecha: dateStr, horas_ocupadas: blocks.reduce((s: number, b: any) => s + ((b.hora_fin ?? 18) - (b.hora_inicio ?? 7)), 0),
-      bloques: blocks.map((b: any) => ({ nombre: b.tarea ?? b.nombre ?? '', proyecto_id: b.proyecto_id ?? 0, proyecto: b.proyecto ?? '', hora_inicio: this.formatHora(b.hora_inicio ?? 7), hora_fin: this.formatHora(b.hora_fin ?? 18), horas: (b.hora_fin ?? 18) - (b.hora_inicio ?? 7) })) };
+    const mapped2 = blocks.map((b: any) => ({ nombre: b.tarea ?? b.nombre ?? '', proyecto_id: b.proyecto_id ?? 0, proyecto: b.proyecto ?? '', hora_inicio: this.formatHora(b.hora_inicio ?? 7), hora_fin: this.formatHora(b.hora_fin ?? 18), horas: (b.hora_fin ?? 18) - (b.hora_inicio ?? 7) }));
+    mapped2.sort((a, b) => this.timeToDecimal(a.hora_inicio) - this.timeToDecimal(b.hora_inicio));
+    return { fecha: dateStr, horas_ocupadas: mapped2.reduce((s, b) => s + (b.horas ?? 0), 0), bloques: mapped2 };
   }
 
   getBloqueStyle(b: DiaBloque, color: string): Record<string, string> {
@@ -271,6 +274,11 @@ export class CoordGantt implements OnInit {
   getProjectColor(id: number): string {
     if (!this.projectColorMap.has(id)) { this.projectColorMap.set(id, COLOR_POOL[this.projectColorMap.size % COLOR_POOL.length]); }
     return this.projectColorMap.get(id)!;
+  }
+
+  getOperarioColor(id: number): string {
+    if (!this.operarioColorMap.has(id)) { this.operarioColorMap.set(id, COLOR_POOL[this.operarioColorMap.size % COLOR_POOL.length]); }
+    return this.operarioColorMap.get(id)!;
   }
 
   private buildProjectColorMap(resources: any[]): void {

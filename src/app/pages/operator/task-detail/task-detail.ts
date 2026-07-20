@@ -167,6 +167,25 @@ export class OpTaskDetail implements OnInit {
     this.activeTab = 'evidencias';
   }
 
+  // T4.5 — Completar sin evidencia
+  completarSinEvidencia(): void {
+    const idOperario = this.api.getCurrentUserId();
+    if (!idOperario) return;
+    this.submitting = true;
+    this.api.completarTareaDirecta(this.task.id, idOperario).subscribe({
+      next: () => {
+        this.task.estado = 'completada';
+        this.task.fin_real = new Date().toISOString();
+        this.submitting = false;
+        this.cdr.detectChanges();
+      },
+      error: () => {
+        this.submitting = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
   // ── Horas ──────────────────────────────────────────────────────────────────
   get horasDuracion(): string {
     const [sh, sm] = this.horaForm.hora_inicio.split(':').map(Number);

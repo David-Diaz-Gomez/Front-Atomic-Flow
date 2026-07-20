@@ -108,6 +108,7 @@
   outline: none;
   cursor: pointer;
   &:focus { border-color: #0052cc; }
+  &--proyecto { min-width: 200px; max-width: 280px; }
 }
 
 // ── Loading / Empty ────────────────────────────────────────────────────────
@@ -272,7 +273,78 @@
   &:disabled { opacity: .4; cursor: not-allowed; }
 }
 
-.page-info { font-size: 13px; color: #64748b; font-weight: 600; }
+.page-info {
+  font-size: 13px; color: #64748b; font-weight: 600;
+  display: flex; align-items: center; gap: 6px;
+  &__total { font-size: 12px; font-weight: 400; color: #94a3b8; }
+}
+
+// ── Borradores ─────────────────────────────────────────────────────────────
+.borradores-section {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; overflow: hidden;
+}
+
+.borradores-header {
+  background: #fef3c7; padding: 10px 16px; font-size: 13px; font-weight: 700;
+  color: #92400e; display: flex; align-items: center; gap: 8px;
+  .borradores-count {
+    background: #f59e0b; color: white; border-radius: 20px;
+    padding: 1px 8px; font-size: 11px;
+  }
+}
+
+.borrador-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-top: 1px solid #fde68a;
+}
+
+.borrador-info {
+  display: flex; align-items: center; gap: 12px; font-size: 13px;
+  .borrador-id  { font-weight: 700; color: #92400e; }
+  .borrador-prov { color: #475569; }
+  .borrador-fecha { font-size: 11px; color: #94a3b8; }
+}
+
+.badge-borrador {
+  background: #fef3c7; color: #92400e; border: 1px solid #fde68a;
+  font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+}
+
+// ── Estado badge menú ───────────────────────────────────────────────────────
+.td-estado-menu { white-space: nowrap; }
+
+.estado-menu-wrap { position: relative; display: inline-block; }
+
+.estado-badge--btn {
+  cursor: pointer; user-select: none;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: opacity .15s;
+  &:hover { opacity: .8; }
+  i { font-size: 10px; }
+}
+
+.estado-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  z-index: 500;
+  overflow: hidden;
+
+  &__item {
+    padding: 9px 14px;
+    font-size: 12px; font-weight: 700;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    transition: opacity .1s;
+    &:last-child { border-bottom: none; }
+    &:hover { opacity: .75; }
+  }
+}
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 .modal-overlay {
@@ -444,8 +516,94 @@
   &:last-child { border-bottom: none; }
   &:hover { background: #f0f9ff; }
 
-  .ac-name { font-size: 14px; font-weight: 600; color: #1e293b; }
+  .ac-name { font-size: 14px; font-weight: 600; color: #1e293b;
+             display: flex; align-items: center; gap: 6px; }
   .ac-meta { font-size: 12px; color: #94a3b8; }
+}
+
+.ac-codigo {
+  font-size: 11px; font-weight: 700;
+  color: #0052cc; background: #eff6ff;
+  border-radius: 4px; padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+// Asterisco de campo requerido
+.req-star {
+  color: #e53e3e;
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+// ── Presupuesto badge en tabla de items ────────────────────────────────────
+.td-item-pres {
+  white-space: nowrap;
+  min-width: 110px;
+  vertical-align: middle;
+}
+
+.pres-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  white-space: nowrap;
+
+  &.pres-ok {
+    background: #f0fdf4; color: #16a34a; border: 1px solid #86efac;
+  }
+  &.pres-over {
+    background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5;
+  }
+}
+
+.pres-label {
+  display: block; font-size: 10px; color: #dc2626;
+  font-weight: 600; margin-top: 2px;
+}
+
+.pres-na { color: #94a3b8; font-size: 12px; }
+
+.tr-excede { background: #fff8f8 !important; }
+
+// ── Botón + hint "Solicitar nuevo recurso" ─────────────────────────────────
+.nuevo-recurso-hint {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 4px;
+  font-size: 12px; color: #64748b;
+}
+
+.btn-nuevo-recurso {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px;
+  background: white; border: 1.5px dashed #0052cc;
+  border-radius: 8px; color: #0052cc;
+  font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .15s;
+  &:hover { background: #eff6ff; border-style: solid; }
+  i { font-size: 11px; }
+}
+
+// ── Info box en modal nuevo recurso ───────────────────────────────────────
+.nuevo-recurso-info {
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px;
+  padding: 10px 14px; font-size: 13px; color: #1d4ed8;
+  margin-bottom: 16px; display: flex; align-items: flex-start; gap: 8px;
+  i { margin-top: 2px; flex-shrink: 0; }
+}
+
+// Modal pequeño
+.modal-box--sm {
+  max-width: 480px;
+  max-height: 90vh;
+}
+
+// Toggle "sin proyecto"
+.sin-proyecto-toggle {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: #475569; cursor: pointer;
+  margin-bottom: 4px;
+  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #0052cc; }
+  &:hover { color: #1e293b; }
 }
 
 .modal-footer {

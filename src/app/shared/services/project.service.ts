@@ -242,6 +242,10 @@ export class ProjectService {
     );
   }
 
+  completarTarea(faseId: number, tareaId: number): Observable<any> {
+    return this.http.patch<any>(`${this.base}/fases/${faseId}/tareas/${tareaId}/completar`, {}).pipe(map(r => r?.data ?? r));
+  }
+
   assignOperario(faseId: number, tareaId: number, body: any): Observable<any> {
     return this.http.post<any>(`${this.base}/fases/${faseId}/tareas/${tareaId}/operarios`, body).pipe(map(r => r?.data ?? r));
   }

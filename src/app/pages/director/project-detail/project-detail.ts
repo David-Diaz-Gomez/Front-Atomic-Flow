@@ -1,19 +1,23 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
+import { Subscription } from 'rxjs';
 import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
+import { NotificationService } from '../../../shared/services/notification.service';
+import { Api } from '../../../core/services/api';
 
 interface PhaseMachineOcc { nombre: string; porcentaje: number; estado: 'ok' | 'alta' | 'saturada'; }
 
 const ESTADO_LABELS: Record<string, string> = {
-  borrador: 'Borrador', en_revision: 'En Revisión', rechazado: 'Rechazado',
+  borrador: 'Borrador', rechazado: 'Rechazado',
   aprobado: 'Aprobado', en_produccion: 'En Producción', pausado: 'Pausado',
   completado: 'Completado', cancelado: 'Cancelado',
   pendiente: 'Pendiente', asignada: 'Asignada',
   en_progreso: 'En Progreso', completada: 'Completada', bloqueada: 'Bloqueada',
+  en_revision: 'Por verificar',
   'Por Validar': 'Por Validar', 'En Desarrollo': 'En Desarrollo',
 };
 
@@ -30,22 +34,28 @@ const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
   templateUrl: './project-detail.html',
   styleUrl: './project-detail.scss'
 })
-export class ProjectDetail implements OnInit {
+export class ProjectDetail implements OnInit, OnDestroy {
   project: any = null;
   activeTab = 'resumen';
   expandedFases = new Set<number>();
   loading = true;
   error = '';
 
-  // Resource summary from API
+  rawRecursos: any = null;
   resourceSummary: any[] = [];
   totalRecursosValue = 0;
+  private _notifSub: Subscription | null = null;
+
+  solicitudesPendientes: any[] = [];
+  loadingSolicitudes = false;
 
   constructor(
     private router: Router,
     private route: ActivatedRoute,
     private projectSvc: ProjectService,
     private catalogSvc: CatalogService,
+    private notifSvc: NotificationService,
+    private api: Api,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
@@ -55,8 +65,16 @@ export class ProjectDetail implements OnInit {
       const id = parseInt(this.route.snapshot.paramMap.get('id') ?? '0', 10);
       if (id) this.loadProject(id);
       this.catalogSvc.getTiposTarea().subscribe({ next: t => { this.tiposTarea = t; this.cdr.detectChanges(); }, error: () => {} });
+      this._notifSub = this.notifSvc.newNotif$.subscribe(n => {
+        if (['tarea_completada', 'tarea_en_revision'].includes(n.tipo) && this.project &&
+            (!n.proyecto_id || n.proyecto_id === this.project.id)) {
+          this.loadProject(this.project.id);
+        }
+      });
     }
   }
+
+  ngOnDestroy(): void { this._notifSub?.unsubscribe(); }
 
   loadProject(id: number): void {
     this.loading = true;
@@ -69,6 +87,8 @@ export class ProjectDetail implements OnInit {
         this.cdr.detectChanges();
         this.loadResourceSummary(id);
         this.loadProjectInsumos(id);
+        this.loadProjectMuebles(id);
+        this.loadSolicitudes(id);
       },
       error: () => {
         this.error = 'No se pudo cargar el proyecto.';
@@ -146,7 +166,8 @@ export class ProjectDetail implements OnInit {
   getTareaStateClass(estado: string): string {
     const map: Record<string, string> = {
       completada: 'state-done', en_progreso: 'state-progress',
-      asignada: 'state-assigned', pendiente: 'state-pending', bloqueada: 'state-blocked'
+      asignada: 'state-assigned', pendiente: 'state-pending',
+      bloqueada: 'state-blocked', en_revision: 'state-revision',
     };
     return map[estado] ?? 'state-pending';
   }
@@ -212,6 +233,52 @@ export class ProjectDetail implements OnInit {
     return ['aprobado', 'en_produccion', 'pausado', 'En Desarrollo'].includes(this.project?.estado ?? '');
   }
 
+  // ── Solicitudes de recurso pendientes ──────────────────────────────────────
+  loadSolicitudes(id: number): void {
+    this.loadingSolicitudes = true;
+    this.api.getSolicitudesRecurso(id).subscribe({
+      next: data => { this.solicitudesPendientes = data; this.loadingSolicitudes = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingSolicitudes = false; }
+    });
+  }
+
+  aprobarSolicitud(sol: any): void {
+    this.api.aprobarSolicitudRecurso(sol.id).subscribe({
+      next: () => {
+        this.loadSolicitudes(this.project.id);
+        this.loadProjectInsumos(this.project.id);
+      },
+      error: () => {}
+    });
+  }
+
+  rechazarSolicitud(sol: any): void {
+    void Swal.fire({
+      title: 'Rechazar solicitud',
+      input: 'textarea', inputPlaceholder: 'Motivo del rechazo (opcional)...',
+      showCancelButton: true, confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.api.rechazarSolicitudRecurso(sol.id, r.value ?? '').subscribe({
+        next: () => {
+          void Swal.fire({ icon: 'info', title: 'Solicitud rechazada', timer: 1500, showConfirmButton: false });
+          this.loadSolicitudes(this.project.id);
+        },
+        error: () => {}
+      });
+    });
+  }
+
+  onPedirRecurso(r: { id: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number }): void {
+    const proyectoId = this.project?.id;
+    if (!proyectoId) return;
+    this.router.navigate(['/dashboard/director/estados-compra'], {
+      queryParams: { abrirPedido: proyectoId },
+      state: { recurso: { id_detalle_recurso: r.id, nombre: r.nombre, nombre_proveedor: r.nombre_proveedor ?? null, precio_unitario: r.precio_unitario, cantidad: r.cantidad } }
+    });
+  }
+
   // ── Task display helpers (API returns objects, template expects strings) ──
 
   getTaskTipoStr(t: any): string {
@@ -245,11 +312,26 @@ export class ProjectDetail implements OnInit {
     return this.project?.insumos?.find((ins: any) => ins.id === id)?.nombre ?? `#${id}`;
   }
 
+  muebleLabel(id: number): string {
+    return this.project?.muebles?.find((m: any) => m.id === id)?.nombre ?? `#${id}`;
+  }
+
   // ── Insumos disponibles del proyecto (para selector en delegación/fase) ───
   private loadProjectInsumos(id: number): void {
     this.projectSvc.getProjectResources(id).subscribe({
       next: raw => {
+        this.rawRecursos = raw;
         if (this.project) this.project.insumos = this.extractAllInsumos(raw);
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
+  private loadProjectMuebles(id: number): void {
+    this.projectSvc.getProjectMuebles(id).subscribe({
+      next: muebles => {
+        if (this.project) this.project.muebles = muebles ?? [];
         this.cdr.detectChanges();
       },
       error: () => {}
@@ -358,6 +440,33 @@ export class ProjectDetail implements OnInit {
 
   onTipoTareaChange(): void { /* tipo_tarea string se actualiza via ngModel en el form */ }
 
+  // ── Nuevo tipo de tarea (T4.1) ────────────────────────────────────────────
+  showNewTipoInput = false;
+  newTipoLabel = '';
+  newTipoSaving = false;
+
+  createNewTipo(): void {
+    const nombre = this.newTipoLabel.trim();
+    if (!nombre) return;
+    this.newTipoSaving = true;
+    this.catalogSvc.createTipoTarea({ nombre }).subscribe({
+      next: (t: any) => {
+        const item = { id: t.id, nombre: t.nombre ?? nombre };
+        this.tiposTarea = [...this.tiposTarea, item];
+        this.taskForm.id_tipo_tarea = item.id;
+        this.showNewTipoInput = false;
+        this.newTipoLabel = '';
+        this.newTipoSaving = false;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.newTipoSaving = false;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo crear el tipo', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
   // ── Phase modal ────────────────────────────────────────────────────────────
   showPhaseModal = false;
   editingPhaseId: number | null = null;
@@ -389,7 +498,7 @@ export class ProjectDetail implements OnInit {
       fecha_inicio: (fase.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:    (fase.fecha_fin    ?? '').substring(0, 10),
     };
-    this.phaseInsumos = [...(fase.insumos_aplicados ?? [])];
+    this.phaseInsumos = [...(fase.muebles_aplicados ?? fase.insumos_aplicados ?? [])];
     this.resetPhaseConflict();
     this.showPhaseModal = true;
   }
@@ -469,7 +578,7 @@ export class ProjectDetail implements OnInit {
   private doSavePhase(): void {
     const doSave = () => {
       if (this.editingPhaseId !== null) {
-        const updateBody = { ...this.phaseForm, insumos_aplicados: this.phaseInsumos };
+        const updateBody = { ...this.phaseForm, muebles_aplicados: this.phaseInsumos };
         this.projectSvc.updateFase(this.project.id, this.editingPhaseId, updateBody).subscribe({
           next: () => {
             void Swal.fire({ icon: 'success', title: 'Fase actualizada', timer: 1500 });

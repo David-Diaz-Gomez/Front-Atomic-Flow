@@ -50,6 +50,10 @@
       <input type="text" placeholder="Buscar por proyecto, recurso o proveedor..."
              [(ngModel)]="filterSearch" (ngModelChange)="applyFilters()">
     </div>
+    <select [(ngModel)]="filterProyectoId" (ngModelChange)="applyFilters()" class="filter-select filter-select--proyecto">
+      <option value="">Todos los proyectos</option>
+      <option *ngFor="let op of proyectosDisponibles" [value]="op.key">{{ op.label }}</option>
+    </select>
     <select [(ngModel)]="filterEstado" (ngModelChange)="applyFilters()" class="filter-select">
       <option value="">Todos los estados</option>
       <option value="4">Solicitud Pedido</option>
@@ -65,22 +69,41 @@
     <i class="fa fa-spinner fa-spin"></i> Cargando pedidos...
   </div>
 
+  <!-- Borradores (pedidos con recurso pendiente de aprobación) -->
+  <div class="borradores-section" *ngIf="!loading && borradores.length">
+    <div class="borradores-header">
+      <i class="fa fa-clock-o"></i> Pedidos en Borrador — esperando aprobación de recurso
+      <span class="borradores-count">{{ borradores.length }}</span>
+    </div>
+    <div class="borrador-item" *ngFor="let b of borradores">
+      <div class="borrador-info">
+        <span class="borrador-id">#{{ b.id }}</span>
+        <span class="borrador-prov">{{ b.proveedor || 'Sin proveedor' }}</span>
+        <span class="borrador-fecha">Solicitado: {{ fmtFechaSolicitud(b.fecha_solicitud) }}</span>
+      </div>
+      <span class="estado-badge badge-borrador">Borrador</span>
+    </div>
+  </div>
+
   <!-- Empty -->
-  <div class="ec-empty" *ngIf="!loading && !gruposFiltrados.length">
+  <div class="ec-empty" *ngIf="!loading && !gruposFiltrados.length && !borradores.length">
     <i class="fa fa-shopping-cart"></i>
     <p>No se encontraron pedidos.</p>
   </div>
 
   <!-- Grupos por proyecto -->
-  <div class="ec-list" *ngIf="!loading && gruposFiltrados.length">
-    <div class="proyecto-card" *ngFor="let g of gruposFiltrados">
+  <div class="ec-list" *ngIf="!loading && gruposFiltrados.length" (click)="closeEstadoMenus()">
+    <div class="proyecto-card" *ngFor="let g of gruposPaginados">
 
       <div class="proyecto-card__header" (click)="toggleGrupo(g)">
         <div class="proyecto-card__left">
           <i class="fa" [ngClass]="g.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
           <div class="proyecto-card__info">
-            <span class="proyecto-card__name">{{ g.nombre_proyecto }}</span>
-            <span class="proyecto-card__meta">
+            <span class="proyecto-card__name">
+              <span *ngIf="g.codigo_proyecto" class="proyecto-codigo">#{{ g.codigo_proyecto }}</span>
+              {{ g.nombre_proyecto }}
+            </span>
+            <span class="proyecto-card__meta" *ngIf="g.id_proyecto">
               <i class="fa fa-tag"></i> {{ g.centro_costos }}
               &nbsp;·&nbsp;
               <i class="fa fa-circle estado-dot" [ngClass]="'dot-' + g.estado_proyecto"></i>
@@ -134,8 +157,23 @@
               <td class="td-fecha">{{ fmtFechaSolicitud(p.fecha_solicitud) }}</td>
               <td class="td-fecha">{{ fmtFecha(p.fecha_requerida) }}</td>
               <td class="td-fecha">{{ fmtFecha(p.fecha_compra) }}</td>
-              <td>
-                <span class="estado-badge" [ngClass]="estadoClass(p.id_estado_pedido)">{{ p.estado }}</span>
+              <td class="td-estado-menu">
+                <div class="estado-menu-wrap" (click)="$event.stopPropagation()">
+                  <span class="estado-badge estado-badge--btn"
+                        [ngClass]="estadoClass(p.id_estado_pedido)"
+                        (click)="toggleEstadoMenu(p.id, $event)"
+                        title="Haz clic para cambiar el estado">
+                    {{ p.estado }} <i class="fa fa-caret-down"></i>
+                  </span>
+                  <div class="estado-dropdown" *ngIf="openEstadoMenuId === p.id">
+                    <div class="estado-dropdown__item"
+                         *ngFor="let t of getEstadoTransitions(p.id_estado_pedido)"
+                         (click)="changeEstado(p, t.id, $event)"
+                         [ngClass]="estadoClass(t.id)">
+                      {{ t.label }}
+                    </div>
+                  </div>
+                </div>
               </td>
               <td class="td-actions">
                 <button class="btn-hist-row" (click)="openHistorial(p)" title="Ver historial de entregas">
@@ -153,13 +191,16 @@
     </div>
   </div>
 
-  <!-- Paginación -->
-  <div class="pagination" *ngIf="!loading && totalPages > 1">
-    <button class="page-btn" (click)="goPage(page - 1)" [disabled]="page === 1">
+  <!-- Paginación UI -->
+  <div class="pagination" *ngIf="!loading && uiTotalPages > 1">
+    <button class="page-btn" (click)="prevUiPage()" [disabled]="uiPage === 0">
       <i class="fa fa-chevron-left"></i>
     </button>
-    <span class="page-info">Página {{ page }} de {{ totalPages }}</span>
-    <button class="page-btn" (click)="goPage(page + 1)" [disabled]="page === totalPages">
+    <span class="page-info">
+      {{ uiPage + 1 }} / {{ uiTotalPages }}
+      <span class="page-info__total">({{ gruposFiltrados.length }} proyectos)</span>
+    </span>
+    <button class="page-btn" (click)="nextUiPage()" [disabled]="uiPage >= uiTotalPages - 1">
       <i class="fa fa-chevron-right"></i>
     </button>
   </div>
@@ -178,7 +219,7 @@
     <div class="modal-body">
 
       <!-- Proyecto (autocomplete) -->
-      <div class="form-group autocomplete-wrap">
+      <div class="form-group autocomplete-wrap" *ngIf="!sinProyecto">
         <label><i class="fa fa-briefcase"></i> Proyecto</label>
         <div class="autocomplete-input-box">
           <i class="fa fa-search ac-icon"></i>
@@ -195,7 +236,10 @@
         </div>
         <div class="autocomplete-dropdown" *ngIf="showProyectoDropdown && proyectosFiltrados.length">
           <div class="ac-item" *ngFor="let p of proyectosFiltrados" (mousedown)="selectProyecto(p)">
-            <span class="ac-name">{{ p.nombre }}</span>
+            <span class="ac-name">
+              <span *ngIf="p.codigo" class="ac-codigo">#{{ p.codigo }}</span>
+              {{ p.nombre }}
+            </span>
             <span class="ac-meta">{{ p.centro_costos }}</span>
           </div>
         </div>
@@ -207,21 +251,40 @@
         </span>
       </div>
 
-      <!-- Proveedor -->
-      <div class="form-group">
-        <label><i class="fa fa-truck"></i> Proveedor</label>
-        <input type="text" [(ngModel)]="form.proveedor" class="form-control"
-               [class.is-invalid]="submitted && formErrors['proveedor']"
-               placeholder="Nombre del proveedor">
+      <!-- Toggle sin proyecto -->
+      <label class="sin-proyecto-toggle">
+        <input type="checkbox" [ngModel]="sinProyecto" (ngModelChange)="toggleSinProyecto()">
+        <span>Pedido sin proyecto (almacén / recursos libres)</span>
+      </label>
+
+      <!-- Proveedor con autocomplete -->
+      <div class="form-group autocomplete-wrap">
+        <label><i class="fa fa-truck"></i> Proveedor <span class="req-star">*</span></label>
+        <div class="autocomplete-input-box">
+          <i class="fa fa-truck ac-icon"></i>
+          <input type="text" [(ngModel)]="form.proveedor" class="form-control"
+                 [class.is-invalid]="submitted && formErrors['proveedor']"
+                 placeholder="Nombre del proveedor..."
+                 (input)="onProveedorInput()"
+                 (focus)="onProveedorInput()"
+                 (blur)="blurProveedor()">
+          <i class="fa fa-times ac-clear" *ngIf="form.proveedor"
+             (mousedown)="form.proveedor=''; showProveedorDropdown=false"></i>
+        </div>
+        <div class="autocomplete-dropdown" *ngIf="showProveedorDropdown && proveedoresFiltrados.length">
+          <div class="ac-item" *ngFor="let pv of proveedoresFiltrados" (mousedown)="selectProveedor(pv)">
+            <span class="ac-name">{{ pv }}</span>
+          </div>
+        </div>
         <span class="field-error" *ngIf="submitted && formErrors['proveedor']">
           <i class="fa fa-exclamation-circle"></i> {{ formErrors['proveedor'] }}
         </span>
       </div>
 
-      <!-- Fechas -->
+      <!-- Fechas (obligatorias) -->
       <div class="form-row">
         <div class="form-group">
-          <label><i class="fa fa-calendar"></i> Fecha de solicitud</label>
+          <label><i class="fa fa-calendar"></i> Fecha de solicitud <span class="req-star">*</span></label>
           <input type="date" [(ngModel)]="form.fecha_solicitud" class="form-control"
                  [class.is-invalid]="submitted && (formErrors['fecha_solicitud'] || formErrors['fecha_rango'])">
           <span class="field-error" *ngIf="submitted && formErrors['fecha_solicitud']">
@@ -229,7 +292,7 @@
           </span>
         </div>
         <div class="form-group">
-          <label><i class="fa fa-calendar-check-o"></i> Fecha requerida</label>
+          <label><i class="fa fa-calendar-check-o"></i> Fecha requerida <span class="req-star">*</span></label>
           <input type="date" [(ngModel)]="form.fecha_requerida" class="form-control"
                  [class.is-invalid]="submitted && (formErrors['fecha_requerida'] || formErrors['fecha_rango'])">
           <span class="field-error" *ngIf="submitted && formErrors['fecha_requerida']">
@@ -270,29 +333,34 @@
           </span>
           <button type="button" class="btn-add-item"
                   (click)="addItem()"
-                  [disabled]="!form.id_proyecto || loadingRecursos || !recursos.length">
+                  [disabled]="!sinProyecto && (!form.id_proyecto || loadingRecursos || !recursos.length)">
             <i class="fa fa-plus"></i> Agregar recurso
           </button>
         </div>
 
-        <!-- Sin proyecto seleccionado -->
-        <div class="items-hint" *ngIf="!form.id_proyecto">
-          <i class="fa fa-info-circle"></i> Selecciona un proyecto para elegir recursos
+        <!-- Sin proyecto seleccionado y no es sin-proyecto -->
+        <div class="items-hint" *ngIf="!sinProyecto && !form.id_proyecto">
+          <i class="fa fa-info-circle"></i> Selecciona un proyecto o activa "Pedido sin proyecto"
         </div>
 
         <!-- Cargando recursos -->
-        <div class="items-hint" *ngIf="form.id_proyecto && loadingRecursos">
+        <div class="items-hint" *ngIf="!sinProyecto && form.id_proyecto && loadingRecursos">
           <i class="fa fa-spinner fa-spin"></i> Cargando recursos...
         </div>
 
         <!-- Sin recursos en el proyecto -->
-        <div class="items-hint items-hint--warn" *ngIf="form.id_proyecto && !loadingRecursos && !recursos.length">
+        <div class="items-hint items-hint--warn" *ngIf="!sinProyecto && form.id_proyecto && !loadingRecursos && !recursos.length">
           <i class="fa fa-exclamation-triangle"></i> Este proyecto no tiene recursos asignados
         </div>
 
-        <!-- Sin ítems aún -->
-        <div class="items-hint" *ngIf="form.id_proyecto && !loadingRecursos && recursos.length && form.items.length === 0">
+        <!-- Sin ítems aún (con proyecto) -->
+        <div class="items-hint" *ngIf="!sinProyecto && form.id_proyecto && !loadingRecursos && recursos.length && form.items.length === 0">
           <i class="fa fa-arrow-up"></i> Haz clic en "Agregar recurso" para empezar
+        </div>
+
+        <!-- Sin ítems aún (sin proyecto) -->
+        <div class="items-hint" *ngIf="sinProyecto && form.items.length === 0">
+          <i class="fa fa-arrow-up"></i> Haz clic en "Agregar recurso" para añadir ítems libres
         </div>
 
         <!-- Tabla de ítems -->
@@ -303,15 +371,25 @@
                 <th>Recurso</th>
                 <th class="th-num">Cantidad</th>
                 <th class="th-num">Valor unitario</th>
-                <th>Observación <span class="label-optional">(opcional)</span></th>
+                <th class="th-num" *ngIf="!sinProyecto">Límite director</th>
+                <th>Observación</th>
                 <th class="th-action"></th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let item of form.items; let i = index"
-                  [class.tr-error]="submitted && (formErrors['item_r_'+i] || formErrors['item_c_'+i] || formErrors['item_v_'+i])">
+                  [class.tr-error]="submitted && (formErrors['item_r_'+i] || formErrors['item_c_'+i] || formErrors['item_v_'+i] || formErrors['item_o_'+i])"
+                  [class.tr-excede]="!sinProyecto && itemExcede(item)">
                 <td class="td-item-select">
-                  <select [(ngModel)]="item.id_detalle_recurso" class="form-control form-control--sm"
+                  <!-- Modo sin proyecto: texto libre -->
+                  <input *ngIf="sinProyecto" type="text"
+                         [(ngModel)]="item.nombre_recurso_libre"
+                         class="form-control form-control--sm"
+                         [class.is-invalid]="submitted && formErrors['item_r_'+i]"
+                         placeholder="Nombre del recurso...">
+                  <!-- Modo con proyecto: select del recurso -->
+                  <select *ngIf="!sinProyecto"
+                          [(ngModel)]="item.id_detalle_recurso" class="form-control form-control--sm"
                           [class.is-invalid]="submitted && formErrors['item_r_'+i]">
                     <option [ngValue]="null" disabled>Seleccionar recurso</option>
                     <option *ngFor="let r of recursos" [ngValue]="r.id_detalle_recurso">{{ r.nombre }}</option>
@@ -327,19 +405,45 @@
                          [class.is-invalid]="submitted && formErrors['item_v_'+i]"
                          placeholder="0" min="0">
                 </td>
+                <!-- Columna presupuesto: verde si OK, rojo si excede -->
+                <td class="td-item-pres" *ngIf="!sinProyecto">
+                  <ng-container *ngIf="getPresupuesto(item.id_detalle_recurso) > 0">
+                    <span class="pres-badge"
+                          [class.pres-ok]="!itemExcede(item)"
+                          [class.pres-over]="itemExcede(item)">
+                      <i class="fa" [ngClass]="itemExcede(item) ? 'fa-exclamation-triangle' : 'fa-check'"></i>
+                      {{ fmtMoney(getPresupuesto(item.id_detalle_recurso)) }}
+                    </span>
+                    <span class="pres-label" *ngIf="itemExcede(item)">
+                      +{{ fmtMoney(itemTotal(item) - getPresupuesto(item.id_detalle_recurso)) }}
+                    </span>
+                  </ng-container>
+                  <span class="pres-na" *ngIf="!getPresupuesto(item.id_detalle_recurso)">—</span>
+                </td>
                 <td class="td-item-obs">
                   <input type="text" [(ngModel)]="item.observacion" class="form-control form-control--sm"
-                         placeholder="Nota adicional...">
+                         [class.is-invalid]="submitted && formErrors['item_o_'+i]"
+                         [placeholder]="(!sinProyecto && itemExcede(item)) ? '⚠ Justificación obligatoria' : 'Nota adicional...'">
+                  <span class="field-error" *ngIf="submitted && formErrors['item_o_'+i]">
+                    {{ formErrors['item_o_'+i] }}
+                  </span>
                 </td>
                 <td class="td-item-del">
-                  <button type="button" class="btn-del-item" (click)="removeItem(i)"
-                          title="Eliminar recurso">
+                  <button type="button" class="btn-del-item" (click)="removeItem(i)" title="Eliminar recurso">
                     <i class="fa fa-trash"></i>
                   </button>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Botón nuevo recurso (solo con proyecto seleccionado) -->
+        <div class="nuevo-recurso-hint" *ngIf="!sinProyecto && form.id_proyecto && !loadingRecursos">
+          <span>¿El recurso no está en la lista?</span>
+          <button type="button" class="btn-nuevo-recurso" (click)="openNuevoRecursoModal()">
+            <i class="fa fa-plus-circle"></i> Solicitar nuevo recurso
+          </button>
         </div>
       </div>
 
@@ -394,6 +498,70 @@
       <button class="btn-guardar" (click)="submitForm()" [disabled]="saving || !isFormValid">
         <i class="fa" [ngClass]="saving ? 'fa-spinner fa-spin' : 'fa-check'"></i>
         {{ saving ? 'Guardando...' : 'Registrar Pedido' }}
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Modal Solicitar Nuevo Recurso ────────────────────────────────────── -->
+<div class="modal-overlay" *ngIf="showNuevoRecursoModal" (click)="closeNuevoRecursoModal()">
+  <div class="modal-box modal-box--sm" (click)="$event.stopPropagation()">
+
+    <div class="modal-header">
+      <h2><i class="fa fa-plus-circle"></i> Solicitar Nuevo Recurso</h2>
+      <button class="modal-close" (click)="closeNuevoRecursoModal()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="modal-body">
+      <p class="nuevo-recurso-info">
+        <i class="fa fa-info-circle"></i>
+        El recurso quedará pendiente de aprobación. El pedido se guardará como
+        <strong>Borrador</strong> hasta que sea aprobado desde "Mi Proyecto".
+      </p>
+
+      <div class="form-group">
+        <label>Nombre del recurso <span class="req-star">*</span></label>
+        <input type="text" [(ngModel)]="nuevoRecursoForm.nombre" class="form-control"
+               [class.is-invalid]="nuevoRecursoSubmitted && !nuevoRecursoForm.nombre.trim()"
+               placeholder="Ej: Vinilo 5,7mm">
+      </div>
+
+      <div class="form-group">
+        <label>Tipo <span class="req-star">*</span></label>
+        <select [(ngModel)]="nuevoRecursoForm.tipo_recurso" class="form-control">
+          <option value="materia_prima">Materia Prima</option>
+          <option value="proveedores">Proveedores</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Precio unitario <span class="req-star">*</span></label>
+          <input type="number" [(ngModel)]="nuevoRecursoForm.precio_unitario" class="form-control"
+                 [class.is-invalid]="nuevoRecursoSubmitted && !nuevoRecursoForm.precio_unitario"
+                 placeholder="0" min="0">
+        </div>
+        <div class="form-group">
+          <label>Cantidad <span class="req-star">*</span></label>
+          <input type="number" [(ngModel)]="nuevoRecursoForm.cantidad" class="form-control"
+                 [class.is-invalid]="nuevoRecursoSubmitted && !nuevoRecursoForm.cantidad"
+                 placeholder="0" min="1">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Observaciones <span class="label-optional">(opcional)</span></label>
+        <input type="text" [(ngModel)]="nuevoRecursoForm.observaciones" class="form-control"
+               placeholder="Presentación física, especificaciones...">
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-cancelar" (click)="closeNuevoRecursoModal()" [disabled]="savingNuevoRecurso">Cancelar</button>
+      <button class="btn-guardar" (click)="submitNuevoRecurso()" [disabled]="savingNuevoRecurso">
+        <i class="fa" [ngClass]="savingNuevoRecurso ? 'fa-spinner fa-spin' : 'fa-paper-plane'"></i>
+        {{ savingNuevoRecurso ? 'Enviando...' : 'Enviar Solicitud' }}
       </button>
     </div>
 

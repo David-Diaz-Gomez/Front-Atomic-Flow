@@ -50,9 +50,15 @@
         <p>Inicio: {{ formatDateTime(task.inicio_real) }}</p>
       </div>
     </div>
-    <button class="banner-btn btn-evidence" (click)="activeTab='evidencias'; showEvidForm=true">
-      <i class="fa fa-camera"></i> Subir evidencia
-    </button>
+    <div class="banner-actions">
+      <button class="banner-btn btn-evidence" (click)="activeTab='evidencias'; showEvidForm=true">
+        <i class="fa fa-camera"></i> Subir evidencia
+      </button>
+      <button class="banner-btn btn-complete-no-ev" (click)="completarSinEvidencia()" [disabled]="submitting">
+        <i class="fa" [ngClass]="submitting ? 'fa-spinner fa-spin' : 'fa-check'"></i>
+        Completar sin evidencia
+      </button>
+    </div>
   </div>
 
   <!-- En revisión / rechazada -->

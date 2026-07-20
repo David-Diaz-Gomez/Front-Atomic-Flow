@@ -8,6 +8,7 @@ import { Footer } from './components/footer/footer';
 import { NotifBellComponent } from './components/notif-bell/notif-bell';
 import { GanttGeneral } from './components/gantt-general/gantt-general';
 import { PlantillasFases } from './components/plantillas-fases/plantillas-fases';
+import { RecursosDetalle } from './components/recursos-detalle/recursos-detalle';
 
 @NgModule({
   declarations: [
@@ -16,6 +17,7 @@ import { PlantillasFases } from './components/plantillas-fases/plantillas-fases'
     NotifBellComponent,
     GanttGeneral,
     PlantillasFases,
+    RecursosDetalle,
   ],
   imports: [
     CommonModule,
@@ -28,6 +30,7 @@ import { PlantillasFases } from './components/plantillas-fases/plantillas-fases'
     NotifBellComponent,
     GanttGeneral,
     PlantillasFases,
+    RecursosDetalle,
   ],
 })
 export class SharedModule {}

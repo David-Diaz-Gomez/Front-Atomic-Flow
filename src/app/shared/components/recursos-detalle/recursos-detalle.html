@@ -1,0 +1,202 @@
+<div class="rd-empty" *ngIf="!recursos">
+  <i class="fa fa-spinner fa-spin"></i> Cargando recursos...
+</div>
+
+<div class="rd-empty" *ngIf="recursos && !hasData">
+  <i class="fa fa-cube"></i>
+  <p>Sin recursos registrados en este proyecto.</p>
+</div>
+
+<div class="recursos-detalle" *ngIf="recursos && hasData">
+
+  <!-- Tabs de sección -->
+  <div class="budget-tabs">
+    <button [class.active]="activeSection === 'materia_prima'" (click)="setSection('materia_prima')">
+      <i class="fa fa-cubes"></i> Materia Prima
+      <span class="tab-total" *ngIf="mostrarPrecios">{{ formatCOP(sectionTotal('materia_prima')) }}</span>
+    </button>
+    <button [class.active]="activeSection === 'proveedores'" (click)="setSection('proveedores')">
+      <i class="fa fa-truck"></i> Proveedores
+      <span class="tab-total" *ngIf="mostrarPrecios">{{ formatCOP(sectionTotal('proveedores')) }}</span>
+    </button>
+    <button [class.active]="activeSection === 'carpinteria'" (click)="setSection('carpinteria')">
+      <i class="fa fa-wrench"></i> Carpintería
+      <span class="tab-total" *ngIf="mostrarPrecios">{{ formatCOP(sectionTotal('carpinteria')) }}</span>
+    </button>
+    <button [class.active]="activeSection === 'impresiones'" (click)="setSection('impresiones')">
+      <i class="fa fa-print"></i> Impresiones
+      <span class="tab-total" *ngIf="mostrarPrecios">{{ formatCOP(sectionTotal('impresiones')) }}</span>
+    </button>
+    <button [class.active]="activeSection === 'mano_de_obra'" (click)="setSection('mano_de_obra')">
+      <i class="fa fa-users"></i> Mano de Obra
+      <span class="tab-total" *ngIf="mostrarPrecios">{{ formatCOP(sectionTotal('mano_de_obra')) }}</span>
+    </button>
+  </div>
+
+  <!-- ── Materia Prima ── -->
+  <div class="budget-table-wrap" *ngIf="activeSection === 'materia_prima'">
+    <table class="budget-view-table">
+      <thead>
+        <tr>
+          <th>Mueble</th><th>Nombre</th><th>Observaciones</th>
+          <th class="right" *ngIf="mostrarPrecios">Precio/u</th>
+          <th class="center">Cant.</th>
+          <th class="right" *ngIf="mostrarPrecios">Total</th>
+          <th *ngIf="mostrarPedido"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of budget.materia_prima">
+          <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+          <td>{{ r.nombre }}</td>
+          <td class="muted">{{ r.observaciones || '—' }}</td>
+          <td class="right" *ngIf="mostrarPrecios">{{ formatCOP(r.precio_unitario) }}</td>
+          <td class="center">{{ r.cantidad }}</td>
+          <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
+          <td *ngIf="mostrarPedido" class="td-pedido-btn">
+            <button class="btn-pedido-row" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
+              <i class="fa fa-shopping-cart"></i> Pedir
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="!budget.materia_prima.length">
+          <td [attr.colspan]="mostrarPrecios ? 6 : 4" class="muted center">Sin registros en esta sección</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Proveedores ── -->
+  <div class="budget-table-wrap" *ngIf="activeSection === 'proveedores'">
+    <table class="budget-view-table">
+      <thead>
+        <tr>
+          <th>Mueble</th><th>Nombre</th><th>Proveedor</th><th>Observaciones</th>
+          <th class="right" *ngIf="mostrarPrecios">Precio/u</th>
+          <th class="center">Cant.</th>
+          <th class="right" *ngIf="mostrarPrecios">Total</th>
+          <th *ngIf="mostrarPedido"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of budget.proveedores">
+          <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+          <td>{{ r.nombre }}</td>
+          <td class="muted">{{ r.nombre_proveedor || '—' }}</td>
+          <td class="muted">{{ r.observaciones || '—' }}</td>
+          <td class="right" *ngIf="mostrarPrecios">{{ formatCOP(r.precio_unitario) }}</td>
+          <td class="center">{{ r.cantidad }}</td>
+          <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
+          <td *ngIf="mostrarPedido" class="td-pedido-btn">
+            <button class="btn-pedido-row" (click)="pedirRecurso.emit(r)" title="Generar pedido de compra para este recurso">
+              <i class="fa fa-shopping-cart"></i> Pedir
+            </button>
+          </td>
+        </tr>
+        <tr *ngIf="!budget.proveedores.length">
+          <td [attr.colspan]="mostrarPrecios ? 7 : 5" class="muted center">Sin registros en esta sección</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Carpintería ── -->
+  <div class="budget-table-wrap" *ngIf="activeSection === 'carpinteria'">
+    <table class="budget-view-table">
+      <thead>
+        <tr>
+          <th>Mueble</th><th>Descripción</th><th class="center">Cant.</th>
+          <th>Materiales</th><th class="center">Ancho</th><th class="center">Alto</th><th class="center">Fondo</th>
+          <th class="right" *ngIf="mostrarPrecios">Precio/u</th>
+          <th class="right" *ngIf="mostrarPrecios">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of budget.carpinteria">
+          <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+          <td>{{ r.nombre }}</td>
+          <td class="center">{{ r.cantidad }}</td>
+          <td><span class="material-chips">{{ carpMaterials(r) }}</span></td>
+          <td class="center">{{ r.ancho }}cm</td>
+          <td class="center">{{ r.alto }}cm</td>
+          <td class="center">{{ r.fondo }}cm</td>
+          <td class="right" *ngIf="mostrarPrecios">{{ formatCOP(r.precio_unitario) }}</td>
+          <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
+        </tr>
+        <tr *ngIf="!budget.carpinteria.length">
+          <td [attr.colspan]="mostrarPrecios ? 9 : 7" class="muted center">Sin registros en esta sección</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Impresiones ── -->
+  <div class="budget-table-wrap" *ngIf="activeSection === 'impresiones'">
+    <table class="budget-view-table">
+      <thead>
+        <tr>
+          <th>Mueble</th><th>Descripción</th><th class="center">Prov.</th>
+          <th class="center">Cant.</th><th class="center">Dimensiones</th>
+          <th class="center">Cal.</th><th class="center">CMYK</th><th class="center">M²</th>
+          <th class="right" *ngIf="mostrarPrecios">Precio/u</th>
+          <th class="right" *ngIf="mostrarPrecios">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of budget.impresiones">
+          <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+          <td>{{ r.nombre }}</td>
+          <td class="center">{{ r.proveedor }}</td>
+          <td class="center">{{ r.cantidad }}</td>
+          <td class="center">{{ r.ancho_m }}×{{ r.alto_m }}m</td>
+          <td class="center">{{ r.calibre }}</td>
+          <td class="center cmyk-cell">
+            <span class="cmyk-c">{{ r.c }}</span>
+            <span class="cmyk-m">{{ r.m }}</span>
+            <span class="cmyk-y">{{ r.y }}</span>
+            <span class="cmyk-k">{{ r.k }}</span>
+          </td>
+          <td class="center">{{ r.m2_vinilo.toFixed(3) }}</td>
+          <td class="right" *ngIf="mostrarPrecios">{{ formatCOP(r.precio_unitario) }}</td>
+          <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
+        </tr>
+        <tr *ngIf="!budget.impresiones.length">
+          <td [attr.colspan]="mostrarPrecios ? 10 : 8" class="muted center">Sin registros en esta sección</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Mano de Obra ── -->
+  <div class="budget-table-wrap" *ngIf="activeSection === 'mano_de_obra'">
+    <table class="budget-view-table">
+      <thead>
+        <tr>
+          <th>Mueble</th><th>Concepto</th>
+          <th class="right" *ngIf="mostrarPrecios">Precio/u</th>
+          <th class="center">Cant.</th>
+          <th class="right" *ngIf="mostrarPrecios">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of budget.mano_de_obra">
+          <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
+          <td>{{ r.nombre }}</td>
+          <td class="right" *ngIf="mostrarPrecios">{{ formatCOP(r.precio_unitario) }}</td>
+          <td class="center">{{ r.cantidad }}</td>
+          <td class="right total-cell" *ngIf="mostrarPrecios">{{ formatCOP(r.valor_total) }}</td>
+        </tr>
+        <tr *ngIf="!budget.mano_de_obra.length">
+          <td [attr.colspan]="mostrarPrecios ? 5 : 3" class="muted center">Sin registros en esta sección</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Gran Total -->
+  <div class="budget-grand-total" *ngIf="mostrarPrecios">
+    <span>TOTAL PRESUPUESTO</span>
+    <strong>{{ formatCOP(grandTotal()) }}</strong>
+  </div>
+
+</div>

@@ -1,11 +1,12 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, Subscription } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import Swal from 'sweetalert2';
 import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
+import { NotificationService } from '../../../shared/services/notification.service';
 import { Api } from '../../../core/services/api';
 
 const HOURS = [7,8,9,10,11,12,13,14,15,16,17,18];
@@ -19,7 +20,8 @@ const DAYS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
   templateUrl: './project-detail.html',
   styleUrl:    './project-detail.scss',
 })
-export class CoordProjectDetail implements OnInit {
+export class CoordProjectDetail implements OnInit, OnDestroy {
+  private _notifSub: Subscription | null = null;
   project: any = null;
   loading = true;
   error = '';
@@ -27,6 +29,7 @@ export class CoordProjectDetail implements OnInit {
   activeTab = 'fases';
   expandedFases = new Set<number>();
 
+  rawRecursos: any = null;
   operarios: any[] = [];
   maquinas:  any[] = [];
 
@@ -35,14 +38,14 @@ export class CoordProjectDetail implements OnInit {
   assignFase: any = null;
   assignTab: 'operario' | 'maquinaria' | 'insumos' = 'operario';
 
-  opForm = { operario_id: null as number | null, hora_inicio: '07:00', hora_fin: '14:00' };
+  opForm = { operario_id: null as number | null, hora_inicio: '08:00', hora_fin: '18:00' };
   opSelectedDates: string[] = [];
   opConflict: 'idle' | 'checking' | 'ok' | 'conflict' = 'idle';
   opConflictMsg = '';
   opConflictDetails: Array<{ fecha: string; info: string }> = [];
   pendingOpSlots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [];
 
-  maqForm = { maquinaria_id: null as number | null, hora_inicio: '07:00', hora_fin: '14:00', operario_id: null as number | null };
+  maqForm = { maquinaria_id: null as number | null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null as number | null };
   maqSelectedDates: string[] = [];
   pendingMaqSlots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [];
 
@@ -59,6 +62,7 @@ export class CoordProjectDetail implements OnInit {
     private router:     Router,
     private projectSvc: ProjectService,
     private catalogSvc: CatalogService,
+    private notifSvc:   NotificationService,
     private api:        Api,
     private cdr:        ChangeDetectorRef,
     @Inject(PLATFORM_ID) private pid: object,
@@ -72,7 +76,17 @@ export class CoordProjectDetail implements OnInit {
     if (isPlatformBrowser(this.pid)) {
       const id = parseInt(this.route.snapshot.paramMap.get('id') ?? '0', 10);
       this.loadAll(id);
+      // Recarga automática cuando el superoperario marca una tarea como en_revision
+      this._notifSub = this.notifSvc.newNotif$.subscribe(n => {
+        if (n.tipo === 'tarea_en_revision' && this.project && (!n.proyecto_id || n.proyecto_id === this.project.id)) {
+          this.loadAll(this.project.id);
+        }
+      });
     }
+  }
+
+  ngOnDestroy(): void {
+    this._notifSub?.unsubscribe();
   }
 
   loadAll(projectId: number): void {
@@ -86,6 +100,7 @@ export class CoordProjectDetail implements OnInit {
       next: ({ project, operarios, maquinas, recursos }) => {
         this.operarios = operarios;
         this.maquinas  = maquinas;
+        this.rawRecursos = recursos;
         if (project) {
           project.fases = (project.fases ?? []).map((f: any) => ({
             ...f,
@@ -97,6 +112,26 @@ export class CoordProjectDetail implements OnInit {
           this.project = project;
           const primera = project.fases[0];
           if (primera) this.expandedFases.add(primera.id);
+
+          // Si el panel de asignación estaba abierto, la referencia a assignTask apunta
+          // al objeto viejo. Se busca la tarea actualizada y se recalcula taskDays para
+          // que el calendario muestre las fechas correctas.
+          if (this.showAssignPanel && this.assignTask) {
+            const oldId = this.assignTask.id;
+            let found: any = null;
+            for (const f of project.fases) {
+              found = (f.tareas ?? []).find((t: any) => t.id === oldId);
+              if (found) break;
+            }
+            if (found) {
+              this.assignTask    = found;
+              this.taskDays      = this.buildDateRange(found.fecha_inicio, found.fecha_fin);
+              this.opSelectedDates  = this.taskDays.map((d: Date) => this.toStr(d));
+              this.maqSelectedDates = this.taskDays.map((d: Date) => this.toStr(d));
+            } else {
+              this.closeAssign();
+            }
+          }
         }
         this.loading = false;
         this.cdr.detectChanges();
@@ -174,8 +209,8 @@ export class CoordProjectDetail implements OnInit {
   openAssign(task: any, fase: any): void {
     this.assignTask = task; this.assignFase = fase;
     this.assignTab  = 'operario';
-    this.opForm     = { operario_id: null, hora_inicio: '07:00', hora_fin: '14:00' };
-    this.maqForm    = { maquinaria_id: null, hora_inicio: '07:00', hora_fin: '14:00', operario_id: null };
+    this.opForm     = { operario_id: null, hora_inicio: '08:00', hora_fin: '18:00' };
+    this.maqForm    = { maquinaria_id: null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null };
     this.opConflict = 'idle'; this.opConflictMsg = ''; this.opConflictDetails = [];
     this.opOccCache = []; this.maqOccCache = [];
     this.pendingOpSlots  = [];
@@ -303,7 +338,7 @@ export class CoordProjectDetail implements OnInit {
     if (!this.opSelectedDates.length) { void Swal.fire('Atención', 'Selecciona al menos un día', 'warning'); return; }
     this.pendingOpSlots.push({ fechas: [...this.opSelectedDates], hora_inicio: this.opForm.hora_inicio, hora_fin: this.opForm.hora_fin });
     this.opSelectedDates = this.taskDays.map(d => this.toStr(d));
-    this.opForm.hora_inicio = '07:00'; this.opForm.hora_fin = '14:00';
+    this.opForm.hora_inicio = '08:00'; this.opForm.hora_fin = '18:00';
     this.opConflict = 'idle'; this.opConflictDetails = [];
     this.cdr.detectChanges();
   }
@@ -313,7 +348,7 @@ export class CoordProjectDetail implements OnInit {
     if (!this.maqSelectedDates.length) { void Swal.fire('Atención', 'Selecciona al menos un día', 'warning'); return; }
     this.pendingMaqSlots.push({ fechas: [...this.maqSelectedDates], hora_inicio: this.maqForm.hora_inicio, hora_fin: this.maqForm.hora_fin });
     this.maqSelectedDates = this.taskDays.map(d => this.toStr(d));
-    this.maqForm.hora_inicio = '07:00'; this.maqForm.hora_fin = '14:00';
+    this.maqForm.hora_inicio = '08:00'; this.maqForm.hora_fin = '18:00';
     this.cdr.detectChanges();
   }
   removeMaqSlot(i: number): void { this.pendingMaqSlots.splice(i, 1); this.cdr.detectChanges(); }
@@ -351,7 +386,7 @@ export class CoordProjectDetail implements OnInit {
             }
             done++;
             if (done === slots.length) {
-              this.opForm = { operario_id: null, hora_inicio: '07:00', hora_fin: '14:00' };
+              this.opForm = { operario_id: null, hora_inicio: '08:00', hora_fin: '18:00' };
               this.pendingOpSlots = [];
               this.opConflict = 'idle'; this.opConflictDetails = [];
               void Swal.fire({ icon: 'success', title: 'Operario asignado', timer: 1500 });
@@ -395,7 +430,7 @@ export class CoordProjectDetail implements OnInit {
           }
           done++;
           if (done === slots.length) {
-            this.maqForm = { maquinaria_id: null, hora_inicio: '07:00', hora_fin: '14:00', operario_id: null };
+            this.maqForm = { maquinaria_id: null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null };
             this.pendingMaqSlots = [];
             void Swal.fire({ icon: 'success', title: 'Maquinaria asignada', timer: 1500 });
             this.reloadOccupancy();
@@ -440,6 +475,28 @@ export class CoordProjectDetail implements OnInit {
     this.cdr.detectChanges();
   }
 
+  completarTarea(task: any, fase: any): void {
+    void Swal.fire({
+      title: '¿Completar esta tarea?',
+      html: `<b>${task.nombre}</b><br><small>El superoperario la marcó como lista. ¿Confirmas la verificación?</small>`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, completar',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#00A859',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.projectSvc.completarTarea(fase.id, task.id).subscribe({
+        next: () => {
+          task.estado = 'completada';
+          void Swal.fire({ icon: 'success', title: 'Tarea completada', timer: 1500, showConfirmButton: false });
+          this.cdr.detectChanges();
+        },
+        error: (err: any) => void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar la tarea', 'error'),
+      });
+    });
+  }
+
   toggleOpDate(d: string): void {
     const i = this.opSelectedDates.indexOf(d); i === -1 ? this.opSelectedDates.push(d) : this.opSelectedDates.splice(i, 1);
     this.onOperarioOrHoursChange();
@@ -462,7 +519,10 @@ export class CoordProjectDetail implements OnInit {
   }
 
   buildDateRange(from: string, to: string, max = 14): Date[] {
-    const result: Date[] = []; const cur = new Date(from); const end = new Date(to);
+    const result: Date[] = [];
+    // Force local-time parse to avoid UTC offset shifting the day back by 1
+    const cur = new Date(`${String(from).substring(0, 10)}T00:00:00`);
+    const end = new Date(`${String(to).substring(0, 10)}T00:00:00`);
     while (cur <= end && result.length < max) { result.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
     return result;
   }
@@ -556,7 +616,7 @@ export class CoordProjectDetail implements OnInit {
     this.projectSvc.updateTarea(this.editTaskFase.id, this.editTask.id, {
       nombre:        this.editForm.nombre,
       descripcion:   this.editForm.descripcion  || null,
-      id_tipo_tarea: this.editForm.id_tipo_tarea,
+      ...(this.editForm.id_tipo_tarea != null ? { id_tipo_tarea: this.editForm.id_tipo_tarea } : {}),
       fecha_inicio:  this.editForm.fecha_inicio || null,
       fecha_fin:     this.editForm.fecha_fin    || null,
       depende_de:    this.editForm.depende_de,
@@ -628,13 +688,15 @@ export class CoordProjectDetail implements OnInit {
   // ── Subir evidencia ───────────────────────────────────────────────────────
   showEvidModal = false;
   evidTask: any = null;
+  evidFase: any = null;
   evidFiles: File[] = [];
   evidPreviews: string[] = [];
   evidDesc = '';
   evidSaving = false;
 
-  openEvidModal(task: any): void {
+  openEvidModal(task: any, fase: any): void {
     this.evidTask = task;
+    this.evidFase = fase;
     this.evidFiles = [];
     this.evidPreviews = [];
     this.evidDesc = '';
@@ -642,7 +704,15 @@ export class CoordProjectDetail implements OnInit {
     this.cdr.detectChanges();
   }
 
-  closeEvidModal(): void { this.showEvidModal = false; this.evidTask = null; this.cdr.detectChanges(); }
+  closeEvidModal(): void { this.showEvidModal = false; this.evidTask = null; this.evidFase = null; this.cdr.detectChanges(); }
+
+  completarTareaDesdeEvid(): void {
+    if (!this.evidTask || !this.evidFase) return;
+    const task = this.evidTask;
+    const fase = this.evidFase;
+    this.closeEvidModal();
+    this.completarTarea(task, fase);
+  }
 
   onEvidFilesSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -711,6 +781,34 @@ export class CoordProjectDetail implements OnInit {
       error: (err: any) => {
         this.taskSaving = false;
         void Swal.fire('Error', err?.error?.message ?? 'No se pudo crear la tarea', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  // ── Nuevo tipo de tarea (T4.1) ────────────────────────────────────────────
+  showNewTipoInput = false;
+  newTipoLabel = '';
+  newTipoSaving = false;
+
+  createNewTipo(): void {
+    const nombre = this.newTipoLabel.trim();
+    if (!nombre) return;
+    this.newTipoSaving = true;
+    this.catalogSvc.createTipoTarea({ nombre }).subscribe({
+      next: (t: any) => {
+        const item = { id: t.id, nombre: t.nombre ?? nombre };
+        this.tiposTarea = [...this.tiposTarea, item];
+        this.taskForm.id_tipo_tarea = item.id;
+        this.editForm.id_tipo_tarea = item.id;
+        this.showNewTipoInput = false;
+        this.newTipoLabel = '';
+        this.newTipoSaving = false;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.newTipoSaving = false;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo crear el tipo', 'error');
         this.cdr.detectChanges();
       },
     });

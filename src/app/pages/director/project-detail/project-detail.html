@@ -5,7 +5,7 @@
     <button class="btn-back" (click)="goBack()"><i class="fa fa-arrow-left"></i></button>
     <div class="header-info">
       <div class="header-top">
-        <h1>{{ p.nombre }}</h1>
+        <h1>{{ p.codigo ? '#' + p.codigo + ' · ' + p.nombre : p.nombre }}</h1>
         <span class="badge-urgente" *ngIf="p.urgente === true"><i class="fa fa-bolt"></i> URGENTE</span>
         <span class="estado-badge" [ngClass]="'estado-' + p.estado">{{ getEstadoLabel(p.estado) }}</span>
       </div>
@@ -46,7 +46,6 @@
     </button>
     <button [class.active]="activeTab === 'cronograma'"  (click)="setTab('cronograma')"><i class="fa fa-calendar"></i> Cronograma</button>
     <button [class.active]="activeTab === 'recursos'"    (click)="setTab('recursos')"><i class="fa fa-cube"></i> Recursos</button>
-    <button class="tab-download" (click)="downloadRecursos()"><i class="fa fa-file-excel-o"></i> Descargar</button>
     <button *ngIf="p.link_trello" class="tab-trello" (click)="openTrello(p.link_trello)">
       <i class="fa fa-trello"></i> Trello
     </button>
@@ -209,10 +208,10 @@
             </div>
           </div>
 
-          <!-- Insumos aplicados a la fase -->
-          <div class="fase-insumos-row" *ngIf="fase.insumos_aplicados?.length">
-            <span class="fase-insumos-label"><i class="fa fa-cube"></i> Insumos:</span>
-            <span class="fase-insumo-chip" *ngFor="let iid of fase.insumos_aplicados">{{ insumoLabel(iid) }}</span>
+          <!-- Muebles aplicados a la fase -->
+          <div class="fase-insumos-row" *ngIf="fase.muebles_aplicados?.length">
+            <span class="fase-insumos-label"><i class="fa fa-th-large"></i> Muebles:</span>
+            <span class="fase-insumo-chip" *ngFor="let mid of fase.muebles_aplicados">{{ muebleLabel(mid) }}</span>
           </div>
 
           <!-- Add task -->
@@ -272,27 +271,37 @@
 
   <!-- ═══════════════════ TAB: Recursos ══════════════════════════════════ -->
   <div class="tab-content" *ngIf="activeTab === 'recursos'">
-    <div class="recursos-card" *ngIf="resourceSummary.length || totalRecursosValue">
-      <table class="recursos-table">
-        <thead>
-          <tr><th>Categoría</th><th class="right">Total</th></tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let r of resourceSummary">
-            <td><span class="tipo-badge">{{ r.tipo }}</span></td>
-            <td class="right">{{ formatCOP(r.total) }}</td>
-          </tr>
-          <tr class="gran-total">
-            <td><strong>Gran Total</strong></td>
-            <td class="right"><strong>{{ formatCOP(totalRecursosValue) }}</strong></td>
-          </tr>
-        </tbody>
-      </table>
+
+    <!-- Panel: solicitudes de recurso pendientes -->
+    <div class="solicitudes-panel" *ngIf="solicitudesPendientes.length">
+      <div class="solicitudes-header">
+        <i class="fa fa-exclamation-circle"></i>
+        Solicitudes de recursos pendientes
+        <span class="sol-count">{{ solicitudesPendientes.length }}</span>
+      </div>
+      <div class="solicitud-row" *ngFor="let sol of solicitudesPendientes">
+        <div class="sol-info">
+          <span class="sol-nombre">{{ sol.nombre }}</span>
+          <span class="sol-meta">{{ sol.tipo_recurso }} · {{ sol.cantidad }} ud · ${{ sol.precio_unitario | number:'1.0-0' }}</span>
+          <span class="sol-obs" *ngIf="sol.observaciones">{{ sol.observaciones }}</span>
+        </div>
+        <div class="sol-actions">
+          <button class="btn-sol-ok" (click)="aprobarSolicitud(sol)" title="Aprobar">
+            <i class="fa fa-check"></i> Aprobar
+          </button>
+          <button class="btn-sol-no" (click)="rechazarSolicitud(sol)" title="Rechazar">
+            <i class="fa fa-times"></i> Rechazar
+          </button>
+        </div>
+      </div>
     </div>
-    <div class="empty-state" *ngIf="!resourceSummary.length && !totalRecursosValue">
-      <i class="fa fa-cube"></i>
-      <p>Sin recursos registrados en este proyecto.</p>
-    </div>
+
+    <app-recursos-detalle
+      [recursos]="rawRecursos"
+      [mostrarPrecios]="true"
+      [mostrarPedido]="canManagePhases"
+      (pedirRecurso)="onPedirRecurso($event)">
+    </app-recursos-detalle>
   </div>
 
 
@@ -331,19 +340,21 @@
           </div>
         </div>
 
-        <!-- ── Insumos / Materiales de la fase ── -->
-        <div class="mform-group" *ngIf="project?.insumos?.length">
-          <label>Insumos aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(selecciona los que aplican)</span></label>
+        <!-- ── Muebles de la fase ── -->
+        <div class="mform-group" *ngIf="project?.muebles?.length">
+          <label>Muebles aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(selecciona los que aplican)</span></label>
           <div class="insumo-phase-list">
-            <label class="insumo-check-item" *ngFor="let ins of project!.insumos">
-              <input type="checkbox" [checked]="isPhaseInsumoSelected(ins.id)" (change)="togglePhaseInsumo(ins.id)">
-              <span class="insumo-check-name">{{ ins.nombre }}</span>
-              <span class="tipo-badge-sm">{{ ins.tipo }}</span>
+            <label class="insumo-check-item" *ngFor="let m of project!.muebles">
+              <input type="checkbox" [checked]="isPhaseInsumoSelected(m.id)" (change)="togglePhaseInsumo(m.id)">
+              <span class="insumo-check-name">{{ m.nombre }}</span>
             </label>
           </div>
           <div class="insumos-sel-count" *ngIf="phaseInsumos.length > 0">
-            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} insumo(s) seleccionado(s)
+            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} mueble(s) seleccionado(s)
           </div>
+        </div>
+        <div class="mform-group" *ngIf="!project?.muebles?.length">
+          <p style="color:var(--text-muted);font-size:.85rem"><i class="fa fa-info-circle"></i> El proyecto no tiene muebles definidos.</p>
         </div>
 
         <!-- ── Validación de disponibilidad ── -->
@@ -413,6 +424,16 @@
           <select [(ngModel)]="taskForm.id_tipo_tarea" (ngModelChange)="onTipoTareaChange()">
             <option *ngFor="let t of tiposTarea" [ngValue]="t.id">{{ t.nombre }}</option>
           </select>
+          <div class="new-tipo-inline" *ngIf="!showNewTipoInput">
+            <button type="button" class="btn-link-sm" (click)="showNewTipoInput=true"><i class="fa fa-plus"></i> Nuevo tipo</button>
+          </div>
+          <div class="new-tipo-inline" *ngIf="showNewTipoInput">
+            <input [(ngModel)]="newTipoLabel" placeholder="Nombre del nuevo tipo..." maxlength="60" class="mform-input-sm">
+            <button type="button" class="btn-primary-xs" (click)="createNewTipo()" [disabled]="!newTipoLabel.trim() || newTipoSaving">
+              {{ newTipoSaving ? '...' : 'Agregar' }}
+            </button>
+            <button type="button" class="btn-cancel-xs" (click)="showNewTipoInput=false; newTipoLabel=''">✕</button>
+          </div>
         </div>
         <div class="mform-group">
           <label>Depende de</label>
@@ -481,18 +502,17 @@
           <textarea [(ngModel)]="delegateInstrucciones" rows="3"
                     placeholder="Ej: Priorizar el corte CNC antes del laminado. Coordinar con el proveedor de MDF..."></textarea>
         </div>
-        <!-- ── Insumos disponibles del proyecto ── -->
-        <div class="mform-group" *ngIf="project?.insumos?.length">
-          <label>Insumos aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(marca los que aplican)</span></label>
+        <!-- ── Muebles disponibles del proyecto ── -->
+        <div class="mform-group" *ngIf="project?.muebles?.length">
+          <label>Muebles aplicables a esta fase <span style="font-weight:normal;color:var(--text-muted)">(marca los que aplican)</span></label>
           <div class="insumo-phase-list">
-            <label class="insumo-check-item" *ngFor="let ins of project!.insumos">
-              <input type="checkbox" [checked]="isPhaseInsumoSelected(ins.id)" (change)="togglePhaseInsumo(ins.id)">
-              <span class="insumo-check-name">{{ ins.nombre }}</span>
-              <span class="tipo-badge-sm">{{ ins.tipo }}</span>
+            <label class="insumo-check-item" *ngFor="let m of project!.muebles">
+              <input type="checkbox" [checked]="isPhaseInsumoSelected(m.id)" (change)="togglePhaseInsumo(m.id)">
+              <span class="insumo-check-name">{{ m.nombre }}</span>
             </label>
           </div>
           <div class="insumos-sel-count" *ngIf="phaseInsumos.length > 0">
-            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} insumo(s) seleccionado(s)
+            <i class="fa fa-check-circle"></i> {{ phaseInsumos.length }} mueble(s) seleccionado(s)
           </div>
         </div>
       </div>
@@ -508,4 +528,9 @@
 
 </div><!-- /detail-page -->
 
-<div class="loading-state" *ngIf="!project"><i class="fa fa-spinner fa-spin"></i> Cargando proyecto...</div>
+<div class="loading-state" *ngIf="!project && !error"><i class="fa fa-spinner fa-spin"></i> Cargando proyecto...</div>
+<div class="error-state" *ngIf="error && !project">
+  <i class="fa fa-exclamation-circle"></i>
+  <p>{{ error }}</p>
+  <button class="btn-outline" (click)="goBack()"><i class="fa fa-arrow-left"></i> Volver</button>
+</div>

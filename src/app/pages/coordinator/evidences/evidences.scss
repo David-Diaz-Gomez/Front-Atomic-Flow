@@ -24,6 +24,11 @@
 }
 .btn-evidencia { padding: 7px 14px; background: #0052cc; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; &:hover { background: #003d99; } }
 .btn-reasignar { padding: 7px 14px; background: #fef2f2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; &:hover { background: #fee2e2; } }
+.btn-verificar { padding: 7px 14px; background: #00A859; color: white; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; &:hover { background: #008c49; } }
+.btn-verificar-solo { padding: 9px 20px; background: #00A859; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; &:hover:not(:disabled) { background: #008c49; } &:disabled { opacity: .6; cursor: not-allowed; } }
+.ev-card__estado { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 4px; width: fit-content; }
+.ev-estado--revision { background: rgba(124,58,237,.1); color: #7c3aed; }
+.ev-estado--done    { background: rgba(0,168,89,.1); color: #00A859; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; backdrop-filter: blur(2px); }
 .ev-modal {
   background: white; border-radius: 16px; width: 90%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,.2); overflow: hidden;
@@ -66,7 +71,7 @@ textarea.mform-input { resize: vertical; font-family: inherit; }
     flex-direction: column; align-items: stretch; gap: 10px; padding: 14px;
     &__left { display: none; }
     &__actions { flex-direction: row; }
-    .btn-evidencia, .btn-reasignar { flex: 1; justify-content: center; }
+    .btn-evidencia, .btn-reasignar, .btn-verificar { flex: 1; justify-content: center; }
   }
   .ev-modal {
     width: 100%; max-width: 100%; height: 100%; max-height: 100%;

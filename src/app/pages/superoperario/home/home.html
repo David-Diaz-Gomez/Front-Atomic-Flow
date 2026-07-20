@@ -6,7 +6,6 @@
       <h1><i class="fa fa-desktop"></i> Kiosko de Producción</h1>
       <span class="kiosko-date">{{ todayLabel }}</span>
     </div>
-    <app-notif-bell></app-notif-bell>
     <div class="kiosko-header__tabs">
       <button [class.tab-active]="view === 'calendar'" (click)="switchView('calendar')">
         <i class="fa fa-calendar"></i> Día
@@ -246,14 +245,45 @@
         </div>
       </div>
       <div class="task-modal__footer">
-        <button class="btn-completar" *ngIf="selectedTarea?.estado !== 'completada'"
+        <!-- Pendiente: puedo marcarla -->
+        <button class="btn-completar"
+                *ngIf="!selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'"
                 (click)="marcarCompletada()" [disabled]="isLoading">
           <i class="fa fa-check"></i> {{ isLoading ? 'Guardando...' : 'Marcar como Completada' }}
         </button>
+        <!-- Yo ya completé pero otros aún no -->
+        <div class="completada-msg mi-parte-msg"
+             *ngIf="selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'">
+          <i class="fa fa-check-circle"></i> Tu parte completada —
+          <span *ngIf="selectedTarea && selectedTarea.total_operarios > 1">
+            {{ selectedTarea.operarios_completados }}/{{ selectedTarea.total_operarios }} operario(s) terminaron
+          </span>
+        </div>
+        <!-- Todos completaron → en_revision -->
+        <div class="completada-msg en-revision-msg" *ngIf="selectedTarea?.estado === 'en_revision'">
+          <i class="fa fa-hourglass-half"></i> Todos terminaron — pendiente de verificación del coordinador
+        </div>
+        <!-- Verificada por coordinador -->
         <div class="completada-msg" *ngIf="selectedTarea?.estado === 'completada'">
           <i class="fa fa-check-circle"></i> Completada a las {{ completadaHora(selectedTarea?.completado_en ?? null) }}
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══ ANNOUNCEMENT MODAL ════════════════════════════════════════════════ -->
+  <div class="announcement-overlay" *ngIf="showAnnouncementModal" (click)="dismissAnnouncement()">
+    <div class="announcement-box">
+      <div class="ann-icon"><i class="fa fa-tasks"></i></div>
+      <div class="ann-label">NUEVA TAREA ASIGNADA</div>
+      <div class="ann-name">{{ currentAnnouncement?.operarioNombre }}</div>
+      <div class="ann-tasks">
+        <span *ngFor="let t of currentAnnouncement?.tareas">{{ t }}</span>
+      </div>
+      <div class="ann-queue" *ngIf="announcementQueue.length > 0">
+        <i class="fa fa-ellipsis-h"></i> +{{ announcementQueue.length }} más en cola
+      </div>
+      <div class="ann-hint">Toca para continuar</div>
     </div>
   </div>
 

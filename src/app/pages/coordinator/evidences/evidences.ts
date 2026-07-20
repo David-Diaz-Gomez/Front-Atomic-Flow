@@ -4,6 +4,7 @@ import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
 import { Api } from '../../../core/services/api';
 import Swal from 'sweetalert2';
+import { forkJoin } from 'rxjs';
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -118,6 +119,74 @@ export class CoordEvidences implements OnInit {
         this.cdr.detectChanges();
       },
     });
+  }
+
+  /** Sube evidencia Y verifica la tarea en un solo clic (si tiene archivos + está en_revision). */
+  subirYVerificar(): void {
+    if (!this.evidTarea) return;
+    this.evidSaving = true;
+    const tarea = this.evidTarea;
+
+    const verificar$ = this.projectSvc.completarTarea(tarea.fase_id, tarea.id);
+
+    if (this.selectedFiles.length) {
+      const fd = new FormData();
+      for (const f of this.selectedFiles) fd.append('imagen', f);
+      fd.append('descripcion', this.evidDesc);
+      fd.append('id_coordinador', String(this.api.getCurrentUserId() ?? ''));
+      forkJoin([this.projectSvc.subirEvidencias(tarea.id, fd), verificar$]).subscribe({
+        next: () => {
+          this.evidSaving = false;
+          this.tareas = this.tareas.filter(t => t.id !== tarea.id);
+          void Swal.fire({ icon: 'success', title: 'Evidencia subida y tarea verificada', timer: 1800, showConfirmButton: false });
+          this.closeEvidModal(); this.cdr.detectChanges();
+        },
+        error: (err: any) => {
+          this.evidSaving = false;
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar la operación', 'error');
+          this.cdr.detectChanges();
+        },
+      });
+    } else {
+      verificar$.subscribe({
+        next: () => {
+          this.evidSaving = false;
+          this.tareas = this.tareas.filter(t => t.id !== tarea.id);
+          void Swal.fire({ icon: 'success', title: 'Tarea verificada y completada', timer: 1500, showConfirmButton: false });
+          this.closeEvidModal(); this.cdr.detectChanges();
+        },
+        error: (err: any) => {
+          this.evidSaving = false;
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo verificar la tarea', 'error');
+          this.cdr.detectChanges();
+        },
+      });
+    }
+  }
+
+  /** Verifica la tarea directamente desde la tarjeta (sin abrir modal de evidencia). */
+  verificarTarea(t: any): void {
+    void Swal.fire({
+      title: '¿Verificar tarea?',
+      html: `<b>${t.nombre}</b><br><small>El operario la marcó como lista. ¿Confirmas sin subir evidencia?</small>`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'Sí, verificar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#00A859',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.projectSvc.completarTarea(t.fase_id, t.id).subscribe({
+        next: () => {
+          this.tareas = this.tareas.filter(x => x.id !== t.id);
+          void Swal.fire({ icon: 'success', title: 'Tarea verificada', timer: 1400, showConfirmButton: false });
+          this.cdr.detectChanges();
+        },
+        error: (err: any) => void Swal.fire('Error', err?.error?.message ?? 'No se pudo verificar', 'error'),
+      });
+    });
+  }
+
+  estadoLabel(estado: string): string {
+    return estado === 'en_revision' ? 'En revisión' : 'Completada';
   }
 
   // ── Reassign modal ────────────────────────────────────────────────────────

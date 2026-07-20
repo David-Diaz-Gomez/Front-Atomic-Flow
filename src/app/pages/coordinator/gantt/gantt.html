@@ -166,7 +166,10 @@
                 <td colspan="8" class="section-row"><i class="fa fa-users"></i> Operarios</td>
               </tr>
               <tr *ngFor="let op of filteredOpOcc">
-                <td class="resource-label"><i class="fa fa-user"></i> {{ op.nombre_completo || ((op.nombre||'') + (op.apellido?' '+op.apellido:'')) || ('Op.'+op.id) }}</td>
+                <td class="resource-label"
+                    [style.border-left]="'3px solid ' + getOperarioColor(op.id_usuario ?? op.id ?? 0)">
+                  <i class="fa fa-user"></i> {{ op.nombre_completo || ((op.nombre||'') + (op.apellido?' '+op.apellido:'')) || ('Op.'+op.id) }}
+                </td>
                 <td *ngFor="let day of calendarDays" class="cal-cell"
                     [class.weekend-cell]="isWeekend(day)"
                     [class.today-cell]="isTodayMarker(day)"
@@ -177,7 +180,7 @@
                     <span class="occ-pct-top">{{ calcDayPct(diaData) }}%</span>
                     <div class="occ-bar-track">
                       <div class="occ-bloque" *ngFor="let b of diaData.bloques"
-                           [ngStyle]="getBloqueStyle(b, getProjectColor(b.proyecto_id))"></div>
+                           [ngStyle]="getBloqueStyle(b, getOperarioColor(op.id_usuario ?? op.id ?? 0))"></div>
                     </div>
                   </ng-container>
                 </td>

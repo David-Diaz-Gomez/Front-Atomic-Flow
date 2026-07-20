@@ -78,11 +78,17 @@ export class CatalogService {
     );
   }
 
-  // ── Tipos de tarea ── GET /tipos-tarea
+  // ── Tipos de tarea ── GET /tipos-tarea · POST /tipos-tarea
 
   getTiposTarea(): Observable<any[]> {
     return this.http.get<any>(`${this.base}/tipos-tarea`).pipe(
       map(r => r?.data ?? [])
+    );
+  }
+
+  createTipoTarea(body: { nombre: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/tipos-tarea`, body).pipe(
+      map(r => r?.data ?? r)
     );
   }
 
