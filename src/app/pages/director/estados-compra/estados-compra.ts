@@ -161,8 +161,10 @@ export class EstadosCompra implements OnInit {
   // ── Modal Nuevo Recurso (solicitud) ───────────────────────────────────────
   showNuevoRecursoModal = false;
   savingNuevoRecurso = false;
-  nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null as number | null, cantidad: null as number | null, observaciones: '' };
+  nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null as number | null, cantidad: null as number | null, observaciones: '', id_mueble: null as number | null };
   nuevoRecursoSubmitted = false;
+  muebles: any[] = [];
+  loadingMuebles = false;
 
   // ── Filtro rápido por proyecto ────────────────────────────────────────────
   filterProyectoId: string = '';  // '' = todos
@@ -816,9 +818,17 @@ export class EstadosCompra implements OnInit {
   // ── Modal Nuevo Recurso ───────────────────────────────────────────────────
 
   openNuevoRecursoModal(): void {
-    this.nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null, cantidad: null, observaciones: '' };
+    this.nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null, cantidad: null, observaciones: '', id_mueble: null };
     this.nuevoRecursoSubmitted = false;
     this.showNuevoRecursoModal = true;
+    this.muebles = [];
+    if (this.form.id_proyecto) {
+      this.loadingMuebles = true;
+      this.projectSvc.getProjectMuebles(this.form.id_proyecto).subscribe({
+        next: (list: any[]) => { this.muebles = list ?? []; this.loadingMuebles = false; this.cdr.detectChanges(); },
+        error: () => { this.loadingMuebles = false; },
+      });
+    }
     this.cdr.detectChanges();
   }
 
@@ -858,6 +868,7 @@ export class EstadosCompra implements OnInit {
           cantidad: f.cantidad!,
           observaciones: f.observaciones || undefined,
           id_pedido: idPedido ?? null,
+          id_mueble: f.id_mueble ?? null,
         }).subscribe({
           next: () => {
             this.savingNuevoRecurso = false;

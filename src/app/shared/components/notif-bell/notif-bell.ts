@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { NotificationService, AppNotif } from '../../services/notification.service';
 
@@ -11,39 +11,43 @@ import { NotificationService, AppNotif } from '../../services/notification.servi
 export class NotifBellComponent {
   showPanel = false;
 
-  constructor(public notifSvc: NotificationService, private router: Router) {}
+  constructor(
+    public notifSvc: NotificationService,
+    private router: Router,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   toggle(): void { this.showPanel = !this.showPanel; }
 
-  markAll(): void { this.notifSvc.markAllRead(); this.showPanel = false; }
+  markAll(): void { this.notifSvc.markAllRead(); }
 
-  private get roleId(): number {
-    try { return JSON.parse(localStorage.getItem('currentUser') ?? 'null')?.roleId ?? 0; }
-    catch { return 0; }
+  /** Checkbox click: marca/desmarca individualmente sin navegar */
+  toggleRead(n: AppNotif, event: MouseEvent): void {
+    event.stopPropagation();
+    if (n.leida) return; // ya leída — no hacer nada al hacer click en el check
+    this.notifSvc.markRead(n.id);
+    this.cdr.detectChanges();
   }
 
-  onClick(n: AppNotif): void {
+  /** Click en el cuerpo del ítem: navega Y marca como leída solo esa */
+  navigate(n: AppNotif): void {
     this.notifSvc.markRead(n.id);
     this.showPanel = false;
 
     const pid = n.proyecto_id;
     const role = this.roleId;
 
-    // Coordinator (3)
     if (role === 3) {
       if (['tarea_completada', 'tarea_en_revision', 'evidencia', 'evidencia_subida'].includes(n.tipo)) {
         void this.router.navigateByUrl('/dashboard/coordinator/evidences');
       } else if (['dependencia_resuelta', 'cambio_fechas', 'asignacion', 'reasignacion'].includes(n.tipo)) {
         void this.router.navigateByUrl(pid ? `/dashboard/coordinator/project/${pid}` : '/dashboard/coordinator/home');
-      } else if (n.tipo === 'fase_delegada') {
-        void this.router.navigateByUrl('/dashboard/coordinator/home');
       } else {
         void this.router.navigateByUrl('/dashboard/coordinator/home');
       }
       return;
     }
 
-    // Director (2)
     if (role === 2) {
       if (['evidencia_subida', 'evidencia', 'tarea_completada', 'tarea_en_revision'].includes(n.tipo)) {
         void this.router.navigateByUrl(pid ? `/dashboard/director/project/${pid}` : '/dashboard/director/evidencias');
@@ -57,11 +61,14 @@ export class NotifBellComponent {
       return;
     }
 
-    // Admin (1)
     if (role === 1) { void this.router.navigateByUrl('/dashboard/admin/projects'); return; }
 
-    // Operator / Superoperario (4/5) — fallback
     void this.router.navigateByUrl('/dashboard/superoperario/home');
+  }
+
+  private get roleId(): number {
+    try { return JSON.parse(localStorage.getItem('currentUser') ?? 'null')?.roleId ?? 0; }
+    catch { return 0; }
   }
 
   @HostListener('document:click', ['$event'])

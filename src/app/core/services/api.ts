@@ -309,7 +309,7 @@ export class Api {
     );
   }
 
-  createSolicitudRecurso(idProyecto: number, body: { nombre: string; tipo_recurso: string; precio_unitario: number; cantidad: number; observaciones?: string; id_pedido?: number | null }): Observable<any> {
+  createSolicitudRecurso(idProyecto: number, body: { nombre: string; tipo_recurso: string; precio_unitario: number; cantidad: number; observaciones?: string; id_pedido?: number | null; id_mueble?: number | null }): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/proyectos/${idProyecto}/solicitud-recurso`, body).pipe(
       catchError(err => { this.notifyError('No se pudo crear la solicitud.'); return throwError(() => err); })
     );
