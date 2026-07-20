@@ -121,6 +121,7 @@ export class SuperOpHome implements OnInit, OnDestroy {
   toggleKioskMode(): void {
     this.kioskMode = this.kioskMode === 'fijado' ? 'libre' : 'fijado';
     localStorage.setItem('kioskMode', this.kioskMode);
+    if (this.kioskMode === 'fijado' && this.isFiltered) this.clearFilter();
     this.cdr.detectChanges();
   }
 

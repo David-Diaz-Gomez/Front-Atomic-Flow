@@ -27,8 +27,8 @@
     </div>
   </div>
 
-  <!-- ══ FILTER BAR ══════════════════════════════════════════════════════════ -->
-  <div class="kiosko-filter">
+  <!-- ══ FILTER BAR (solo en modo libre) ═══════════════════════════════════ -->
+  <div class="kiosko-filter" *ngIf="kioskMode === 'libre'">
     <div class="filter-row" *ngIf="!isFiltered">
       <div class="filter-field">
         <label>Operario</label>
