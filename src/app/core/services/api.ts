@@ -264,6 +264,39 @@ export class Api {
     );
   }
 
+  getManoDeObra(filters: { estado?: string; id_proyecto?: number }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.estado)      params = params.set('estado', filters.estado);
+    if (filters.id_proyecto) params = params.set('id_proyecto', filters.id_proyecto.toString());
+    return this.http.get<any>(`${this.baseUrl}/reportes/mano-de-obra`, { params }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getPagoOperarios(filters: { estado?: string; id_proyecto?: number; fecha_inicio?: string; fecha_fin?: string }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.estado)       params = params.set('estado', filters.estado);
+    if (filters.id_proyecto)  params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
+    return this.http.get<any>(`${this.baseUrl}/reportes/pago-operarios`, { params }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getCambiosSistema(filters: { fecha_inicio?: string; fecha_fin?: string; tipo?: string }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
+    if (filters.tipo)         params = params.set('tipo', filters.tipo);
+    return this.http.get<any>(`${this.baseUrl}/reportes/cambios-sistema`, { params }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   // ── Vista General / Plantillas ────────────────────────────────────────────
 
   getVistaGeneralProyectos(): Observable<any[]> {
@@ -290,10 +323,11 @@ export class Api {
   getMenuForRole(roleId: number): any[] {
     const menus: any = {
       1: [
-        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/reports' },
         { title: 'Proyectos',      icon: 'fa-briefcase',    route: '/dashboard/admin/home' },
         { title: 'Usuarios',       icon: 'fa-users',        route: '/dashboard/admin/users' },
         { title: 'Vista General',  icon: 'fa-globe',        route: '/dashboard/admin/vista-general' },
+        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/reports' },
+        { title: 'Reportes',       icon: 'fa-file-text-o',  route: '/dashboard/admin/reportes' },
       ],
       2: [
         { title: 'Mis Proyectos',  icon: 'fa-briefcase',    route: '/dashboard/director/home' },

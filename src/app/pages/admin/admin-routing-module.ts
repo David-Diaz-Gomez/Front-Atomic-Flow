@@ -3,6 +3,7 @@ import { RouterModule, Routes } from '@angular/router';
 import { Projects } from './projects/projects';
 import { Users } from './users/users';
 import { Reports } from './reports/reports';
+import { Reportes } from './reportes/reportes';
 import { GanttGeneral } from '../../shared/components/gantt-general/gantt-general';
 
 const routes: Routes = [
@@ -10,6 +11,7 @@ const routes: Routes = [
   { path: 'home',           component: Projects },
   { path: 'users',          component: Users },
   { path: 'reports',        component: Reports },
+  { path: 'reportes',       component: Reportes },
   { path: 'vista-general',  component: GanttGeneral },
 ];
 

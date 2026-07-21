@@ -1,0 +1,278 @@
+<div class="reportes-page">
+
+  <div class="page-header">
+    <div class="page-title">
+      <h1><i class="fa fa-file-text-o"></i> Reportes</h1>
+      <span class="subtitle">Mano de obra y trazabilidad del sistema</span>
+    </div>
+  </div>
+
+  <!-- ── Sección 1: Mano de Obra ── -->
+  <section class="dash-section">
+    <h2 class="section-title">Mano de Obra</h2>
+
+    <!-- Filtros + Tabs en la misma fila -->
+    <div class="mo-toolbar">
+      <div class="mo-filters">
+        <div class="filter-field">
+          <label>Estado proyecto</label>
+          <select class="filter-select" [(ngModel)]="filtroEstado" (ngModelChange)="onFilterChange()">
+            <option value="">Todos</option>
+            <option value="activo">Activos</option>
+            <option value="finalizado">Finalizados</option>
+          </select>
+        </div>
+
+        <!-- Filtros solo visibles en tab "Por Operario" -->
+        <ng-container *ngIf="activeTab === 'operario'">
+          <div class="filter-field proyecto-field">
+            <label>Proyecto</label>
+            <div class="proyecto-autocomplete">
+              <input type="text" class="filter-select"
+                [(ngModel)]="filtroProyectoText"
+                (ngModelChange)="showProyectoDropdown = true"
+                (focus)="showProyectoDropdown = true"
+                (blur)="onProyectoBlur()"
+                placeholder="Todos los proyectos"
+                autocomplete="off">
+              <button class="proyecto-clear" *ngIf="filtroProyectoText" (mousedown)="clearProyecto()">
+                <i class="fa fa-times"></i>
+              </button>
+              <div class="proyecto-dropdown" *ngIf="showProyectoDropdown && proyectosBusqueda.length > 0">
+                <div class="proyecto-option" *ngFor="let p of proyectosBusqueda" (mousedown)="selectProyecto(p)">
+                  {{ p.nombre }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="filter-field">
+            <label>Desde</label>
+            <input type="date" class="filter-select" [(ngModel)]="filtroFechaInicio" (ngModelChange)="loadPago()">
+          </div>
+          <div class="filter-field">
+            <label>Hasta</label>
+            <input type="date" class="filter-select" [(ngModel)]="filtroFechaFin" (ngModelChange)="loadPago()">
+          </div>
+        </ng-container>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tab-group">
+        <button class="tab-btn" [class.active]="activeTab === 'proyecto'" (click)="setTab('proyecto')">
+          <i class="fa fa-bar-chart"></i> Por Proyecto
+        </button>
+        <button class="tab-btn" [class.active]="activeTab === 'operario'" (click)="setTab('operario')">
+          <i class="fa fa-users"></i> Por Operario
+        </button>
+      </div>
+    </div>
+
+    <!-- ─── TAB: Por Proyecto ─── -->
+    <ng-container *ngIf="activeTab === 'proyecto'">
+      <div class="chart-loading" *ngIf="loadingMO">
+        <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+      </div>
+
+      <ng-container *ngIf="!loadingMO">
+        <div class="chart-empty" *ngIf="moData.length === 0">
+          <i class="fa fa-bar-chart"></i>
+          <p>Sin datos para los filtros seleccionados</p>
+          <span>Verifica que los proyectos tengan recursos de tipo "Mano de Obra" en su presupuesto y operarios con evidencias registradas.</span>
+        </div>
+
+        <ng-container *ngIf="moData.length > 0">
+          <!-- KPIs resumen -->
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-indigo"><i class="fa fa-money"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ formatCop(totalPresupuestoMO) }}</span>
+                <span class="kpi-label">Presupuesto MO total</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-green"><i class="fa fa-check-circle"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ formatCop(totalCostoRealMO) }}</span>
+                <span class="kpi-label">Costo real total</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon" [ngClass]="totalDiferenciaMO >= 0 ? 'kpi-green' : 'kpi-red'">
+                <i class="fa" [ngClass]="totalDiferenciaMO >= 0 ? 'fa-arrow-down' : 'fa-arrow-up'"></i>
+              </div>
+              <div class="kpi-body">
+                <span class="kpi-value" [ngClass]="difClass(totalDiferenciaMO)">{{ formatCop(totalDiferenciaMO) }}</span>
+                <span class="kpi-label">Diferencia acumulada</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-amber"><i class="fa fa-clock-o"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ totalHorasMO | number:'1.1-1' }} h</span>
+                <span class="kpi-label">Horas reales totales</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gráfico -->
+          <div class="chart-card" style="margin-bottom: 20px;">
+            <div class="canvas-wrap canvas-bar">
+              <canvas #moChart></canvas>
+            </div>
+          </div>
+
+          <!-- Tabla + botón Excel -->
+          <div class="table-card">
+            <div class="table-card-header">
+              <span class="table-count">{{ moData.length }} proyecto{{ moData.length !== 1 ? 's' : '' }}</span>
+              <button class="btn-excel" (click)="downloadMOExcel()">
+                <i class="fa fa-download"></i> Descargar Excel
+              </button>
+            </div>
+            <div class="table-scroll">
+              <table class="reporte-table">
+                <thead>
+                  <tr>
+                    <th>Proyecto</th>
+                    <th>Estado</th>
+                    <th class="text-center">Fecha Inicio</th>
+                    <th class="text-center">Fecha Fin</th>
+                    <th class="text-center">Operarios</th>
+                    <th class="text-right">Horas</th>
+                    <th class="text-right">Presupuesto MO</th>
+                    <th class="text-right">Real MO</th>
+                    <th class="text-right">Diferencia</th>
+                    <th class="text-center">% Ejecución</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let r of moData">
+                    <td class="td-nombre">{{ r.nombre_proyecto }}</td>
+                    <td><span class="estado-badge" [ngClass]="estadoClass(r.estado)">{{ estadoLabel(r.estado) }}</span></td>
+                    <td class="text-center text-muted">{{ formatDate(r.fecha_inicio) }}</td>
+                    <td class="text-center text-muted">{{ formatDate(r.fecha_fin) }}</td>
+                    <td class="text-center">{{ r.total_operarios }}</td>
+                    <td class="text-right">{{ r.total_horas_reales | number:'1.1-1' }}</td>
+                    <td class="text-right">{{ formatCop(r.presupuesto_mo) }}</td>
+                    <td class="text-right">{{ formatCop(r.costo_real_mo) }}</td>
+                    <td class="text-right" [ngClass]="difClass(r.diferencia)">{{ formatCop(r.diferencia) }}</td>
+                    <td class="text-center">
+                      <span *ngIf="r.porcentaje_ejecucion !== null" class="pct-badge" [ngClass]="pctClass(r.porcentaje_ejecucion)">
+                        {{ r.porcentaje_ejecucion }}%
+                      </span>
+                      <span *ngIf="r.porcentaje_ejecucion === null" class="text-muted">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="total-row">
+                    <td colspan="5"><strong>TOTALES</strong></td>
+                    <td class="text-right"><strong>{{ totalHorasMO | number:'1.1-1' }}</strong></td>
+                    <td class="text-right"><strong>{{ formatCop(totalPresupuestoMO) }}</strong></td>
+                    <td class="text-right"><strong>{{ formatCop(totalCostoRealMO) }}</strong></td>
+                    <td class="text-right" [ngClass]="difClass(totalDiferenciaMO)"><strong>{{ formatCop(totalDiferenciaMO) }}</strong></td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </ng-container>
+      </ng-container>
+    </ng-container>
+
+    <!-- ─── TAB: Por Operario ─── -->
+    <ng-container *ngIf="activeTab === 'operario'">
+      <div class="chart-loading" *ngIf="loadingPago">
+        <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+      </div>
+
+      <ng-container *ngIf="!loadingPago">
+        <div class="chart-empty" *ngIf="pagoData.length === 0">
+          <i class="fa fa-users"></i>
+          <p>Sin datos para los filtros seleccionados</p>
+          <span>Verifica que los operarios tengan <strong>valor_hora</strong> asignado y evidencias registradas.</span>
+        </div>
+
+        <ng-container *ngIf="pagoData.length > 0">
+          <!-- KPIs -->
+          <div class="kpi-row" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-green"><i class="fa fa-money"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ formatCop(totalPagadoOp) }}</span>
+                <span class="kpi-label">Valor total operarios</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-amber"><i class="fa fa-clock-o"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ totalHorasOp | number:'1.1-1' }} h</span>
+                <span class="kpi-label">Horas totales</span>
+              </div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon kpi-indigo"><i class="fa fa-user"></i></div>
+              <div class="kpi-body">
+                <span class="kpi-value">{{ pagoData.length }}</span>
+                <span class="kpi-label">Operarios con horas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla + Excel -->
+          <div class="table-card">
+            <div class="table-card-header">
+              <span class="table-count">{{ pagoData.length }} operario{{ pagoData.length !== 1 ? 's' : '' }}</span>
+              <button class="btn-excel" (click)="downloadPagoExcel()">
+                <i class="fa fa-download"></i> Descargar Excel
+              </button>
+            </div>
+            <div class="table-scroll">
+              <table class="reporte-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Operario</th>
+                    <th class="text-right">Valor/Hora</th>
+                    <th class="text-center">Proyectos</th>
+                    <th class="text-right">Horas Totales</th>
+                    <th class="text-right">Valor Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let r of pagoData; let i = index">
+                    <td class="td-pos">{{ i + 1 }}</td>
+                    <td class="td-nombre">{{ r.nombre_operario }}</td>
+                    <td class="text-right text-muted">{{ formatCop(r.valor_hora) }}/h</td>
+                    <td class="text-center">{{ r.total_proyectos }}</td>
+                    <td class="text-right">{{ r.total_horas | number:'1.1-1' }} h</td>
+                    <td class="text-right td-pagado">{{ formatCop(r.total_pagado) }}</td>
+                  </tr>
+                </tbody>
+                <tfoot>
+                  <tr class="total-row">
+                    <td colspan="4"><strong>TOTALES</strong></td>
+                    <td class="text-right"><strong>{{ totalHorasOp | number:'1.1-1' }} h</strong></td>
+                    <td class="text-right"><strong>{{ formatCop(totalPagadoOp) }}</strong></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </ng-container>
+      </ng-container>
+    </ng-container>
+  </section>
+
+  <!-- ── Sección 2: Cambios en el Sistema ── -->
+  <section class="dash-section">
+    <h2 class="section-title">Cambios en el Sistema</h2>
+    <div class="section-placeholder">
+      <i class="fa fa-list-alt"></i>
+      <p>Próximamente</p>
+    </div>
+  </section>
+
+</div>
