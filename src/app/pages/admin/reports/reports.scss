@@ -51,6 +51,12 @@
     position: relative;
 
     input { width: 100%; box-sizing: border-box; padding-right: 28px; }
+    input.locked {
+      cursor: default;
+      background: #f8fafc;
+      color: var(--text-dark);
+      font-weight: 600;
+    }
 
     .proyecto-clear {
       position: absolute;
@@ -170,10 +176,10 @@
       transition: 0.2s;
       &:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.1); }
 
+      &.stat-total    { border-left-color: #64748b; }
       &.stat-ok       { border-left-color: var(--atomo-green-dark); }
       &.stat-pending  { border-left-color: #3b82f6; }
       &.stat-warning  { border-left-color: #f59e0b; }
-      &.stat-blocked  { border-left-color: #ef4444; }
 
       .stat-icon {
         width: 46px; height: 46px;

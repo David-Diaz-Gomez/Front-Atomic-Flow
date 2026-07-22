@@ -56,10 +56,33 @@ export class NotificationService implements OnDestroy {
     this.connectStream();
   }
 
+  /** true si el JWT ya venció (o no se puede leer). Solo lee el payload, no lo valida
+   *  criptográficamente — el backend igual verifica la firma; esto es solo para no
+   *  intentar conectar con un token que sabemos de antemano que va a rechazar. */
+  private isTokenExpired(token: string): boolean {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return !payload.exp || payload.exp * 1000 <= Date.now();
+    } catch {
+      return true;
+    }
+  }
+
   /** Conecta al stream SSE de notificaciones para recibir push inmediato. */
   private connectStream(): void {
     const token = this.api.getToken();
     if (!token) return;
+
+    // El token de acceso dura poco (1h); si ya venció, refrescarlo primero evita
+    // abrir el EventSource sabiendo que el backend lo va a rechazar de entrada.
+    if (this.isTokenExpired(token)) {
+      this.api.refreshToken().subscribe({
+        next: () => this.connectStream(),
+        error: () => { /* refresh_token también venció: espera al próximo login */ },
+      });
+      return;
+    }
+
     this._es?.close();
     this._es = new EventSource(`${this.api.baseUrl}/notificaciones/stream?token=${encodeURIComponent(token)}`);
     this._es.addEventListener('notificacion', (e: MessageEvent) => {
@@ -73,9 +96,21 @@ export class NotificationService implements OnDestroy {
       } catch { /* payload inesperado, ignorar */ }
     });
     this._es.onerror = () => {
-      // EventSource reintenta solo; si el token cambió (refresh), reconectamos con el nuevo
       this._es?.close();
       this._es = null;
+
+      const current = this.api.getToken();
+      if (current && this.isTokenExpired(current)) {
+        // El token venció mientras el stream estaba abierto: refrescar en vez de
+        // reintentar en bucle con el mismo token muerto cada 5s.
+        this.api.refreshToken().subscribe({
+          next: () => this.connectStream(),
+          error: () => { /* refresh_token también venció: espera al próximo login */ },
+        });
+        return;
+      }
+
+      // Falla de red u otro motivo transitorio: reintentar con el token actual.
       setTimeout(() => this.connectStream(), 5_000);
     };
   }

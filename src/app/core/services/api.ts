@@ -297,6 +297,41 @@ export class Api {
     );
   }
 
+  getKpisEstadoTareas(filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ tareas_completadas: number; tareas_no_completadas: number; tareas_entregadas_retraso: number; tareas_bloqueadas: number } | null> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/kpis-estado-tareas`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? null),
+      catchError(() => of(null))
+    );
+  }
+
+  getProyectosPorEstado(filters: { fecha_inicio?: string; fecha_fin?: string }): Observable<{ proyectos_activos: number; proyectos_en_revision: number; proyectos_finalizados: number } | null> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/proyectos-por-estado`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? null),
+      catchError(() => of(null))
+    );
+  }
+
+  getFasesPorAvance(filters: {
+    id_proyecto: number;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{
+    id_fase: number; nombre_fase: string; total_tareas: number;
+    pendientes: { valor: number; pct: number };
+    en_progreso: { valor: number; pct: number };
+    completadas: { valor: number; pct: number };
+  }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/fases-avance`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   // ── Vista General / Plantillas ────────────────────────────────────────────
 
   getVistaGeneralProyectos(): Observable<any[]> {

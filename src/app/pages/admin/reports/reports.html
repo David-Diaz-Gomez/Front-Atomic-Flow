@@ -16,8 +16,10 @@
         <input type="text" class="filter-select"
           [(ngModel)]="filtroProyectoText"
           (ngModelChange)="onProyectoTextChange($event)"
-          (focus)="showProyectoDropdown = true"
+          (focus)="onProyectoFocus()"
           (blur)="onProyectoBlur()"
+          [readonly]="!!filtroProyecto"
+          [class.locked]="!!filtroProyecto"
           placeholder="Todos los proyectos"
           autocomplete="off">
         <button class="proyecto-clear" *ngIf="filtroProyectoText" (mousedown)="clearProyecto()">
@@ -56,33 +58,42 @@
 
     <div class="section-grid section-grid-1">
       <div class="kpi-block">
-        <div class="stats-row">
+        <div class="chart-loading" *ngIf="loadingKpis">
+          <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+        </div>
+
+        <div class="chart-empty" *ngIf="!loadingKpis && !kpis">
+          <i class="fa fa-check-circle"></i>
+          <p>Sin datos para los filtros seleccionados</p>
+        </div>
+
+        <div class="stats-row" *ngIf="!loadingKpis && kpis as k">
+          <div class="stat-card stat-total">
+            <div class="stat-icon"><i class="fa fa-list"></i></div>
+            <div class="stat-info">
+              <span class="stat-value">{{ k.total }}</span>
+              <span class="stat-label">Total de Tareas</span>
+            </div>
+          </div>
           <div class="stat-card stat-ok">
             <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
             <div class="stat-info">
-              <span class="stat-value">{{ kpis.completadas.valor }} <small>({{ kpis.completadas.pct }}%)</small></span>
+              <span class="stat-value">{{ k.completadas.valor }} <small>({{ k.completadas.pct }}%)</small></span>
               <span class="stat-label">Tareas Completadas</span>
             </div>
           </div>
           <div class="stat-card stat-pending">
             <div class="stat-icon"><i class="fa fa-hourglass-half"></i></div>
             <div class="stat-info">
-              <span class="stat-value">{{ kpis.noCompletadas.valor }} <small>({{ kpis.noCompletadas.pct }}%)</small></span>
+              <span class="stat-value">{{ k.noCompletadas.valor }} <small>({{ k.noCompletadas.pct }}%)</small></span>
               <span class="stat-label">Tareas No Completadas</span>
             </div>
           </div>
           <div class="stat-card stat-warning">
             <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
             <div class="stat-info">
-              <span class="stat-value">{{ kpis.conRetraso.valor }} <small>({{ kpis.conRetraso.pct }}%)</small></span>
+              <span class="stat-value">{{ k.conRetraso.valor }} <small>({{ k.conRetraso.pct }}%)</small></span>
               <span class="stat-label">Entregadas con Retraso</span>
-            </div>
-          </div>
-          <div class="stat-card stat-blocked">
-            <div class="stat-icon"><i class="fa fa-ban"></i></div>
-            <div class="stat-info">
-              <span class="stat-value">{{ kpis.bloqueadas.valor }} <small>({{ kpis.bloqueadas.pct }}%)</small></span>
-              <span class="stat-label">Tareas Bloqueadas</span>
             </div>
           </div>
         </div>
@@ -91,18 +102,20 @@
       <div class="chart-card">
         <div class="chart-card-header">
           <h3>Estados de Proyectos</h3>
-          <span class="chart-type-tag">Gráfico de torta</span>
+          <span class="chart-type-tag">Gráfico de barras</span>
         </div>
-        <div class="chart-placeholder">
-          <i class="fa fa-pie-chart"></i>
-          <p>Gráfico pendiente de implementación</p>
-          <span>
-            Tres segmentos: <code>en_produccion</code>, <code>pausado</code> y <code>finalizado</code>.
-            Vista previa —
-            {{ proyectosPorEstado.en_produccion.label }} {{ proyectosPorEstado.en_produccion.valor }} ({{ proyectosPorEstado.en_produccion.pct }}%),
-            {{ proyectosPorEstado.pausado.label }} {{ proyectosPorEstado.pausado.valor }} ({{ proyectosPorEstado.pausado.pct }}%),
-            {{ proyectosPorEstado.finalizado.label }} {{ proyectosPorEstado.finalizado.valor }} ({{ proyectosPorEstado.finalizado.pct }}%).
-          </span>
+
+        <div class="chart-loading" *ngIf="loadingProyectosPorEstado">
+          <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+        </div>
+
+        <div class="chart-empty" *ngIf="!loadingProyectosPorEstado && !proyectosPorEstado">
+          <i class="fa fa-bar-chart"></i>
+          <p>Sin datos disponibles</p>
+        </div>
+
+        <div class="canvas-wrap" *ngIf="!loadingProyectosPorEstado && proyectosPorEstado">
+          <canvas #estadosChart></canvas>
         </div>
       </div>
     </div>
@@ -263,10 +276,18 @@
           <h3>Fases del proyecto</h3>
           <span class="chart-type-tag">Barras horizontales apiladas</span>
         </div>
-        <div class="chart-placeholder">
+
+        <div class="chart-loading" *ngIf="loadingFasesAvance">
+          <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+        </div>
+
+        <div class="chart-empty" *ngIf="!loadingFasesAvance && fasesAvance.length === 0">
           <i class="fa fa-tasks"></i>
-          <p>Gráfico pendiente de implementación</p>
-          <span>Una barra por fase con el % de avance según el estado de sus tareas.</span>
+          <p>Este proyecto todavía no tiene fases con tareas</p>
+        </div>
+
+        <div class="canvas-wrap canvas-bar" *ngIf="!loadingFasesAvance && fasesAvance.length > 0">
+          <canvas #fasesChart></canvas>
         </div>
       </div>
     </div>

@@ -27,6 +27,8 @@ type Tab = 'grafico' | 'ranking';
 export class Reports implements OnInit, OnDestroy {
   @ViewChild('ocupacionChart')   ocupacionChartRef!:   ElementRef<HTMLCanvasElement>;
   @ViewChild('presupuestoChart') presupuestoChartRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('estadosChart')     estadosChartRef!:     ElementRef<HTMLCanvasElement>;
+  @ViewChild('fasesChart')       fasesChartRef!:       ElementRef<HTMLCanvasElement>;
 
   proyectos: any[] = [];
   loadingCatalogos = true;
@@ -53,25 +55,40 @@ export class Reports implements OnInit, OnDestroy {
   loadingPresupuesto = false;
   private presupuestoChart: Chart | null = null;
 
+  private estadosChart: Chart | null = null;
+  private fasesChart: Chart | null = null;
+
   // ── Ranking ──
   rankingData: { id_recurso: number; nombre: string; total_horas: number; total_tareas: number }[] = [];
   loadingRanking = false;
   rankingSearch = '';
   rankingSortDir: 'desc' | 'asc' = 'desc';
 
-  // ── KPIs Sección 1 (placeholder) ──
-  kpis = {
-    completadas:   { valor: 128, pct: 62 },
-    noCompletadas: { valor: 54,  pct: 26 },
-    conRetraso:    { valor: 18,  pct: 9  },
-    bloqueadas:    { valor: 12,  pct: 6  },
-  };
+  // ── KPIs Sección 1 ──
+  kpis: {
+    total:         number;
+    completadas:   { valor: number; pct: number };
+    noCompletadas: { valor: number; pct: number };
+    conRetraso:    { valor: number; pct: number };
+  } | null = null;
+  loadingKpis = false;
 
-  proyectosPorEstado = {
-    en_produccion: { valor: 9,  pct: 45, label: 'En Producción' },
-    pausado:       { valor: 4,  pct: 20, label: 'Pausado' },
-    finalizado:    { valor: 7,  pct: 35, label: 'Finalizado' },
-  };
+  // ── Estados de proyectos (Sección 1) ──
+  proyectosPorEstado: {
+    activos:     { valor: number; pct: number; label: string };
+    enRevision:  { valor: number; pct: number; label: string };
+    finalizados: { valor: number; pct: number; label: string };
+  } | null = null;
+  loadingProyectosPorEstado = false;
+
+  // ── Avance por fases (Sección 4) ──
+  fasesAvance: {
+    id_fase: number; nombre_fase: string; total_tareas: number;
+    pendientes: { valor: number; pct: number };
+    en_progreso: { valor: number; pct: number };
+    completadas: { valor: number; pct: number };
+  }[] = [];
+  loadingFasesAvance = false;
 
   constructor(
     private projectSvc: ProjectService,
@@ -96,6 +113,8 @@ export class Reports implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.ocupacionChart?.destroy();
     this.presupuestoChart?.destroy();
+    this.estadosChart?.destroy();
+    this.fasesChart?.destroy();
   }
 
   // ── Catálogos ──────────────────────────────────────────────────────────────
@@ -103,20 +122,19 @@ export class Reports implements OnInit, OnDestroy {
   loadCatalogos(): void {
     this.loadingCatalogos = true;
     this.projectSvc.getProjects({ limit: 200 }).subscribe({
-      next: ({ data }) => { this.proyectos = data; this.loadingCatalogos = false; },
-      error: () => { this.proyectos = []; this.loadingCatalogos = false; },
+      next: ({ data }) => { this.proyectos = data; this.loadingCatalogos = false; this.cdr.detectChanges(); },
+      error: () => { this.proyectos = []; this.loadingCatalogos = false; this.cdr.detectChanges(); },
     });
   }
 
   // ── Filtros generales ──────────────────────────────────────────────────────
 
-  /** Proyectos filtrados por estado (para el datalist y para proyectoSeleccionado). */
+  /** Proyectos filtrados por estado (para el datalist y para proyectoSeleccionado).
+   *  "Activo" = únicamente aprobado o en_produccion (no incluye borrador, en_revision ni pausado). */
   get proyectosFiltrados(): any[] {
     if (!this.filtroEstado) return this.proyectos;
-    return this.proyectos.filter(p => {
-      const fin = p.estado === 'finalizado';
-      return this.filtroEstado === 'finalizado' ? fin : !fin;
-    });
+    if (this.filtroEstado === 'finalizado') return this.proyectos.filter(p => p.estado === 'finalizado');
+    return this.proyectos.filter(p => p.estado === 'aprobado' || p.estado === 'en_produccion');
   }
 
   get proyectoSeleccionado(): any | null {
@@ -130,12 +148,21 @@ export class Reports implements OnInit, OnDestroy {
     return q ? base.filter(p => p.nombre.toLowerCase().includes(q)) : base;
   }
 
+  /** Con un proyecto ya seleccionado el input queda en solo lectura, así que esto
+   *  solo puede dispararse mientras se está escribiendo para buscar (sin selección). */
   onProyectoTextChange(text: string): void {
+    if (this.filtroProyecto) return;
     this.showProyectoDropdown = true;
     if (!text.trim() && this.filtroProyecto !== '') {
       this.filtroProyecto = '';
       this.onFilterChange();
     }
+  }
+
+  /** No reabre el dropdown si ya hay un proyecto elegido — hay que limpiar con la "x" primero. */
+  onProyectoFocus(): void {
+    if (this.filtroProyecto) return;
+    this.showProyectoDropdown = true;
   }
 
   selectProyecto(p: any): void {
@@ -189,6 +216,178 @@ export class Reports implements OnInit, OnDestroy {
     this.loadOcupacion();
     this.loadRanking();
     this.loadPresupuesto();
+    this.loadKpis();
+    this.loadProyectosPorEstado();
+    this.loadFasesAvance();
+  }
+
+  loadKpis(): void {
+    this.loadingKpis = true;
+    this.api.getKpisEstadoTareas(this.currentFilters).subscribe({
+      next: (data) => {
+        if (!data) { this.kpis = null; this.loadingKpis = false; this.cdr.detectChanges(); return; }
+        const completadas   = Number(data.tareas_completadas) || 0;
+        const noCompletadas = Number(data.tareas_no_completadas) || 0;
+        const conRetraso    = Number(data.tareas_entregadas_retraso) || 0;
+        // Las tarjetas de % usan el mismo denominador (completadas + no completadas = total en alcance)
+        // para que los porcentajes sean comparables entre sí, aunque "con retraso" sea un subconjunto
+        // superpuesto de las otras dos, no una categoría mutuamente excluyente.
+        const total = completadas + noCompletadas;
+        const pct = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
+        this.kpis = {
+          total,
+          completadas:   { valor: completadas,   pct: pct(completadas) },
+          noCompletadas: { valor: noCompletadas, pct: pct(noCompletadas) },
+          conRetraso:    { valor: conRetraso,    pct: pct(conRetraso) },
+        };
+        this.loadingKpis = false;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.kpis = null; this.loadingKpis = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  loadProyectosPorEstado(): void {
+    this.loadingProyectosPorEstado = true;
+    this.api.getProyectosPorEstado({
+      fecha_inicio: this.filtroFechaInicio || undefined,
+      fecha_fin:    this.filtroFechaFin    || undefined,
+    }).subscribe({
+      next: (data) => {
+        if (!data) { this.proyectosPorEstado = null; this.loadingProyectosPorEstado = false; this.cdr.detectChanges(); return; }
+        const activos     = Number(data.proyectos_activos) || 0;
+        const enRevision  = Number(data.proyectos_en_revision) || 0;
+        const finalizados = Number(data.proyectos_finalizados) || 0;
+        const total = activos + enRevision + finalizados;
+        const pct = (n: number) => total > 0 ? Math.round((n / total) * 100) : 0;
+        this.proyectosPorEstado = {
+          activos:     { valor: activos,     pct: pct(activos),     label: 'Activos' },
+          enRevision:  { valor: enRevision,  pct: pct(enRevision),  label: 'En Revisión' },
+          finalizados: { valor: finalizados, pct: pct(finalizados), label: 'Finalizados' },
+        };
+        this.loadingProyectosPorEstado = false;
+        this.cdr.detectChanges();
+        this.renderEstadosChart();
+      },
+      error: () => { this.proyectosPorEstado = null; this.loadingProyectosPorEstado = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  loadFasesAvance(): void {
+    if (!this.filtroProyecto) { this.fasesAvance = []; this.fasesChart?.destroy(); this.fasesChart = null; return; }
+    this.loadingFasesAvance = true;
+    this.api.getFasesPorAvance({
+      id_proyecto:  this.filtroProyecto,
+      fecha_inicio: this.filtroFechaInicio || undefined,
+      fecha_fin:    this.filtroFechaFin    || undefined,
+    }).subscribe({
+      next: (data) => {
+        this.fasesAvance = data;
+        this.loadingFasesAvance = false;
+        this.cdr.detectChanges();
+        this.renderFasesChart();
+      },
+      error: () => { this.fasesAvance = []; this.loadingFasesAvance = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  // Muestra una sola barra cuando hay un estado específico filtrado; las 3 categorías si no hay filtro.
+  private renderEstadosChart(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    if (!this.estadosChartRef?.nativeElement) return;
+
+    this.estadosChart?.destroy();
+    this.estadosChart = null;
+    if (!this.proyectosPorEstado) return;
+
+    const pe = this.proyectosPorEstado;
+    const opciones: Record<string, { label: string; valor: number; pct: number; color: string }> = {
+      activo:     { label: pe.activos.label,     valor: pe.activos.valor,     pct: pe.activos.pct,     color: '#8DC63F' },
+      finalizado: { label: pe.finalizados.label,  valor: pe.finalizados.valor, pct: pe.finalizados.pct, color: '#3b82f6' },
+    };
+    const todas = [
+      { label: pe.activos.label,     valor: pe.activos.valor,     pct: pe.activos.pct,     color: '#8DC63F' },
+      { label: pe.enRevision.label,  valor: pe.enRevision.valor,  pct: pe.enRevision.pct,  color: '#f59e0b' },
+      { label: pe.finalizados.label, valor: pe.finalizados.valor, pct: pe.finalizados.pct, color: '#3b82f6' },
+    ];
+    const items = this.filtroEstado && opciones[this.filtroEstado] ? [opciones[this.filtroEstado]] : todas;
+
+    const labels = items.map(i => i.label);
+    const values = items.map(i => i.valor);
+    const colors = items.map(i => i.color);
+    const pcts   = items.map(i => i.pct);
+
+    this.estadosChart = new Chart(this.estadosChartRef.nativeElement, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{ data: values, backgroundColor: colors, borderRadius: 6, maxBarThickness: 70 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.parsed.y} proyecto${ctx.parsed.y !== 1 ? 's' : ''} (${pcts[ctx.dataIndex]}%)`,
+            },
+          },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 12 } } },
+          y: { beginAtZero: true, ticks: { precision: 0, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+        },
+      },
+    });
+  }
+
+  private renderFasesChart(): void {
+    if (!isPlatformBrowser(this.platformId)) return;
+    if (!this.fasesChartRef?.nativeElement) return;
+
+    this.fasesChart?.destroy();
+    this.fasesChart = null;
+    if (!this.fasesAvance.length) return;
+
+    const labels      = this.fasesAvance.map(f => f.nombre_fase);
+    const pendientes  = this.fasesAvance.map(f => f.pendientes.pct);
+    const enProgreso  = this.fasesAvance.map(f => f.en_progreso.pct);
+    const completadas = this.fasesAvance.map(f => f.completadas.pct);
+    const valores      = this.fasesAvance.map(f => ({ p: f.pendientes.valor, e: f.en_progreso.valor, c: f.completadas.valor }));
+
+    this.fasesChart = new Chart(this.fasesChartRef.nativeElement, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Pendiente',   data: pendientes,  backgroundColor: '#94a3b8', borderRadius: 4 },
+          { label: 'En progreso', data: enProgreso,   backgroundColor: '#fbbf24', borderRadius: 4 },
+          { label: 'Completada',  data: completadas, backgroundColor: '#22c55e', borderRadius: 4 },
+        ],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { font: { size: 12 }, padding: 16 } },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const v = valores[ctx.dataIndex];
+                const n = ctx.datasetIndex === 0 ? v.p : ctx.datasetIndex === 1 ? v.e : v.c;
+                return ` ${ctx.dataset.label}: ${n} tarea${n !== 1 ? 's' : ''} (${ctx.parsed.x}%)`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: { stacked: true, min: 0, max: 100, ticks: { callback: (v) => `${v}%`, font: { size: 11 } }, grid: { color: '#f1f5f9' } },
+          y: { stacked: true, ticks: { font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
   }
 
   loadOcupacion(): void {
@@ -200,15 +399,15 @@ export class Reports implements OnInit, OnDestroy {
         this.cdr.detectChanges();
         this.renderOcupacionChart();
       },
-      error: () => { this.ocupacionData = []; this.loadingOcupacion = false; },
+      error: () => { this.ocupacionData = []; this.loadingOcupacion = false; this.cdr.detectChanges(); },
     });
   }
 
   loadRanking(): void {
     this.loadingRanking = true;
     this.api.getRankingRecursos(this.tipoRecurso, this.currentFilters).subscribe({
-      next: (data) => { this.rankingData = data; this.loadingRanking = false; },
-      error: () => { this.rankingData = []; this.loadingRanking = false; },
+      next: (data) => { this.rankingData = data; this.loadingRanking = false; this.cdr.detectChanges(); },
+      error: () => { this.rankingData = []; this.loadingRanking = false; this.cdr.detectChanges(); },
     });
   }
 
@@ -221,7 +420,7 @@ export class Reports implements OnInit, OnDestroy {
         this.cdr.detectChanges();
         this.renderPresupuestoChart();
       },
-      error: () => { this.presupuestoData = []; this.loadingPresupuesto = false; },
+      error: () => { this.presupuestoData = []; this.loadingPresupuesto = false; this.cdr.detectChanges(); },
     });
   }
 
