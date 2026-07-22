@@ -230,6 +230,12 @@ export class ProjectService {
     );
   }
 
+  inactivarTarea(faseId: number, tareaId: number, forzar = false): Observable<any> {
+    return this.http.patch<any>(`${this.base}/fases/${faseId}/tareas/${tareaId}/inactivar`, { forzar }).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
   rescheduleTarea(faseId: number, tareaId: number, body: { fecha_inicio: string; fecha_fin: string }): Observable<any> {
     return this.http.patch<any>(`${this.base}/fases/${faseId}/tareas/${tareaId}/fechas`, body).pipe(
       map(r => r?.data ?? r)

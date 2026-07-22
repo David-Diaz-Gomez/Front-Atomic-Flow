@@ -669,20 +669,33 @@ export class ProjectDetail implements OnInit {
     void Swal.fire({ icon: 'warning', title: 'Tareas dependientes afectadas', html, confirmButtonText: 'Entendido' });
   }
 
-  deleteTask(faseId: number, tarea: any): void {
-    if (['en_progreso', 'completada'].includes(tarea.estado)) {
-      void Swal.fire('No permitido', 'La tarea está en progreso o completada', 'warning'); return;
-    }
-    void Swal.fire({
-      title: `¿Eliminar tarea "${tarea.nombre}"?`, icon: 'warning',
-      showCancelButton: true, confirmButtonText: 'Eliminar', cancelButtonText: 'Cancelar',
-      confirmButtonColor: '#dc2626'
-    }).then(r => {
-      if (!r.isConfirmed) return;
-      this.projectSvc.changeTareaStatus(faseId, tarea.id, 'bloqueada', 'Eliminada por director').subscribe({
-        next: () => this.loadProject(this.project.id),
-        error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo eliminar la tarea', 'error'),
-      });
+  inactivarTarea(faseId: number, tarea: any): void {
+    this.projectSvc.inactivarTarea(faseId, tarea.id, false).subscribe({
+      next: (res) => {
+        if (res.requiere_confirmacion) {
+          const hijasHtml = (res.hijas as any[])
+            .map((h: any) => `<li>${h.nombre}</li>`)
+            .join('');
+          void Swal.fire({
+            title: `¿Inactivar "${tarea.nombre}"?`,
+            icon: 'warning',
+            html: `<p>Las siguientes tareas dependen de ella y perderán su vínculo:</p><ul style="text-align:left;margin-top:8px">${hijasHtml}</ul>`,
+            showCancelButton: true,
+            confirmButtonText: 'Inactivar de todas formas',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc2626'
+          }).then(r => {
+            if (!r.isConfirmed) return;
+            this.projectSvc.inactivarTarea(faseId, tarea.id, true).subscribe({
+              next: () => this.loadProject(this.project.id),
+              error: (err: any) => void Swal.fire('Error', err.error?.message ?? 'No se pudo inactivar la tarea', 'error'),
+            });
+          });
+        } else {
+          this.loadProject(this.project.id);
+        }
+      },
+      error: (err: any) => void Swal.fire('No permitido', err.error?.message ?? 'No se pudo inactivar la tarea', 'warning'),
     });
   }
 

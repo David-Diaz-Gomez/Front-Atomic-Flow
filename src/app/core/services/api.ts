@@ -217,6 +217,78 @@ export class Api {
     );
   }
 
+  // ── Pedidos ───────────────────────────────────────────────────────────────
+
+  getPedidos(page = 1): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/pedidos?page=${page}`).pipe(
+      map((r: any) => r?.data ?? r),
+      catchError(() => of({ data: [], total: 0, page: 1, totalPages: 1 }))
+    );
+  }
+
+  getPedidosByProject(idProyecto: number, page = 1): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/pedidos/proyecto/${idProyecto}?page=${page}`).pipe(
+      map((r: any) => r?.data ?? r),
+      catchError(() => of({ data: [], total: 0, page: 1, totalPages: 1 }))
+    );
+  }
+
+  createPedido(body: {
+    fecha_requerida: string;
+    fecha_solicitud: number;
+    proveedor: string;
+    valor: number;
+    detalle?: string | null;
+    fecha_compra?: string | null;
+    items: { id_detalle_recurso: number; cantidad: number; valor_unitario: number; observacion?: string | null }[];
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/pedidos`, body).pipe(
+      tap(() => Swal.fire({ icon: 'success', title: '¡Pedido registrado!', timer: 1600, showConfirmButton: false })),
+      catchError(err => { this.notifyError('No se pudo registrar el pedido.'); return throwError(() => err); })
+    );
+  }
+
+  getHistoricoPedido(idPedido: number): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/historico-pedido/pedido/${idPedido}`).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  crearHistoricoPedido(body: {
+    fecha_recibido: string;
+    observaciones?: string;
+    id_pedido: number;
+    items: { id_detalle_pedido_recurso: number; cantidad_recibida: number }[];
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/historico-pedido`, body).pipe(
+      tap(() => Swal.fire({ icon: 'success', title: '¡Entrega registrada!', timer: 1500, showConfirmButton: false })),
+      map((r: any) => r?.data ?? r),
+      catchError(err => { this.notifyError(err.error?.message ?? 'No se pudo registrar la entrega.'); return throwError(() => err); })
+    );
+  }
+
+  updatePedido(id: number, body: { fecha_compra?: string | null; id_estado_pedido?: number }): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/pedidos/${id}`, body).pipe(
+      tap(() => Swal.fire({ icon: 'success', title: '¡Pedido actualizado!', timer: 1500, showConfirmButton: false })),
+      catchError(err => { this.notifyError('No se pudo actualizar el pedido.'); return throwError(() => err); })
+    );
+  }
+
+  inhabilitarPedido(id: number): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/pedidos/${id}/inhabilitar`, {}).pipe(
+      tap(() => Swal.fire({ icon: 'success', title: 'Pedido inhabilitado', timer: 1500, showConfirmButton: false })),
+      catchError(err => { this.notifyError('No se pudo inhabilitar el pedido.'); return throwError(() => err); })
+    );
+  }
+
+  getRecursosParaPedido(idProyecto: number): Observable<{ id_detalle_recurso: number; nombre_recurso: string; tipo_recurso: string; observaciones: string | null }[]> {
+    return this.http.get<any>(`${this.baseUrl}/proyectos/${idProyecto}/recursos-pedido`).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   // ── Analytics ─────────────────────────────────────────────────────────────
 
   private analyticsParams(tipo: string, filters: { id_proyecto?: number; estado?: string; fecha_inicio?: string; fecha_fin?: string }): HttpParams {
@@ -369,8 +441,9 @@ export class Api {
         { title: 'Nuevo Proyecto', icon: 'fa-plus-circle',  route: '/dashboard/director/project-new' },
         { title: 'Vista General',  icon: 'fa-globe',        route: '/dashboard/director/vista-general' },
         { title: 'Cronograma',     icon: 'fa-bar-chart',    route: '/dashboard/director/gantt' },
-        { title: 'Evidencias',     icon: 'fa-camera',       route: '/dashboard/director/evidencias' },
-        { title: 'Aprobaciones',   icon: 'fa-check-circle', route: '/dashboard/director/approvals' },
+        { title: 'Evidencias',       icon: 'fa-camera',       route: '/dashboard/director/evidencias' },
+        { title: 'Aprobaciones',     icon: 'fa-check-circle', route: '/dashboard/director/approvals' },
+        { title: 'Estados de Compra', icon: 'fa-shopping-cart', route: '/dashboard/director/estados-compra' },
       ],
       3: [
         { title: 'Mis Proyectos', icon: 'fa-briefcase', route: '/dashboard/coordinator/home' },

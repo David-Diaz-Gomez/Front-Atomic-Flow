@@ -195,11 +195,11 @@
                 </div>
               </div>
               <span class="task-badge" [ngClass]="getTareaBadgeClass(t)" [title]="getTareaTooltip(t)">{{ getTareaBadgeLabel(t) }}</span>
-              <div class="task-actions" *ngIf="canManagePhases && (t.estado === 'pendiente' || t.estado === 'bloqueada')">
+              <div class="task-actions" *ngIf="canManagePhases && (t.estado === 'pendiente' || t.estado === 'asignada' || t.estado === 'bloqueada')">
                 <button class="btn-task-action" (click)="openEditTask(fase, t)" title="Editar tarea">
                   <i class="fa fa-pencil"></i>
                 </button>
-                <button class="btn-task-action btn-task-delete" (click)="deleteTask(fase.id, t)" title="Eliminar tarea" *ngIf="t.estado === 'pendiente'">
+                <button class="btn-task-action btn-task-delete" (click)="inactivarTarea(fase.id, t)" title="Inactivar tarea" *ngIf="t.estado === 'pendiente' || t.estado === 'asignada'">
                   <i class="fa fa-times"></i>
                 </button>
                 <button class="btn-task-action" (click)="quitarDependencia(fase, t)" title="Quitar dependencia" *ngIf="t.depende_de">
