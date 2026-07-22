@@ -42,6 +42,17 @@ export class Reportes implements OnInit, OnDestroy {
   pagoData: any[] = [];
   loadingPago = false;
 
+  // ── Cambios en el sistema (audit log) ──────────────────────────────────────
+  cambiosData: any[] = [];
+  loadingCambios = false;
+  cambiosTipo: string = '';
+  cambiosFechaInicio: string = '';
+  cambiosFechaFin: string = '';
+  cambiosPage = 1;
+  cambiosLimit = 5;
+  cambiosTotalPages = 1;
+  cambiosTotalRecords = 0;
+
   constructor(
     private api: Api,
     private projectSvc: ProjectService,
@@ -61,7 +72,14 @@ export class Reportes implements OnInit, OnDestroy {
         next: ({ data }) => { this.proyectos = data; },
         error: () => { this.proyectos = []; },
       });
+
+      const haceUnMes = new Date();
+      haceUnMes.setMonth(haceUnMes.getMonth() - 1);
+      this.cambiosFechaInicio = haceUnMes.toISOString().slice(0, 10);
+      this.cambiosFechaFin    = now.toISOString().slice(0, 10);
+
       this.loadAll();
+      this.loadCambios();
     }
   }
 
@@ -97,6 +115,46 @@ export class Reportes implements OnInit, OnDestroy {
       next: (data) => { this.pagoData = data; this.loadingPago = false; },
       error: () => { this.pagoData = []; this.loadingPago = false; },
     });
+  }
+
+  loadCambios(): void {
+    this.loadingCambios = true;
+    this.api.getCambiosSistema({
+      fecha_inicio: this.cambiosFechaInicio || undefined,
+      fecha_fin:    this.cambiosFechaFin    || undefined,
+      tipo:         this.cambiosTipo        || undefined,
+      page:         this.cambiosPage,
+      limit:        this.cambiosLimit,
+    }).subscribe({
+      next: ({ data, pagination }) => {
+        this.cambiosData = data;
+        this.cambiosTotalPages   = pagination?.total_pages   ?? 1;
+        this.cambiosTotalRecords = pagination?.total_records ?? data.length;
+        this.loadingCambios = false;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.cambiosData = []; this.loadingCambios = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  // Cambiar filtros siempre vuelve a la página 1 — si no, podrías quedar en una
+  // página que ya no existe para el nuevo filtro (ej. estabas en la página 5 y el
+  // filtro nuevo solo tiene 2 páginas de resultados).
+  onCambiosFilterChange(): void {
+    this.cambiosPage = 1;
+    this.loadCambios();
+  }
+
+  cambiosPageAnterior(): void {
+    if (this.cambiosPage <= 1) return;
+    this.cambiosPage--;
+    this.loadCambios();
+  }
+
+  cambiosPageSiguiente(): void {
+    if (this.cambiosPage >= this.cambiosTotalPages) return;
+    this.cambiosPage++;
+    this.loadCambios();
   }
 
   private get currentFilters() {
@@ -169,6 +227,19 @@ export class Reportes implements OnInit, OnDestroy {
 
   formatCop(v: number): string {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
+  }
+
+  formatDateTime(d: string | null): string {
+    if (!d) return '—';
+    return new Date(d).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+
+  accionIcon(accion: string): string {
+    return { CREATE: 'fa-plus-circle', UPDATE: 'fa-pencil', DELETE: 'fa-trash' }[accion] ?? 'fa-circle';
+  }
+
+  accionClass(accion: string): string {
+    return { CREATE: 'accion-create', UPDATE: 'accion-update', DELETE: 'accion-delete' }[accion] ?? '';
   }
 
   formatDate(d: string | null): string {

@@ -358,14 +358,16 @@ export class Api {
     );
   }
 
-  getCambiosSistema(filters: { fecha_inicio?: string; fecha_fin?: string; tipo?: string }): Observable<any[]> {
+  getCambiosSistema(filters: { fecha_inicio?: string; fecha_fin?: string; tipo?: string; page?: number; limit?: number }): Observable<{ data: any[]; pagination: any }> {
     let params = new HttpParams();
     if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
     if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
     if (filters.tipo)         params = params.set('tipo', filters.tipo);
+    if (filters.page)         params = params.set('page', filters.page.toString());
+    if (filters.limit)        params = params.set('limit', filters.limit.toString());
     return this.http.get<any>(`${this.baseUrl}/reportes/cambios-sistema`, { params }).pipe(
-      map((r: any) => r?.data ?? []),
-      catchError(() => of([]))
+      map((r: any) => ({ data: r?.data ?? [], pagination: r?.pagination ?? {} })),
+      catchError(() => of({ data: [], pagination: {} }))
     );
   }
 

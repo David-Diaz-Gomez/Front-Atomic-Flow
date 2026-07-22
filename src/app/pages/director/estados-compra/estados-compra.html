@@ -600,7 +600,7 @@
         <div class="pr-items">
           <span class="pr-label"><i class="fa fa-list"></i> Recursos</span>
           <div class="pr-item" *ngFor="let item of editingPedido.items">
-            <i class="fa fa-cube"></i> {{ labelRecursoItem(item) }}
+            <span class="pr-item-name"><i class="fa fa-cube"></i> {{ labelRecursoItem(item) }}</span>
             <span class="pr-item-nums">{{ item.cantidad }} uds. × {{ fmtMoney(item.valor_unitario) }}</span>
           </div>
         </div>

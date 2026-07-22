@@ -269,10 +269,68 @@
   <!-- ── Sección 2: Cambios en el Sistema ── -->
   <section class="dash-section">
     <h2 class="section-title">Cambios en el Sistema</h2>
-    <div class="section-placeholder">
-      <i class="fa fa-list-alt"></i>
-      <p>Próximamente</p>
+
+    <div class="mo-toolbar">
+      <div class="mo-filters">
+        <div class="filter-field">
+          <label>Tipo</label>
+          <select class="filter-select" [(ngModel)]="cambiosTipo" (ngModelChange)="onCambiosFilterChange()">
+            <option value="">Todos</option>
+            <option value="usuario">Usuarios</option>
+            <option value="proyecto">Proyectos</option>
+            <option value="pedido">Pedidos</option>
+            <option value="tarea">Tareas</option>
+            <option value="evidencia">Evidencias</option>
+          </select>
+        </div>
+        <div class="filter-field">
+          <label>Desde</label>
+          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaInicio" (ngModelChange)="onCambiosFilterChange()">
+        </div>
+        <div class="filter-field">
+          <label>Hasta</label>
+          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaFin" (ngModelChange)="onCambiosFilterChange()">
+        </div>
+      </div>
     </div>
+
+    <div class="chart-loading" *ngIf="loadingCambios">
+      <i class="fa fa-spinner fa-spin"></i> Cargando datos...
+    </div>
+
+    <ng-container *ngIf="!loadingCambios">
+      <div class="chart-empty" *ngIf="cambiosData.length === 0">
+        <i class="fa fa-list-alt"></i>
+        <p>Sin cambios registrados para los filtros seleccionados</p>
+      </div>
+
+      <div class="table-card" *ngIf="cambiosData.length > 0">
+        <div class="table-card-header">
+          <span class="table-count">{{ cambiosTotalRecords }} cambio{{ cambiosTotalRecords !== 1 ? 's' : '' }}</span>
+        </div>
+        <div class="audit-feed">
+          <div class="audit-row" *ngFor="let c of cambiosData">
+            <div class="audit-icon" [ngClass]="accionClass(c.accion)">
+              <i class="fa" [ngClass]="accionIcon(c.accion)"></i>
+            </div>
+            <div class="audit-body">
+              <span class="audit-desc">{{ c.descripcion }}</span>
+              <span class="audit-time">{{ formatDateTime(c.creado_en) }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="audit-pagination">
+          <button class="page-btn" [disabled]="cambiosPage <= 1" (click)="cambiosPageAnterior()">
+            <i class="fa fa-chevron-left"></i> Anterior
+          </button>
+          <span class="page-info">Página {{ cambiosPage }} de {{ cambiosTotalPages }}</span>
+          <button class="page-btn" [disabled]="cambiosPage >= cambiosTotalPages" (click)="cambiosPageSiguiente()">
+            Siguiente <i class="fa fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </ng-container>
   </section>
 
 </div>
