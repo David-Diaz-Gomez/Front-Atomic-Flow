@@ -1,0 +1,136 @@
+<div class="ec-wrap">
+
+  <!-- Header -->
+  <div class="ec-header">
+    <div>
+      <h1><i class="fa fa-shopping-cart"></i> Estados de Compra</h1>
+      <span class="ec-sub">Seguimiento de pedidos activos — solo lectura</span>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card stat-total">
+      <div class="stat-icon"><i class="fa fa-list-alt"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.total }}</span>
+        <span class="stat-label">Total Pedidos</span>
+      </div>
+    </div>
+    <div class="stat-card stat-solicitud">
+      <div class="stat-icon"><i class="fa fa-clock-o"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.solicitud }}</span>
+        <span class="stat-label">Solicitud Pedido</span>
+      </div>
+    </div>
+    <div class="stat-card stat-parcial">
+      <div class="stat-icon"><i class="fa fa-hourglass-half"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.parcial }}</span>
+        <span class="stat-label">Parcialmente Recibido</span>
+      </div>
+    </div>
+    <div class="stat-card stat-completo">
+      <div class="stat-icon"><i class="fa fa-check-circle"></i></div>
+      <div class="stat-info">
+        <span class="stat-value">{{ stats.completo }}</span>
+        <span class="stat-label">Recibido Completo</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box">
+      <i class="fa fa-search"></i>
+      <input type="text" placeholder="Buscar por proyecto, código, recurso o proveedor..."
+             [(ngModel)]="filterSearch" (ngModelChange)="applyFilters()">
+    </div>
+    <select [(ngModel)]="filterEstado" (ngModelChange)="applyFilters()" class="filter-select">
+      <option value="">Todos los estados</option>
+      <option value="4">Solicitud Pedido</option>
+      <option value="3">Pedido en Bodega Incompleto</option>
+      <option value="2">Pedido en Bodega Completo</option>
+      <option value="1">Compra Realizada</option>
+      <option value="5">Inhabilitado</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div class="ec-loading" *ngIf="loading">
+    <i class="fa fa-spinner fa-spin"></i> Cargando pedidos...
+  </div>
+
+  <!-- Empty -->
+  <div class="ec-empty" *ngIf="!loading && !gruposFiltrados.length">
+    <i class="fa fa-shopping-cart"></i>
+    <p>No se encontraron pedidos.</p>
+  </div>
+
+  <!-- Grupos por proyecto -->
+  <div class="ec-list" *ngIf="!loading && gruposFiltrados.length">
+    <div class="proyecto-card" *ngFor="let g of gruposFiltrados">
+
+      <div class="proyecto-card__header" (click)="toggleGrupo(g)">
+        <div class="proyecto-card__left">
+          <i class="fa" [ngClass]="g.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+          <div class="proyecto-card__info">
+            <span class="proyecto-card__name">{{ proyectoLabel(g) }}</span>
+            <span class="proyecto-card__meta" *ngIf="g.centro_costos">
+              <i class="fa fa-tag"></i> {{ g.centro_costos }}
+            </span>
+          </div>
+        </div>
+        <div class="proyecto-card__badge">
+          <i class="fa fa-shopping-cart"></i> {{ g.pedidos.length }} pedido{{ g.pedidos.length !== 1 ? 's' : '' }}
+        </div>
+      </div>
+
+      <div class="pedidos-table-wrap" *ngIf="g.expanded">
+        <table class="pedidos-table">
+          <thead>
+            <tr>
+              <th>Proveedor</th>
+              <th>Recursos</th>
+              <th>Detalle</th>
+              <th>Valor</th>
+              <th>F. Solicitada</th>
+              <th>F. Requerida</th>
+              <th>F. Compra</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of g.pedidos">
+              <td class="td-proveedor">{{ p.proveedor || '—' }}</td>
+              <td class="td-recursos">
+                <div class="recurso-tag" *ngFor="let item of p.items">
+                  <div class="recurso-tag__name">
+                    <i class="fa fa-cube"></i> {{ item.nombre_recurso }}
+                  </div>
+                  <div class="recurso-tag__nums">
+                    <span class="rt-qty">{{ item.cantidad }} uds.</span>
+                    <span class="rt-sep">×</span>
+                    <span class="rt-unit">{{ fmtMoney(item.valor_unitario) }}</span>
+                  </div>
+                </div>
+                <span class="no-items" *ngIf="!p.items?.length">—</span>
+              </td>
+              <td class="td-detalle">{{ p.detalle || '—' }}</td>
+              <td class="td-money">{{ fmtMoney(p.valor) }}</td>
+              <td class="td-fecha">{{ fmtFechaSolicitud(p.fecha_solicitud) }}</td>
+              <td class="td-fecha">{{ fmtFecha(p.fecha_requerida) }}</td>
+              <td class="td-fecha">{{ fmtFecha(p.fecha_compra) }}</td>
+              <td>
+                <span class="estado-badge" [ngClass]="estadoClass(p.id_estado_pedido)">{{ p.estado }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>

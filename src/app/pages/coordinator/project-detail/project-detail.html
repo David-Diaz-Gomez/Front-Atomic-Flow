@@ -70,8 +70,13 @@
                         [title]="t.bloqueada_por_movimiento ? 'Reprograma las fechas de esta tarea antes de asignar recursos' : ''">
                   <i class="fa fa-plus"></i> Asignar
                 </button>
-                <button class="btn-evidencia" (click)="openEvidModal(t)">
+                <button class="btn-evidencia" (click)="openEvidModal(t, fase)">
                   <i class="fa fa-camera"></i> Evidencia
+                </button>
+                <button class="btn-verificar" (click)="completarTarea(t, fase); $event.stopPropagation()"
+                        *ngIf="t.estado === 'en_revision'"
+                        title="El superoperario marcó esta tarea como lista. Verificar y completar.">
+                  <i class="fa fa-check-circle"></i> Verificar y completar
                 </button>
               </div>
 
@@ -136,16 +141,8 @@
   <!-- ═══ TAB: Insumos ═══════════════════════════════════════════════════════ -->
   <div class="tab-content" *ngIf="activeTab==='insumos'">
     <div class="insumos-card">
-      <div class="insumos-note"><i class="fa fa-info-circle"></i> Estos son los materiales disponibles del proyecto. Puedes vincularlos a tareas desde el panel de asignación (sin indicar cantidades).</div>
-      <table class="insumos-table">
-        <thead><tr><th>Material / Insumo</th><th>Tipo</th></tr></thead>
-        <tbody>
-          <tr *ngFor="let ins of p.insumos">
-            <td>{{ ins.nombre }}</td>
-            <td><span class="tipo-badge">{{ ins.tipo }}</span></td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="insumos-note"><i class="fa fa-info-circle"></i> Materiales disponibles del proyecto. Puedes vincularlos a tareas desde el panel de asignación.</div>
+      <app-recursos-detalle [recursos]="rawRecursos" [mostrarPrecios]="false"></app-recursos-detalle>
     </div>
   </div>
 
@@ -577,6 +574,16 @@
           <option [ngValue]="null">— Seleccionar tipo —</option>
           <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
         </select>
+        <div class="new-tipo-inline" *ngIf="!showNewTipoInput">
+          <button type="button" class="btn-link-sm" (click)="showNewTipoInput=true"><i class="fa fa-plus"></i> Nuevo tipo</button>
+        </div>
+        <div class="new-tipo-inline" *ngIf="showNewTipoInput">
+          <input [(ngModel)]="newTipoLabel" placeholder="Nombre del nuevo tipo..." maxlength="60" class="mform-input-sm">
+          <button type="button" class="btn-primary-xs" (click)="createNewTipo()" [disabled]="!newTipoLabel.trim() || newTipoSaving">
+            {{ newTipoSaving ? '...' : 'Agregar' }}
+          </button>
+          <button type="button" class="btn-cancel-xs" (click)="showNewTipoInput=false; newTipoLabel=''">✕</button>
+        </div>
       </div>
       <div class="mform-group">
         <label>Depende de</label>
@@ -590,21 +597,19 @@
         <div class="mform-group">
           <label>Fecha inicio *</label>
           <input type="date" [(ngModel)]="editForm.fecha_inicio" class="mform-input"
-                 [min]="editTaskFase?.fecha_inicio?.substring(0,10)"
-                 [max]="editTaskFase?.fecha_fin?.substring(0,10)">
+                 [min]="editTaskFase?.fecha_inicio?.substring(0,10)">
         </div>
         <div class="mform-group">
           <label>Fecha fin *</label>
           <input type="date" [(ngModel)]="editForm.fecha_fin" class="mform-input"
-                 [min]="editForm.fecha_inicio"
-                 [max]="editTaskFase?.fecha_fin?.substring(0,10)">
+                 [min]="editForm.fecha_inicio">
         </div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" (click)="closeEditTask()">Cancelar</button>
       <button class="btn-primary" (click)="saveEditTask()"
-              [disabled]="!editForm.nombre.trim() || !editForm.id_tipo_tarea || !editForm.fecha_inicio || !editForm.fecha_fin || editSaving">
+              [disabled]="!editForm.nombre.trim() || !editForm.fecha_inicio || !editForm.fecha_fin || editSaving">
         <i class="fa fa-save"></i> {{ editSaving ? 'Guardando...' : 'Guardar cambios' }}
       </button>
     </div>
@@ -633,6 +638,16 @@
           <option [ngValue]="null">— Seleccionar tipo * —</option>
           <option *ngFor="let tp of tiposTarea" [ngValue]="tp.id">{{ tp.nombre }}</option>
         </select>
+        <div class="new-tipo-inline" *ngIf="!showNewTipoInput">
+          <button type="button" class="btn-link-sm" (click)="showNewTipoInput=true"><i class="fa fa-plus"></i> Nuevo tipo</button>
+        </div>
+        <div class="new-tipo-inline" *ngIf="showNewTipoInput">
+          <input [(ngModel)]="newTipoLabel" placeholder="Nombre del nuevo tipo..." maxlength="60" class="mform-input-sm">
+          <button type="button" class="btn-primary-xs" (click)="createNewTipo()" [disabled]="!newTipoLabel.trim() || newTipoSaving">
+            {{ newTipoSaving ? '...' : 'Agregar' }}
+          </button>
+          <button type="button" class="btn-cancel-xs" (click)="showNewTipoInput=false; newTipoLabel=''">✕</button>
+        </div>
       </div>
       <div class="mform-group">
         <label>Depende de</label>
@@ -703,6 +718,11 @@
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" (click)="closeEvidModal()">Cancelar</button>
+      <button class="btn-verificar" (click)="completarTareaDesdeEvid()"
+              *ngIf="evidTask?.estado === 'en_revision'"
+              title="Marcar tarea como verificada y completada">
+        <i class="fa fa-check-circle"></i> Verificar y completar
+      </button>
       <button class="btn-primary" (click)="subirEvidencia()" [disabled]="!evidFiles.length || evidSaving">
         <i class="fa fa-upload"></i> {{ evidSaving ? 'Subiendo...' : 'Subir ' + evidFiles.length + ' foto(s)' }}
       </button>

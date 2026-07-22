@@ -98,7 +98,14 @@
     }
     .btn-assign{padding:5px 12px;background:var(--atomo-gradient);border:none;border-radius:8px;font-family:var(--font-interface);font-weight:bold;font-size:.75rem;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;transition:.2s;&:hover{filter:brightness(1.05);}&:disabled{background:#e5e7eb;color:#9ca3af;cursor:not-allowed;filter:none;}}
     .btn-evidencia{padding:5px 12px;background:#fff;border:1px solid #93c5fd;border-radius:8px;font-family:var(--font-interface);font-weight:bold;font-size:.75rem;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;color:#0052cc;transition:.2s;&:hover{background:#eff6ff;}}
+    .btn-verificar{padding:5px 12px;background:#00A859;border:none;border-radius:8px;font-family:var(--font-interface);font-weight:bold;font-size:.75rem;cursor:pointer;display:flex;align-items:center;gap:5px;flex-shrink:0;color:#fff;transition:.2s;animation:pulse-green 1.5s infinite;&:hover{background:#008c49;}}
   }
+  .new-tipo-inline{display:flex;align-items:center;gap:6px;margin-top:6px;}
+  .btn-link-sm{background:none;border:none;color:#00A859;font-size:.75rem;cursor:pointer;padding:2px 0;font-family:var(--font-interface);display:flex;align-items:center;gap:4px;&:hover{text-decoration:underline;}}
+  .mform-input-sm{flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:.8rem;font-family:var(--font-interface);&:focus{outline:none;border-color:#00A859;}}
+  .btn-primary-xs{padding:5px 10px;background:#00A859;color:#fff;border:none;border-radius:6px;font-size:.75rem;font-family:var(--font-interface);font-weight:bold;cursor:pointer;&:disabled{opacity:.5;cursor:not-allowed;}}
+  .btn-cancel-xs{padding:5px 8px;background:#fff;border:1px solid #d1d5db;border-radius:6px;font-size:.75rem;cursor:pointer;&:hover{background:#f3f4f6;}}
+  @keyframes pulse-green{0%,100%{box-shadow:0 0 0 0 rgba(0,168,89,.4);}50%{box-shadow:0 0 0 5px rgba(0,168,89,0);}}
 
   .task-assigns{margin:6px 0 0 20px;}
   .ev-warn{font-size:.72rem;color:#d97706;background:rgba(245,158,11,.07);border-radius:6px;padding:4px 8px;display:flex;align-items:center;gap:5px;margin-top:5px;i{color:#f59e0b;}}

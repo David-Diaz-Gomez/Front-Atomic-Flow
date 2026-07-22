@@ -5,6 +5,7 @@ import { Api } from '../../../core/services/api';
 interface GGProject {
   id: number;
   nombre: string;
+  codigo: string;
   cliente: string;
   estado: string;
   fecha_inicio: string;
@@ -13,6 +14,8 @@ interface GGProject {
   expanded: boolean;
   fases: GGFase[];
   fasesLoading: boolean;
+  total_tareas: number;
+  tareas_completadas: number;
 }
 
 interface GGFase {
@@ -21,6 +24,8 @@ interface GGFase {
   fecha_inicio: string;
   fecha_fin: string;
   tareas: GGTarea[];
+  total_tareas: number;
+  tareas_completadas: number;
 }
 
 interface GGTarea {
@@ -66,11 +71,14 @@ export class GanttGeneral implements OnInit {
       next: (data: any[]) => {
         const list = data ?? [];
         this.projects = list.map((p: any) => ({
-          id: p.id, nombre: p.nombre, cliente: p.cliente ?? '',
+          id: p.id, nombre: p.nombre, codigo: p.codigo ?? '',
+          cliente: p.cliente ?? '',
           estado: p.estado ?? 'aprobado',
           fecha_inicio: (p.fecha_inicio ?? '').substring(0, 10),
           fecha_fin:    (p.fecha_fin    ?? '').substring(0, 10),
           tiene_fases: p.tiene_fases ?? true,
+          total_tareas: Number(p.total_tareas ?? 0),
+          tareas_completadas: Number(p.tareas_completadas ?? 0),
           expanded: false, fases: [], fasesLoading: false,
         }));
         this.buildGanttAxis();
@@ -131,6 +139,8 @@ export class GanttGeneral implements OnInit {
           id: f.id, nombre: f.nombre,
           fecha_inicio: (f.fecha_inicio ?? '').substring(0, 10),
           fecha_fin:    (f.fecha_fin    ?? '').substring(0, 10),
+          total_tareas: Number(f.total_tareas ?? 0),
+          tareas_completadas: Number(f.tareas_completadas ?? 0),
           tareas: (f.tareas ?? []).map((t: any) => ({
             id: t.id, nombre: t.nombre,
             fecha_inicio: (t.fecha_inicio ?? '').substring(0, 10),
@@ -173,5 +183,38 @@ export class GanttGeneral implements OnInit {
 
   getTareaBarClass(estado: string): string {
     return ({ completada:'t-done', en_progreso:'t-progress', asignada:'t-assigned', pendiente:'t-pending' })[estado] ?? 't-pending';
+  }
+
+  pct(completadas: number, total: number): number {
+    if (!total) return 0;
+    return Math.round((completadas / total) * 100);
+  }
+
+  dateLeft(dateStr: string): number {
+    if (!dateStr) return -1;
+    const t = new Date(dateStr).getTime();
+    const gs = this.ganttStart.getTime();
+    return Math.round((t - gs) / 86400000) * PX_PER_DAY;
+  }
+
+  formatDateShort(dateStr: string): string {
+    if (!dateStr) return '';
+    const parts = dateStr.split(/[-T]/);
+    const m = parseInt(parts[1] ?? '1', 10) - 1;
+    const d = parseInt(parts[2] ?? '1', 10);
+    return `${d} ${MONTHS[m]}`;
+  }
+
+  /** Genera las líneas verticales únicas de inicio y fin de todos los proyectos */
+  get projectDateLines(): { left: number; label: string; tipo: 'start' | 'end' }[] {
+    const seen = new Set<number>();
+    const lines: { left: number; label: string; tipo: 'start' | 'end' }[] = [];
+    for (const p of this.projects) {
+      const ls = this.dateLeft(p.fecha_inicio);
+      const le = this.dateLeft(p.fecha_fin);
+      if (ls >= 0 && !seen.has(ls)) { seen.add(ls); lines.push({ left: ls, label: this.formatDateShort(p.fecha_inicio), tipo: 'start' }); }
+      if (le >= 0 && !seen.has(le)) { seen.add(le); lines.push({ left: le, label: this.formatDateShort(p.fecha_fin), tipo: 'end' }); }
+    }
+    return lines;
   }
 }

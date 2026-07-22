@@ -2,16 +2,16 @@
 
   <div class="dv-header">
     <h1><i class="fa fa-camera"></i> Evidencias de Tareas</h1>
-    <span class="dv-sub">Registro de completación por operarios y evidencias subidas por coordinadores</span>
+    <span class="dv-sub">Tareas completadas o en revisión — con o sin evidencia fotográfica</span>
   </div>
 
   <div class="dv-loading" *ngIf="loading">
-    <i class="fa fa-spinner fa-spin"></i> Cargando evidencias...
+    <i class="fa fa-spinner fa-spin"></i> Cargando...
   </div>
 
   <div class="dv-empty" *ngIf="!loading && !tareas.length">
-    <i class="fa fa-camera"></i>
-    <p>No hay evidencias registradas aún.</p>
+    <i class="fa fa-check-circle"></i>
+    <p>No hay tareas completadas aún.</p>
   </div>
 
   <div class="dv-list" *ngIf="!loading && tareas.length">
@@ -19,77 +19,121 @@
 
       <!-- Card header -->
       <div class="dv-card__header" (click)="toggleExpand(t)">
-        <div class="dv-card__left">
-          <i class="fa" [ngClass]="t.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
-          <div class="dv-card__info">
-            <span class="dv-card__name">{{ t.nombre }}</span>
-            <span class="dv-card__meta">
-              <i class="fa fa-briefcase"></i> {{ t.proyecto }} &nbsp;·&nbsp;
-              <i class="fa fa-sitemap"></i> {{ t.fase }}
+        <div class="dv-card__top">
+          <div class="dv-card__left">
+            <i class="fa" [ngClass]="t.expanded ? 'fa-chevron-down' : 'fa-chevron-right'"></i>
+            <div class="dv-card__info">
+              <span class="dv-card__name">{{ t.tarea }}</span>
+              <span class="dv-card__meta">
+                <i class="fa fa-briefcase"></i> {{ t.proyecto }} &nbsp;·&nbsp;
+                <i class="fa fa-sitemap"></i> {{ t.fase }}
+              </span>
+            </div>
+          </div>
+
+          <div class="dv-card__badges">
+            <span class="dv-estado" [ngClass]="t.estado === 'completada' ? 'dv-estado--done' : 'dv-estado--revision'">
+              <i class="fa" [ngClass]="t.estado === 'completada' ? 'fa-check-circle' : 'fa-hourglass-half'"></i>
+              {{ t.estado === 'completada' ? 'Completada' : 'En revisión' }}
+            </span>
+            <span class="dv-evcount" [ngClass]="t.evidencias.length ? 'dv-evcount--has' : 'dv-evcount--none'">
+              <i class="fa fa-image"></i> {{ t.evidencias.length || 'Sin fotos' }}
             </span>
           </div>
         </div>
 
-        <!-- Timeline chips -->
+        <!-- Timeline -->
         <div class="dv-card__timeline">
-          <!-- Operator completed -->
+          <!-- Operario marcó -->
           <div class="timeline-chip timeline-chip--op">
             <div class="tc-icon"><i class="fa fa-user"></i></div>
             <div class="tc-body">
-              <span class="tc-label">Completó</span>
-              <strong class="tc-name">{{ t.operario }}</strong>
+              <span class="tc-label">Marcó lista</span>
+              <strong class="tc-name">{{ t.operario || '—' }}</strong>
               <span class="tc-time">{{ fmt(t.completado_en) }}</span>
             </div>
           </div>
 
           <div class="timeline-arrow"><i class="fa fa-long-arrow-right"></i></div>
 
-          <!-- Coordinator uploaded evidence -->
-          <div class="timeline-chip timeline-chip--coord">
-            <div class="tc-icon"><i class="fa fa-camera"></i></div>
+          <!-- Coordinador verificó -->
+          <div class="timeline-chip" [ngClass]="t.estado === 'completada' ? 'timeline-chip--coord' : 'timeline-chip--pending'">
+            <div class="tc-icon">
+              <i class="fa" [ngClass]="t.estado === 'completada' ? 'fa-check-circle' : 'fa-clock-o'"></i>
+            </div>
             <div class="tc-body">
-              <span class="tc-label">Evidencia subida</span>
-              <strong class="tc-name">{{ t.coordinador }}</strong>
-              <span class="tc-time">{{ fmt(t.evidencia_subida_en) }}</span>
+              <span class="tc-label">{{ t.estado === 'completada' ? 'Verificó' : 'Pendiente verificación' }}</span>
+              <strong class="tc-name">{{ t.estado === 'completada' ? (t.verificador || t.coordinador || '—') : '—' }}</strong>
+              <span class="tc-time">{{ t.verificado_en ? fmt(t.verificado_en) : (t.estado === 'completada' ? 'Verificado' : '') }}</span>
             </div>
           </div>
 
-          <!-- Delta time -->
-          <div class="tc-delta" *ngIf="t.completado_en && t.evidencia_subida_en">
-            <i class="fa fa-clock-o"></i>
-            {{ minutosEntre(t.completado_en, t.evidencia_subida_en) }}
+          <!-- Delta 1: operario vs su horario programado -->
+          <div class="tc-delta"
+               *ngIf="vsHorario(t)"
+               [ngClass]="vsHorario(t)?.tipo === 'late' ? 'tc-delta--late' : vsHorario(t)?.tipo === 'early' ? 'tc-delta--early' : 'tc-delta--ok'">
+            <i class="fa" [ngClass]="vsHorario(t)?.tipo === 'late' ? 'fa-exclamation-circle' : 'fa-clock-o'"></i>
+            {{ vsHorario(t)?.label }}
           </div>
 
-          <!-- Evidence count -->
-          <div class="ev-count">
-            <i class="fa fa-image"></i> {{ t.evidencias.length }}
+          <!-- Delta 2: cuánto tardó el coordinador en aprobar (completado_en → verificado_en) -->
+          <div class="tc-delta tc-delta--coord" *ngIf="tiempoAprobacion(t)">
+            <i class="fa fa-check"></i> aprobó en {{ tiempoAprobacion(t) }}
           </div>
         </div>
       </div>
 
-      <!-- Expanded: image gallery -->
+      <!-- Expanded body -->
       <div class="dv-card__gallery" *ngIf="t.expanded">
+
+        <!-- Resumen texto -->
         <div class="gallery-info">
           <div class="gallery-info__row">
             <i class="fa fa-user"></i>
-            <span><strong>{{ t.operario }}</strong> marcó la tarea como completada el
-              <strong>{{ fmt(t.completado_en) }}</strong></span>
+            <span>
+              <strong>{{ t.operario || 'Operario desconocido' }}</strong>
+              marcó la tarea como lista el <strong>{{ fmt(t.completado_en) }}</strong>
+              <ng-container *ngIf="vsHorario(t)">
+                — <strong>{{ vsHorario(t)?.label }}</strong> respecto a su horario programado
+              </ng-container>
+            </span>
           </div>
-          <div class="gallery-info__row">
-            <i class="fa fa-camera"></i>
-            <span><strong>{{ t.coordinador }}</strong> subió {{ t.evidencias.length }} evidencia(s) el
-              <strong>{{ fmt(t.evidencia_subida_en) }}</strong>
-              ({{ minutosEntre(t.completado_en, t.evidencia_subida_en) }})</span>
+          <div class="gallery-info__row" *ngIf="t.estado === 'completada'">
+            <i class="fa fa-check-circle" style="color:#00A859"></i>
+            <span>
+              <strong>{{ t.verificador || t.coordinador || 'Coordinador' }}</strong>
+              verificó y completó
+              <ng-container *ngIf="t.verificado_en"> el <strong>{{ fmt(t.verificado_en) }}</strong>
+                <ng-container *ngIf="tiempoAprobacion(t)"> — aprobó <strong>{{ tiempoAprobacion(t) }}</strong> después de que el operario la marcó</ng-container>
+              </ng-container>
+            </span>
+          </div>
+          <div class="gallery-info__row gallery-info__row--warn" *ngIf="t.estado === 'en_revision'">
+            <i class="fa fa-hourglass-half" style="color:#7c3aed"></i>
+            <span>Pendiente de verificación por el coordinador</span>
+          </div>
+          <div class="gallery-info__row" *ngIf="t.evidencia_subida_en">
+            <i class="fa fa-camera" style="color:#0052cc"></i>
+            <span>
+              Evidencia subida el <strong>{{ fmt(t.evidencia_subida_en) }}</strong>
+              — {{ t.evidencias.length }} foto(s)
+            </span>
           </div>
         </div>
 
-        <div class="gallery-grid">
+        <!-- Galería de fotos -->
+        <div class="gallery-grid" *ngIf="t.evidencias.length">
           <div class="gallery-item" *ngFor="let ev of t.evidencias" (click)="openLightbox(ev.url_imagen)">
             <img [src]="ev.url_imagen" [alt]="ev.descripcion"
                  onerror="this.src='assets/img/img-placeholder.svg'">
             <div class="gallery-item__desc" *ngIf="ev.descripcion">{{ ev.descripcion }}</div>
           </div>
         </div>
+
+        <div class="gallery-no-evid" *ngIf="!t.evidencias.length">
+          <i class="fa fa-image"></i> Sin evidencia fotográfica registrada
+        </div>
+
       </div>
 
     </div>

@@ -44,6 +44,7 @@ interface TareaEditable {
   fecha_fin: string;
   hora_inicio: string;
   hora_fin: string;
+  depende_de_idx: number | null;
 }
 
 function addDays(dateStr: string, days: number): string {
@@ -135,16 +136,17 @@ export class PlantillasFases implements OnInit {
       const faseFin    = addDays(cursor, f.duracion_dias - 1);
       let tareasCursor = faseInicio;
 
-      const tareas: TareaEditable[] = f.tareas.map((t) => {
+      const tareas: TareaEditable[] = f.tareas.map((t, idx) => {
         const tFin = addDays(tareasCursor, t.duracion_dias - 1);
         const tarea: TareaEditable = {
-          nombre:       t.nombre,
-          descripcion:  t.descripcion ?? '',
-          tipo_tarea:   t.tipo_tarea.replace(/\[|\]/g, '').trim(),
-          fecha_inicio: tareasCursor,
-          fecha_fin:    tFin,
-          hora_inicio:  t.hora_inicio,
-          hora_fin:     t.hora_fin,
+          nombre:         t.nombre,
+          descripcion:    t.descripcion ?? '',
+          tipo_tarea:     t.tipo_tarea.replace(/\[|\]/g, '').trim(),
+          fecha_inicio:   tareasCursor,
+          fecha_fin:      tFin,
+          hora_inicio:    t.hora_inicio,
+          hora_fin:       t.hora_fin,
+          depende_de_idx: idx > 0 ? idx - 1 : null,
         };
         tareasCursor = addDays(tFin, 1);
         return tarea;
@@ -162,7 +164,7 @@ export class PlantillasFases implements OnInit {
   }
 
   emptyTarea(): TareaEditable {
-    return { nombre: '', descripcion: '', tipo_tarea: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaInicio, hora_inicio: '07:00', hora_fin: '17:00' };
+    return { nombre: '', descripcion: '', tipo_tarea: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaInicio, hora_inicio: '07:00', hora_fin: '17:00', depende_de_idx: null };
   }
 
   addFase(): void { this.fases.push(this.emptyFase()); this.cdr.detectChanges(); }
@@ -216,15 +218,16 @@ export class PlantillasFases implements OnInit {
       fecha_inicio: f.fecha_inicio,
       fecha_fin:    f.fecha_fin,
       tareas: f.tareas.map(t => ({
-        nombre:       t.nombre,
-        descripcion:  t.descripcion,
-        tipo_tarea:   t.tipo_tarea,
-        fecha_inicio: t.fecha_inicio,
-        fecha_fin:    t.fecha_fin,
-        hora_inicio:  t.hora_inicio,
-        hora_fin:     t.hora_fin,
-        operarios:    [],
-        maquinaria:   [],
+        nombre:         t.nombre,
+        descripcion:    t.descripcion,
+        tipo_tarea:     t.tipo_tarea,
+        fecha_inicio:   t.fecha_inicio,
+        fecha_fin:      t.fecha_fin,
+        hora_inicio:    t.hora_inicio,
+        hora_fin:       t.hora_fin,
+        depende_de_idx: t.depende_de_idx,
+        operarios:      [],
+        maquinaria:     [],
       })),
     }));
 

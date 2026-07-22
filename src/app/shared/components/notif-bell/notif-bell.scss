@@ -14,7 +14,7 @@
   }
 
   .notif-panel {
-    position:absolute;top:48px;right:0;width:320px;background:#fff;border-radius:14px;
+    position:absolute;top:48px;right:0;width:340px;background:#fff;border-radius:14px;
     box-shadow:0 8px 40px rgba(0,0,0,.18);z-index:3000;overflow:hidden;
 
     .notif-panel-header {
@@ -28,32 +28,58 @@
       }
     }
 
-    .notif-list { max-height:340px;overflow-y:auto; }
+    .notif-list { max-height:380px;overflow-y:auto; }
 
     .notif-item {
-      display:flex;align-items:flex-start;gap:10px;padding:10px 14px;
-      transition:.15s;cursor:pointer;border-bottom:1px solid #f9f9f9;
+      display:flex;align-items:flex-start;gap:0;
+      border-bottom:1px solid #f9f9f9;
+      transition:.15s;
       &.notif-unread { background:rgba(141,198,63,.04); }
       &:hover { background:#fafafa; }
+    }
 
-      .notif-icon {
-        width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
-        justify-content:center;font-size:.8rem;flex-shrink:0;
-        &.ni-evidencia           { background:rgba(59,130,246,.12);color:#3b82f6; }
-        &.ni-fase_completada     { background:rgba(0,168,89,.12);color:#00A859; }
-        &.ni-proyecto_completado { background:rgba(141,198,63,.15);color:#5a7c00; }
-        &.ni-fase_delegada       { background:rgba(245,158,11,.12);color:#d97706; }
-        &.ni-sistema             { background:rgba(100,116,139,.1);color:#64748b; }
-      }
+    // Botón checkbox de lectura
+    .notif-check-btn {
+      flex-shrink:0;
+      width:36px;
+      align-self:stretch;
+      display:flex;align-items:center;justify-content:center;
+      background:none;border:none;cursor:pointer;
+      color:#d1d5db;
+      font-size:.85rem;
+      transition:color .15s;
+      padding:0;
+      &:hover { color:var(--atomo-green-dark); }
+      &--read { color:var(--atomo-green-dark); cursor:default; }
+    }
 
-      .notif-body {
-        flex:1;display:flex;flex-direction:column;gap:2px;
-        .notif-title { font-size:.78rem;font-weight:bold;color:var(--text-dark); }
-        .notif-msg   { font-size:.7rem;color:var(--text-muted);line-height:1.4; }
-        .notif-hora  { font-size:.65rem;color:var(--atomo-green-dark);font-weight:600; }
-      }
+    // Cuerpo clickeable (navega)
+    .notif-body {
+      flex:1;
+      display:flex;align-items:flex-start;gap:10px;
+      padding:10px 14px 10px 4px;
+      cursor:pointer;
+      min-width:0;
+    }
 
-      .notif-dot { width:8px;height:8px;border-radius:50%;background:#ef4444;flex-shrink:0;margin-top:4px; }
+    .notif-icon {
+      width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+      justify-content:center;font-size:.8rem;flex-shrink:0;
+      background:rgba(141,198,63,.1);color:var(--atomo-green-dark);
+      &.ni-evidencia           { background:rgba(59,130,246,.12);color:#3b82f6; }
+      &.ni-fase_completada     { background:rgba(0,168,89,.12);color:#00A859; }
+      &.ni-proyecto_completado { background:rgba(141,198,63,.15);color:#5a7c00; }
+      &.ni-fase_delegada       { background:rgba(245,158,11,.12);color:#d97706; }
+      &.ni-sistema             { background:rgba(100,116,139,.1);color:#64748b; }
+      &.ni-tarea_completada    { background:rgba(0,168,89,.12);color:#00A859; }
+      &.ni-asignacion          { background:rgba(59,130,246,.12);color:#3b82f6; }
+    }
+
+    .notif-text {
+      flex:1;display:flex;flex-direction:column;gap:2px;min-width:0;
+      .notif-title { font-size:.78rem;font-weight:bold;color:var(--text-dark);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+      .notif-msg   { font-size:.7rem;color:var(--text-muted);line-height:1.4; }
+      .notif-hora  { font-size:.65rem;color:var(--atomo-green-dark);font-weight:600; }
     }
 
     .notif-empty {

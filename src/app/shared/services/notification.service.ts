@@ -1,12 +1,14 @@
 import { Injectable, OnDestroy, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Subject } from 'rxjs';
 import { Api } from '../../core/services/api';
 
 export type NotifTipo =
-  | 'asignacion' | 'tarea_completada' | 'evidencia' | 'evidencia_subida'
+  | 'asignacion' | 'tarea_completada' | 'tarea_en_revision' | 'evidencia' | 'evidencia_subida'
   | 'fase_completada' | 'proyecto_completado' | 'reasignacion'
-  | 'comentario' | 'recordatorio' | 'fase_delegada' | 'sistema';
+  | 'comentario' | 'recordatorio' | 'fase_delegada' | 'sistema'
+  | 'dependencia_resuelta' | 'cambio_fechas';
 
 export interface AppNotif {
   id: number;
@@ -26,6 +28,9 @@ export class NotificationService implements OnDestroy {
   private _unread  = 0;
   private _timer: any = null;
   private _es: EventSource | null = null;
+
+  /** Emite cada vez que llega una notificación nueva (SSE o polling). */
+  readonly newNotif$ = new Subject<AppNotif>();
 
   get notifs():      AppNotif[] { return this._notifs; }
   get unreadCount(): number     { return this._unread;  }
@@ -92,6 +97,7 @@ export class NotificationService implements OnDestroy {
         if (!this._notifs.some(x => x.id === mapped.id)) {
           this._notifs.unshift(mapped);
           if (!mapped.leida) this._unread++;
+          this.newNotif$.next(mapped);
         }
       } catch { /* payload inesperado, ignorar */ }
     });
@@ -121,7 +127,12 @@ export class NotificationService implements OnDestroy {
     this.http.get<any>(`${this.api.baseUrl}/notificaciones?page=1&limit=30`).subscribe({
       next: (r: any) => {
         const data: any[] = r?.data ?? [];
-        this._notifs = data.map(n => this.map(n));
+        const mapped = data.map(n => this.map(n));
+        // Emitir notificaciones que no teníamos aún
+        mapped.forEach(n => {
+          if (!this._notifs.some(x => x.id === n.id)) this.newNotif$.next(n);
+        });
+        this._notifs = mapped;
         this._unread  = r?.no_leidas ?? data.filter((n: any) => !n.leida).length;
       },
       error: () => { /* mantiene estado anterior */ },

@@ -133,8 +133,24 @@
                 <i class="fa fa-exclamation-triangle"></i> {{ tareaError(f, t) }}
               </div>
 
-              <!-- Tarea description -->
+              <!-- Dependency + description row -->
               <div class="tarea-row__desc">
+                <div class="dep-row" *ngIf="ti > 0">
+                  <label class="dep-label">
+                    <i class="fa fa-link"></i> Depende de:
+                  </label>
+                  <select [(ngModel)]="t.depende_de_idx" class="dep-select">
+                    <option [ngValue]="null">— Sin dependencia —</option>
+                    <option *ngFor="let prev of f.tareas; let pi = index"
+                            [ngValue]="pi"
+                            [disabled]="pi >= ti">
+                      {{ pi + 1 }}. {{ prev.nombre || '(sin nombre)' }}
+                    </option>
+                  </select>
+                  <span class="dep-badge" *ngIf="t.depende_de_idx !== null">
+                    <i class="fa fa-lock"></i> Bloqueada hasta que termine la anterior
+                  </span>
+                </div>
                 <textarea [(ngModel)]="t.descripcion"
                           placeholder="Descripción / instrucciones de la tarea (opcional)"
                           class="t-desc" rows="2"></textarea>

@@ -25,9 +25,13 @@
     <div class="form-section">
       <h2 class="section-title"><i class="fa fa-info-circle"></i> Información General</h2>
       <div class="form-grid">
-        <div class="form-group full-width">
+        <div class="form-group" style="flex:2">
           <label>Nombre del Proyecto *</label>
           <input type="text" [(ngModel)]="form.nombre" placeholder="Ej: Cocina integral Suerox">
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Código del Proyecto</label>
+          <input type="text" [(ngModel)]="form.codigo" placeholder="Ej: P-2024-01">
         </div>
         <div class="form-group full-width">
           <label>Descripción</label>
@@ -270,7 +274,8 @@
         <table class="budget-table">
           <thead><tr>
             <th class="col-mueble">Mueble</th>
-            <th class="col-desc">Descripción</th>
+            <th class="col-desc">Descripción del ítem</th>
+            <th class="col-prov">Nombre Proveedor</th>
             <th class="col-obs">Observaciones</th>
             <th class="col-price">Precio / Unidad</th>
             <th class="col-qty">Cant.</th>
@@ -303,7 +308,8 @@
                   </div>
                 </div>
               </td>
-              <td><input type="text" [(ngModel)]="r.observaciones" placeholder="Notas del proveedor"></td>
+              <td><input type="text" [(ngModel)]="r.nombre_proveedor" placeholder="Proveedor (opcional)"></td>
+              <td><input type="text" [(ngModel)]="r.observaciones" placeholder="Notas adicionales"></td>
               <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onResourceChange(r)" min="0"></td>
               <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onResourceChange(r)" min="0"></td>
               <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
@@ -531,8 +537,9 @@
           <thead><tr>
             <th class="col-mueble">Mueble</th>
             <th class="col-desc">Concepto</th>
+            <th class="col-obs">Observaciones</th>
             <th class="col-price">Precio / Unidad</th>
-            <th class="col-qty">Cantidad</th>
+            <th class="col-qty">Cantidad (H)</th>
             <th class="col-total">Total</th>
             <th class="col-del"></th>
           </tr></thead>
@@ -562,6 +569,7 @@
                   </div>
                 </div>
               </td>
+              <td><input type="text" [(ngModel)]="r.observaciones" placeholder="Aclaraciones opcionales"></td>
               <td><input type="number" [(ngModel)]="r.precio_unitario" (ngModelChange)="onResourceChange(r)" min="0"></td>
               <td><input type="number" [(ngModel)]="r.cantidad" (ngModelChange)="onResourceChange(r)" min="0"></td>
               <td class="total-cell">{{ formatCOP(r.valor_total) }}</td>
@@ -632,20 +640,13 @@
       </div>
       <div class="modal-bdy">
         <div class="mf-group">
-          <label>Razón Social *</label>
-          <input type="text" [(ngModel)]="newClientForm.razon_social" placeholder="Ej: Bavaria S.A.">
+          <label>Nombre del Cliente *</label>
+          <input type="text" [(ngModel)]="newClientForm.nombre" placeholder="Ej: Bavaria S.A." autofocus>
+          <small style="color:var(--text-muted);font-size:.78rem">Solo el nombre es requerido.</small>
         </div>
-        <div class="mf-group">
-          <label>NIT / Identificación</label>
-          <input type="text" [(ngModel)]="newClientForm.identificacion" placeholder="900123456-7">
-        </div>
-        <div class="mf-group">
-          <label>Teléfono</label>
-          <input type="text" [(ngModel)]="newClientForm.telefono" placeholder="6017001234">
-        </div>
-        <div class="mf-group">
-          <label>Dirección</label>
-          <input type="text" [(ngModel)]="newClientForm.direccion" placeholder="Calle 94 #15-40, Bogotá">
+        <div *ngIf="clientSimilares.length" class="mf-warning">
+          <i class="fa fa-exclamation-triangle"></i>
+          Nombre similar ya existe: <strong>{{ clientSimilares[0] }}</strong>. ¿Seguro que quieres agregar otro?
         </div>
       </div>
       <div class="modal-ftr">

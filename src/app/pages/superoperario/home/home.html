@@ -6,7 +6,6 @@
       <h1><i class="fa fa-desktop"></i> Kiosko de Producción</h1>
       <span class="kiosko-date">{{ todayLabel }}</span>
     </div>
-    <app-notif-bell></app-notif-bell>
     <div class="kiosko-header__tabs">
       <button [class.tab-active]="view === 'calendar'" (click)="switchView('calendar')">
         <i class="fa fa-calendar"></i> Día
@@ -18,10 +17,18 @@
         <i class="fa fa-list"></i> Lista
       </button>
     </div>
+    <div class="kiosko-header__right">
+      <button class="btn-kiosk-mode" (click)="toggleKioskMode()"
+              [class.btn-kiosk-mode--fijado]="kioskMode === 'fijado'"
+              [title]="kioskMode === 'fijado' ? 'Modo Fijado: muestra anuncios en pantalla grande' : 'Modo Normal: sin anuncios, navegación de 5 días'">
+        <i class="fa" [ngClass]="kioskMode === 'fijado' ? 'fa-lock' : 'fa-unlock-alt'"></i>
+        {{ kioskMode === 'fijado' ? 'Fijado' : 'Normal' }}
+      </button>
+    </div>
   </div>
 
-  <!-- ══ FILTER BAR ══════════════════════════════════════════════════════════ -->
-  <div class="kiosko-filter">
+  <!-- ══ FILTER BAR (solo en modo libre) ═══════════════════════════════════ -->
+  <div class="kiosko-filter" *ngIf="kioskMode === 'libre'">
     <div class="filter-row" *ngIf="!isFiltered">
       <div class="filter-field">
         <label>Operario</label>
@@ -55,6 +62,24 @@
         <i class="fa fa-sign-out"></i> Cerrar sesión
       </button>
     </div>
+  </div>
+
+  <!-- ══ NAVEGACIÓN DE DÍA ═════════════════════════════════════════════════ -->
+  <!-- 5-day tabs in libre mode -->
+  <div class="day-tabs-bar" *ngIf="kioskMode === 'libre' && (view === 'calendar' || view === 'planner')">
+    <button class="day-tab"
+            *ngFor="let tab of fiveDayTabs; let i = index"
+            [class.day-tab--active]="dayOffset === i"
+            (click)="setDayOffset(i)">
+      <span class="day-tab__label">{{ tab.label }}</span>
+      <span class="day-tab__today" *ngIf="tab.isToday">Hoy</span>
+    </button>
+  </div>
+  <!-- Prev/Next day nav in fijado mode -->
+  <div class="day-nav-bar" *ngIf="kioskMode === 'fijado' && (view === 'calendar' || view === 'planner')">
+    <button class="day-nav-btn" (click)="prevDay()"><i class="fa fa-chevron-left"></i></button>
+    <span class="day-nav-label">{{ todayLabel }}</span>
+    <button class="day-nav-btn" (click)="nextDay()"><i class="fa fa-chevron-right"></i></button>
   </div>
 
   <!-- ══ VISTA DÍA (CALENDAR) ═══════════════════════════════════════════════ -->
@@ -246,14 +271,45 @@
         </div>
       </div>
       <div class="task-modal__footer">
-        <button class="btn-completar" *ngIf="selectedTarea?.estado !== 'completada'"
+        <!-- Pendiente: puedo marcarla -->
+        <button class="btn-completar"
+                *ngIf="!selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'"
                 (click)="marcarCompletada()" [disabled]="isLoading">
           <i class="fa fa-check"></i> {{ isLoading ? 'Guardando...' : 'Marcar como Completada' }}
         </button>
+        <!-- Yo ya completé pero otros aún no -->
+        <div class="completada-msg mi-parte-msg"
+             *ngIf="selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'">
+          <i class="fa fa-check-circle"></i> Tu parte completada —
+          <span *ngIf="selectedTarea && selectedTarea.total_operarios > 1">
+            {{ selectedTarea.operarios_completados }}/{{ selectedTarea.total_operarios }} operario(s) terminaron
+          </span>
+        </div>
+        <!-- Todos completaron → en_revision -->
+        <div class="completada-msg en-revision-msg" *ngIf="selectedTarea?.estado === 'en_revision'">
+          <i class="fa fa-hourglass-half"></i> Todos terminaron — pendiente de verificación del coordinador
+        </div>
+        <!-- Verificada por coordinador -->
         <div class="completada-msg" *ngIf="selectedTarea?.estado === 'completada'">
           <i class="fa fa-check-circle"></i> Completada a las {{ completadaHora(selectedTarea?.completado_en ?? null) }}
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ══ ANNOUNCEMENT MODAL ════════════════════════════════════════════════ -->
+  <div class="announcement-overlay" *ngIf="showAnnouncementModal" (click)="dismissAnnouncement()">
+    <div class="announcement-box">
+      <div class="ann-icon"><i class="fa fa-tasks"></i></div>
+      <div class="ann-label">NUEVA TAREA ASIGNADA</div>
+      <div class="ann-name">{{ currentAnnouncement?.operarioNombre }}</div>
+      <div class="ann-tasks">
+        <span *ngFor="let t of currentAnnouncement?.tareas">{{ t }}</span>
+      </div>
+      <div class="ann-queue" *ngIf="announcementQueue.length > 0">
+        <i class="fa fa-ellipsis-h"></i> +{{ announcementQueue.length }} más en cola
+      </div>
+      <div class="ann-hint">Toca para continuar</div>
     </div>
   </div>
 

@@ -183,8 +183,14 @@ export class Api {
     );
   }
 
+  /** Operario completa su tarea sin subir evidencia (T4.5). */
+  completarTareaDirecta(tareaId: number, idOperario: number): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/tareas/${tareaId}/completar`, { id_operario: idOperario }).pipe(
+      catchError(err => { this.notifyError('No se pudo completar la tarea.'); return throwError(() => err); })
+    );
+  }
+
   // ── Operario (autoservicio) ──────────────────────────────────────────────
-  // NUEVOS ENDPOINTS — pendientes de implementar en backend (ver MD de backend).
 
   /** Lista de proyectos donde el operario tiene tareas asignadas, con avance. */
   getOperarioProyectos(idOperario: number): Observable<any[]> {
@@ -233,18 +239,32 @@ export class Api {
     );
   }
 
+  getProveedoresPedido(): Observable<string[]> {
+    return this.http.get<any>(`${this.baseUrl}/pedidos/proveedores`).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   createPedido(body: {
     fecha_requerida: string;
-    fecha_solicitud: number;
+    fecha_solicitud: number | string;
     proveedor: string;
     valor: number;
     detalle?: string | null;
     fecha_compra?: string | null;
-    items: { id_detalle_recurso: number; cantidad: number; valor_unitario: number; observacion?: string | null }[];
+    id_estado_pedido?: number;
+    items: { id_detalle_recurso?: number | null; nombre_recurso_libre?: string | null; cantidad: number; valor_unitario: number; observacion?: string | null }[];
   }): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/pedidos`, body).pipe(
       tap(() => Swal.fire({ icon: 'success', title: '¡Pedido registrado!', timer: 1600, showConfirmButton: false })),
       catchError(err => { this.notifyError('No se pudo registrar el pedido.'); return throwError(() => err); })
+    );
+  }
+
+  updateEstadoPedido(id: number, id_estado_pedido: number): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/pedidos/${id}/estado`, { id_estado_pedido }).pipe(
+      catchError(err => { this.notifyError('No se pudo actualizar el estado.'); return throwError(() => err); })
     );
   }
 
@@ -268,7 +288,7 @@ export class Api {
     );
   }
 
-  updatePedido(id: number, body: { fecha_compra?: string | null; id_estado_pedido?: number }): Observable<any> {
+  updatePedido(id: number, body: { fecha_compra?: string | null; id_estado_pedido?: number; proveedor?: string; valor?: number; fecha_requerida?: string }): Observable<any> {
     return this.http.put<any>(`${this.baseUrl}/pedidos/${id}`, body).pipe(
       tap(() => Swal.fire({ icon: 'success', title: '¡Pedido actualizado!', timer: 1500, showConfirmButton: false })),
       catchError(err => { this.notifyError('No se pudo actualizar el pedido.'); return throwError(() => err); })
@@ -282,7 +302,7 @@ export class Api {
     );
   }
 
-  getRecursosParaPedido(idProyecto: number): Observable<{ id_detalle_recurso: number; nombre_recurso: string; tipo_recurso: string; observaciones: string | null }[]> {
+  getRecursosParaPedido(idProyecto: number): Observable<{ id_detalle_recurso: number; nombre_recurso: string; tipo_recurso: string; observaciones: string | null; precio_unitario: number; cantidad: number }[]> {
     return this.http.get<any>(`${this.baseUrl}/proyectos/${idProyecto}/recursos-pedido`).pipe(
       map((r: any) => r?.data ?? []),
       catchError(() => of([]))
@@ -307,6 +327,21 @@ export class Api {
     fecha_fin?: string;
   }): Observable<{ id_proyecto: number; nombre_proyecto: string; total_horas: number }[]> {
     return this.http.get<any>(`${this.baseUrl}/analytics/ocupacion`, { params: this.analyticsParams(tipo, filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  // ── Solicitudes de recurso ────────────────────────────────────────────────
+
+  createSolicitudRecurso(idProyecto: number, body: { nombre: string; tipo_recurso: string; precio_unitario: number; cantidad: number; observaciones?: string; id_pedido?: number | null; id_mueble?: number | null }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/proyectos/${idProyecto}/solicitud-recurso`, body).pipe(
+      catchError(err => { this.notifyError('No se pudo crear la solicitud.'); return throwError(() => err); })
+    );
+  }
+
+  getSolicitudesRecurso(idProyecto: number, todas = false): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/proyectos/${idProyecto}/solicitudes-recurso?todas=${todas}`).pipe(
       map((r: any) => r?.data ?? []),
       catchError(() => of([]))
     );
@@ -406,6 +441,28 @@ export class Api {
     );
   }
 
+  // ── Solicitudes de recurso ────────────────────────────────────────────────
+
+  aprobarSolicitudRecurso(id: number): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/solicitudes-recurso/${id}/aprobar`, {}).pipe(
+      tap(() => Swal.fire({ icon: 'success', title: '¡Recurso aprobado!', text: 'Ya aparece en los recursos del proyecto.', timer: 1800, showConfirmButton: false })),
+      catchError(err => { this.notifyError('No se pudo aprobar la solicitud.'); return throwError(() => err); })
+    );
+  }
+
+  rechazarSolicitudRecurso(id: number, motivo: string): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/solicitudes-recurso/${id}/rechazar`, { motivo }).pipe(
+      catchError(err => { this.notifyError('No se pudo rechazar la solicitud.'); return throwError(() => err); })
+    );
+  }
+
+  getAllSolicitudesPendientes(): Observable<any[]> {
+    return this.http.get<any>(`${this.baseUrl}/solicitudes-recurso/pendientes`).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
   // ── Vista General / Plantillas ────────────────────────────────────────────
 
   getVistaGeneralProyectos(): Observable<any[]> {
@@ -448,9 +505,10 @@ export class Api {
         { title: 'Estados de Compra', icon: 'fa-shopping-cart', route: '/dashboard/director/estados-compra' },
       ],
       3: [
-        { title: 'Mis Proyectos', icon: 'fa-briefcase', route: '/dashboard/coordinator/home' },
-        { title: 'Cronograma',    icon: 'fa-bar-chart',  route: '/dashboard/coordinator/gantt' },
-        { title: 'Evidencias',    icon: 'fa-camera',     route: '/dashboard/coordinator/evidences' },
+        { title: 'Mis Proyectos',    icon: 'fa-briefcase',    route: '/dashboard/coordinator/home' },
+        { title: 'Cronograma',       icon: 'fa-bar-chart',    route: '/dashboard/coordinator/gantt' },
+        { title: 'Evidencias',       icon: 'fa-camera',       route: '/dashboard/coordinator/evidences' },
+        { title: 'Estados de Compra', icon: 'fa-shopping-cart', route: '/dashboard/coordinator/estados-compra' },
       ],
       4: [
         { title: 'Inicio',         icon: 'fa-home',      route: '/dashboard/operator/home' },

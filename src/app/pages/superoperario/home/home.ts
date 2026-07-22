@@ -11,6 +11,9 @@ interface TareaKiosko {
   id: number; nombre: string; descripcion: string; instrucciones: string;
   fase: string; proyecto: string; hora_inicio: string; hora_fin: string;
   estado: string; completado_en: string | null; id_operario: number; operario: string;
+  yo_complete: boolean;
+  total_operarios: number;
+  operarios_completados: number;
 }
 
 interface LayoutItem { task: TareaKiosko; col: number; cols: number; }
@@ -27,6 +30,11 @@ function startOfWeek(d: Date): Date {
   const diff = day.getDay() === 0 ? -6 : 1 - day.getDay();
   day.setDate(day.getDate() + diff);
   return day;
+}
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setDate(r.getDate() + n);
+  return r;
 }
 
 @Component({
@@ -55,6 +63,22 @@ export class SuperOpHome implements OnInit, OnDestroy {
   showInactivityModal = false;
   countdown = 30;
 
+  // Kiosk mode
+  kioskMode: 'libre' | 'fijado' = 'libre';
+
+  // Day offset for navigation (0 = today, 1 = tomorrow, etc.)
+  dayOffset = 0;
+
+  // Anuncio de nueva tarea asignada
+  showAnnouncementModal = false;
+  currentAnnouncement: { operarioNombre: string; tareas: string[] } | null = null;
+  announcementQueue: Array<{ operarioNombre: string; tareas: string[] }> = [];
+  private previousTaskIds = new Set<number>();
+  private previousFilteredTaskIds = new Set<number>();
+  private _initialTaskLoad = true;
+  private _initialFilteredLoad = true;
+  private dismissTimeout: any = null;
+
   // Week view
   weekOffset = 0;
   weekDays: Date[] = [];
@@ -68,12 +92,49 @@ export class SuperOpHome implements OnInit, OnDestroy {
 
   readonly HOURS = [7,8,9,10,11,12,13,14,15,16,17,18];
   readonly DAY_H  = 11;
-  readonly todayLabel = new Date().toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  private readonly todayKey = toDateKey(new Date());
+  private readonly todayRealKey = toDateKey(new Date());
 
   constructor(private api: Api, private cdr: ChangeDetectorRef) {}
 
+  // ── Dynamic date getters ──────────────────────────────────────────────────
+
+  get todayKey(): string { return toDateKey(addDays(new Date(), this.dayOffset)); }
+
+  get todayLabel(): string {
+    return addDays(new Date(), this.dayOffset)
+      .toLocaleDateString('es-CO', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  }
+
+  get fiveDayTabs(): Array<{ key: string; label: string; isToday: boolean }> {
+    return Array.from({ length: 5 }, (_, i) => {
+      const d = addDays(new Date(), i);
+      return {
+        key: toDateKey(d),
+        label: `${DAYS_SHORT[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`,
+        isToday: i === 0,
+      };
+    });
+  }
+
+  // ── Kiosk mode ────────────────────────────────────────────────────────────
+
+  toggleKioskMode(): void {
+    this.kioskMode = this.kioskMode === 'fijado' ? 'libre' : 'fijado';
+    localStorage.setItem('kioskMode', this.kioskMode);
+    if (this.kioskMode === 'fijado' && this.isFiltered) this.clearFilter();
+    this.cdr.detectChanges();
+  }
+
+  // ── Day navigation ────────────────────────────────────────────────────────
+
+  prevDay(): void { this.dayOffset--; this.loadTareas(this.isFiltered ? this.filteredOperario?.id : undefined); }
+  nextDay(): void { this.dayOffset++; this.loadTareas(this.isFiltered ? this.filteredOperario?.id : undefined); }
+  setDayOffset(offset: number): void { this.dayOffset = offset; this.loadTareas(this.isFiltered ? this.filteredOperario?.id : undefined); }
+
   ngOnInit(): void {
+    const savedMode = localStorage.getItem('kioskMode');
+    if (savedMode === 'fijado' || savedMode === 'libre') this.kioskMode = savedMode;
+
     this.loadOperarios();
     this.loadTareas();
     this.buildWeek();
@@ -125,7 +186,7 @@ export class SuperOpHome implements OnInit, OnDestroy {
   }
 
   getDayTareas(d: Date): TareaKiosko[] { return this.weekData[toDateKey(d)] ?? []; }
-  isToday(d: Date): boolean { return toDateKey(d) === this.todayKey; }
+  isToday(d: Date): boolean { return toDateKey(d) === this.todayRealKey; }
   dayLabel(d: Date): string { return `${DAYS_SHORT[d.getDay()]} ${d.getDate()}`; }
 
   get weekLabel(): string {
@@ -147,7 +208,40 @@ export class SuperOpHome implements OnInit, OnDestroy {
     this.api.getSuperOpTareas(this.todayKey, idOp).subscribe({
       next: (d: any[]) => {
         const res = d ?? [];
-        idOp ? (this.filteredTareas = res) : (this.tareas = res);
+        if (!idOp) {
+          if (this._initialTaskLoad) {
+            this._initialTaskLoad = false;
+          } else if (this.kioskMode === 'fijado' && this.dayOffset === 0) {
+            // Only announce in fijado mode viewing today
+            const newTasks = res.filter((t: any) => !this.previousTaskIds.has(t.id));
+            if (newTasks.length > 0) {
+              const byOp = new Map<string, string[]>();
+              for (const t of newTasks) {
+                const name: string = t.operario || 'Operario';
+                if (!byOp.has(name)) byOp.set(name, []);
+                byOp.get(name)!.push(t.nombre);
+              }
+              for (const [operarioNombre, tareas] of byOp) {
+                this.announcementQueue.push({ operarioNombre, tareas });
+              }
+              this.processQueue();
+            }
+          }
+          this.previousTaskIds = new Set(res.map((t: any) => t.id));
+          this.tareas = res;
+        } else {
+          // Filtered operario — track new tasks for fijado mode
+          if (!this._initialFilteredLoad && this.kioskMode === 'fijado' && this.dayOffset === 0) {
+            const newTasks = res.filter((t: any) => !this.previousFilteredTaskIds.has(t.id));
+            if (newTasks.length > 0 && this.filteredOperario) {
+              this.announcementQueue.push({ operarioNombre: this.filteredOperario.nombre, tareas: newTasks.map((t: any) => t.nombre) });
+              this.processQueue();
+            }
+          }
+          this._initialFilteredLoad = false;
+          this.previousFilteredTaskIds = new Set(res.map((t: any) => t.id));
+          this.filteredTareas = res;
+        }
         this.cdr.detectChanges();
       },
       error: () => {
@@ -156,6 +250,37 @@ export class SuperOpHome implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       },
     });
+  }
+
+  processQueue(): void {
+    if (this.showAnnouncementModal || this.announcementQueue.length === 0) return;
+    this.currentAnnouncement = this.announcementQueue.shift()!;
+    this.showAnnouncementModal = true;
+    this.cdr.detectChanges();
+    this.speak(this.currentAnnouncement.operarioNombre);
+    clearTimeout(this.dismissTimeout);
+    this.dismissTimeout = setTimeout(() => this.dismissAnnouncement(), 5000);
+  }
+
+  dismissAnnouncement(): void {
+    clearTimeout(this.dismissTimeout);
+    this.showAnnouncementModal = false;
+    this.currentAnnouncement = null;
+    this.cdr.detectChanges();
+    if (this.announcementQueue.length > 0) {
+      this.dismissTimeout = setTimeout(() => this.processQueue(), 600);
+    }
+  }
+
+  private speak(name: string): void {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(`Nueva tarea asignada a ${name}`);
+    utt.lang = 'es-ES';
+    utt.rate = 0.9;
+    utt.pitch = 1;
+    utt.volume = 1;
+    window.speechSynthesis.speak(utt);
   }
 
   get displayTareas(): TareaKiosko[] { return this.isFiltered ? this.filteredTareas : this.tareas; }
@@ -171,18 +296,30 @@ export class SuperOpHome implements OnInit, OnDestroy {
   getLayout(tasks: TareaKiosko[]): LayoutItem[] {
     if (!tasks.length) return [];
     const sorted = [...tasks].sort((a, b) => this.timeToMin(a.hora_inicio) - this.timeToMin(b.hora_inicio));
-    const colEnds: number[] = [];
-    const items: LayoutItem[] = [];
-    for (const task of sorted) {
-      const start = this.timeToMin(task.hora_inicio);
-      let col = colEnds.findIndex(end => end <= start);
-      if (col === -1) { col = colEnds.length; colEnds.push(0); }
-      colEnds[col] = this.timeToMin(task.hora_fin);
-      items.push({ task, col, cols: 0 });
+
+    if (this.isFiltered) {
+      const colEnds: number[] = [];
+      const items: LayoutItem[] = [];
+      for (const task of sorted) {
+        const start = this.timeToMin(task.hora_inicio);
+        let col = colEnds.findIndex(end => end <= start);
+        if (col === -1) { col = colEnds.length; colEnds.push(0); }
+        colEnds[col] = this.timeToMin(task.hora_fin);
+        items.push({ task, col, cols: 0 });
+      }
+      const maxCols = colEnds.length || 1;
+      items.forEach(it => it.cols = maxCols);
+      return items;
     }
-    const maxCols = colEnds.length;
-    items.forEach(it => it.cols = maxCols);
-    return items;
+
+    const presentIds = [...new Set(sorted.map(t => t.id_operario))];
+    presentIds.sort((a, b) => {
+      const ia = this.operarios.findIndex(o => o.id === a);
+      const ib = this.operarios.findIndex(o => o.id === b);
+      return ia - ib;
+    });
+    const cols = presentIds.length || 1;
+    return sorted.map(task => ({ task, col: presentIds.indexOf(task.id_operario), cols }));
   }
 
   get calendarLayout(): LayoutItem[] { return this.getLayout(this.displayTareas); }
@@ -199,13 +336,27 @@ export class SuperOpHome implements OnInit, OnDestroy {
     this.isLoading   = true;
     this.api.verifyOperario(op.correo, this.filterPassword).subscribe({
       next: () => {
-        this.isLoading       = false;
-        this.isFiltered      = true;
+        this.isLoading        = false;
+        this.isFiltered       = true;
         this.filteredOperario = op;
-        this.filterPassword  = '';
+        this.filterPassword   = '';
+        this._initialFilteredLoad = true;
+        this.previousFilteredTaskIds.clear();
         this.loadTareas(op.id);
         if (this.view === 'semana') this.loadWeekData();
         this.startInactivityWatch();
+        // Post-login queue: show today's assigned tasks in fijado mode
+        if (this.kioskMode === 'fijado') {
+          this.api.getSuperOpTareas(this.todayRealKey, op.id).subscribe({
+            next: (tasks: any[]) => {
+              if (tasks?.length > 0) {
+                this.announcementQueue.push({ operarioNombre: op.nombre, tareas: tasks.map((t: any) => t.nombre) });
+                this.processQueue();
+              }
+            },
+            error: () => {}
+          });
+        }
         this.cdr.detectChanges();
       },
       error: (err: any) => {
@@ -221,6 +372,8 @@ export class SuperOpHome implements OnInit, OnDestroy {
     this.filterPassword = ''; this.filterError = ''; this.filteredTareas = [];
     this.showTaskModal = false; this.showInactivityModal = false;
     this.weekData = {};
+    this._initialFilteredLoad = true;
+    this.previousFilteredTaskIds.clear();
     this.clearTimers(); this.removeListeners();
     this.cdr.detectChanges();
   }
@@ -237,16 +390,32 @@ export class SuperOpHome implements OnInit, OnDestroy {
     if (!this.selectedTarea || !this.filteredOperario) return;
     this.isLoading = true;
     this.api.completarTarea(this.selectedTarea.id, this.filteredOperario.id).subscribe({
-      next: () => {
+      next: (res: any) => {
         this.isLoading = false;
+        const nuevoEstado = res?.estado ?? 'en_progreso';
         const now = new Date().toISOString();
         const updateList = (list: TareaKiosko[]) => {
           const t = list.find(x => x.id === this.selectedTarea!.id);
-          if (t) { t.estado = 'completada'; t.completado_en = now; }
+          if (t) {
+            t.estado = nuevoEstado;
+            t.yo_complete = true;
+            if (nuevoEstado === 'en_revision') t.completado_en = now;
+            t.operarios_completados = res?.pendientes != null
+              ? (t.total_operarios - res.pendientes)
+              : t.total_operarios;
+          }
         };
         updateList(this.filteredTareas); updateList(this.tareas);
         Object.values(this.weekData).forEach(updateList);
-        this.closeTask(); this.cdr.detectChanges();
+        if (this.selectedTarea) {
+          this.selectedTarea.estado = nuevoEstado;
+          this.selectedTarea.yo_complete = true;
+          if (nuevoEstado === 'en_revision') this.selectedTarea.completado_en = now;
+          this.selectedTarea.operarios_completados = res?.pendientes != null
+            ? (this.selectedTarea.total_operarios - res.pendientes)
+            : this.selectedTarea.total_operarios;
+        }
+        this.cdr.detectChanges();
       },
       error: () => { this.isLoading = false; this.cdr.detectChanges(); },
     });
@@ -271,7 +440,12 @@ export class SuperOpHome implements OnInit, OnDestroy {
     this.countdownInterval = setInterval(() => { this.countdown--; this.cdr.detectChanges(); if (this.countdown <= 0) this.clearFilter(); }, 1000);
   }
   continueSession(): void { clearInterval(this.countdownInterval); this.showInactivityModal = false; this.scheduleTimeout(); this.cdr.detectChanges(); }
-  clearTimers(): void { clearTimeout(this.inactivityTimeout); clearInterval(this.countdownInterval); }
+  clearTimers(): void {
+    clearTimeout(this.inactivityTimeout);
+    clearInterval(this.countdownInterval);
+    clearTimeout(this.dismissTimeout);
+    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  }
 
   // ── Visual helpers ────────────────────────────────────────────────────────
 
@@ -290,7 +464,7 @@ export class SuperOpHome implements OnInit, OnDestroy {
     return OP_COLORS[(idx >= 0 ? idx : 0) % OP_COLORS.length];
   }
   estadoLabel(e?: string): string {
-    return ({ asignada:'Asignada', en_progreso:'En Progreso', completada:'Completada', pendiente:'Pendiente', reasignada:'Reasignada' })[e ?? ''] ?? (e ?? '');
+    return ({ asignada:'Asignada', en_progreso:'En Progreso', completada:'Completada', en_revision:'Lista para revisar', pendiente:'Pendiente', reasignada:'Reasignada' })[e ?? ''] ?? (e ?? '');
   }
   completadaHora(iso: string | null): string {
     if (!iso) return '';

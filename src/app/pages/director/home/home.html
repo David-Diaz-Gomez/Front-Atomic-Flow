@@ -7,7 +7,6 @@
       <span class="subtitle">Gestión y seguimiento de proyectos activos</span>
     </div>
     <div class="header-actions">
-      <app-notif-bell></app-notif-bell>
       <button class="btn-evidencias" (click)="goToEvidencias()">
         <i class="fa fa-camera"></i> Evidencias
       </button>
@@ -81,12 +80,12 @@
   <div class="projects-grid" *ngIf="!loading && filteredProjects.length > 0">
     <div class="project-card" *ngFor="let p of filteredProjects">
       <!-- Imagen del proyecto -->
-      <div class="card-image">
+      <div class="card-image" (click)="goToDetail(p.id)" style="cursor:pointer">
         <img [src]="p.link_imagen || '/assets/img/project-default.png'"
              [alt]="p.nombre" (error)="$any($event.target).src='/assets/img/project-default.png'">
         <div class="card-image-overlay">
           <span class="estado-badge" [ngClass]="getEstadoClass(p.estado)">{{ getEstadoLabel(p.estado) }}</span>
-          <span class="badge-cc" *ngIf="p.centro_costos">{{ p.centro_costos }}</span>
+          <span class="badge-cc" *ngIf="p.codigo || p.id">{{ p.codigo || ('#' + p.id) }}</span>
         </div>
         <a *ngIf="p.link_trello" [href]="p.link_trello" target="_blank" class="trello-link" title="Ver en Trello">
           <i class="fa fa-trello"></i>

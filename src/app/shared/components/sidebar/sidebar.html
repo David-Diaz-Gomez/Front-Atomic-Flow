@@ -1,13 +1,15 @@
 <div class="sidebar-wrapper" [class.menu-open]="isMenuOpen">
   <div class="sidebar-header">
     <img src="assets/logo-atomo.svg" alt="Logo" class="sidebar-logo">
-    
+
     <button class="hamburger-btn" (click)="toggleMenu()">
       <i class="fa" [ngClass]="isMenuOpen ? 'fa-times' : 'fa-bars'"></i>
     </button>
 
-    <div class="user-role-badge d-none-mobile">
-      <span class="dot"></span> {{ currentUser?.role }}
+    <div class="sidebar-header__tools">
+      <div class="user-role-badge d-none-mobile">
+        <span class="dot"></span> {{ currentUser?.role }}
+      </div>
     </div>
   </div>
 

@@ -1,19 +1,23 @@
-import { Component, OnInit, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
+import { Subscription } from 'rxjs';
 import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
+import { NotificationService } from '../../../shared/services/notification.service';
+import { Api } from '../../../core/services/api';
 
 interface PhaseMachineOcc { nombre: string; porcentaje: number; estado: 'ok' | 'alta' | 'saturada'; }
 
 const ESTADO_LABELS: Record<string, string> = {
-  borrador: 'Borrador', en_revision: 'En Revisión', rechazado: 'Rechazado',
+  borrador: 'Borrador', rechazado: 'Rechazado',
   aprobado: 'Aprobado', en_produccion: 'En Producción', pausado: 'Pausado',
   completado: 'Completado', cancelado: 'Cancelado',
   pendiente: 'Pendiente', asignada: 'Asignada',
   en_progreso: 'En Progreso', completada: 'Completada', bloqueada: 'Bloqueada',
+  en_revision: 'Por verificar',
   'Por Validar': 'Por Validar', 'En Desarrollo': 'En Desarrollo',
 };
 
@@ -30,22 +34,36 @@ const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
   templateUrl: './project-detail.html',
   styleUrl: './project-detail.scss'
 })
-export class ProjectDetail implements OnInit {
+export class ProjectDetail implements OnInit, OnDestroy {
   project: any = null;
   activeTab = 'resumen';
   expandedFases = new Set<number>();
   loading = true;
   error = '';
 
-  // Resource summary from API
+  rawRecursos: any = null;
   resourceSummary: any[] = [];
   totalRecursosValue = 0;
+  private _notifSub: Subscription | null = null;
+
+  solicitudesPendientes: any[] = [];
+  loadingSolicitudes = false;
+
+  // Quick-order modal (abre desde recursos sin navegar)
+  showQuickOrderModal = false;
+  quickOrderRecurso: { id: number; nombre: string; nombre_proveedor: string | null; precio_unitario: number; cantidad: number } | null = null;
+  quickOrderForm = { proveedor: '', cantidad: 1, valor_unitario: 0, fecha_requerida: '', fecha_solicitud: '', observacion: '' };
+  quickOrderSaving = false;
+  quickOrderErrors: Record<string, string> = {};
+  orderedResourceIds = new Set<number>();  // recursos con al menos un pedido en esta sesión
 
   constructor(
     private router: Router,
     private route: ActivatedRoute,
     private projectSvc: ProjectService,
     private catalogSvc: CatalogService,
+    private notifSvc: NotificationService,
+    private api: Api,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
@@ -55,8 +73,16 @@ export class ProjectDetail implements OnInit {
       const id = parseInt(this.route.snapshot.paramMap.get('id') ?? '0', 10);
       if (id) this.loadProject(id);
       this.catalogSvc.getTiposTarea().subscribe({ next: t => { this.tiposTarea = t; this.cdr.detectChanges(); }, error: () => {} });
+      this._notifSub = this.notifSvc.newNotif$.subscribe(n => {
+        if (['tarea_completada', 'tarea_en_revision'].includes(n.tipo) && this.project &&
+            (!n.proyecto_id || n.proyecto_id === this.project.id)) {
+          this.loadProject(this.project.id);
+        }
+      });
     }
   }
+
+  ngOnDestroy(): void { this._notifSub?.unsubscribe(); }
 
   loadProject(id: number): void {
     this.loading = true;
@@ -69,6 +95,9 @@ export class ProjectDetail implements OnInit {
         this.cdr.detectChanges();
         this.loadResourceSummary(id);
         this.loadProjectInsumos(id);
+        this.loadProjectMuebles(id);
+        this.loadSolicitudes(id);
+        this.loadExistingPedidos(id);
       },
       error: () => {
         this.error = 'No se pudo cargar el proyecto.';
@@ -146,7 +175,8 @@ export class ProjectDetail implements OnInit {
   getTareaStateClass(estado: string): string {
     const map: Record<string, string> = {
       completada: 'state-done', en_progreso: 'state-progress',
-      asignada: 'state-assigned', pendiente: 'state-pending', bloqueada: 'state-blocked'
+      asignada: 'state-assigned', pendiente: 'state-pending',
+      bloqueada: 'state-blocked', en_revision: 'state-revision',
     };
     return map[estado] ?? 'state-pending';
   }
@@ -212,6 +242,120 @@ export class ProjectDetail implements OnInit {
     return ['aprobado', 'en_produccion', 'pausado', 'En Desarrollo'].includes(this.project?.estado ?? '');
   }
 
+  // ── Solicitudes de recurso pendientes ──────────────────────────────────────
+  loadSolicitudes(id: number): void {
+    this.loadingSolicitudes = true;
+    this.api.getSolicitudesRecurso(id).subscribe({
+      next: data => { this.solicitudesPendientes = data; this.loadingSolicitudes = false; this.cdr.detectChanges(); },
+      error: () => { this.loadingSolicitudes = false; }
+    });
+  }
+
+  aprobarSolicitud(sol: any): void {
+    this.api.aprobarSolicitudRecurso(sol.id).subscribe({
+      next: () => {
+        this.loadSolicitudes(this.project.id);
+        this.loadProjectInsumos(this.project.id);
+      },
+      error: () => {}
+    });
+  }
+
+  rechazarSolicitud(sol: any): void {
+    void Swal.fire({
+      title: 'Rechazar solicitud',
+      input: 'textarea', inputPlaceholder: 'Motivo del rechazo (opcional)...',
+      showCancelButton: true, confirmButtonText: 'Rechazar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#dc2626',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.api.rechazarSolicitudRecurso(sol.id, r.value ?? '').subscribe({
+        next: () => {
+          void Swal.fire({ icon: 'info', title: 'Solicitud rechazada', timer: 1500, showConfirmButton: false });
+          this.loadSolicitudes(this.project.id);
+        },
+        error: () => {}
+      });
+    });
+  }
+
+  get quickOrderTotal(): string {
+    const total = (Number(this.quickOrderForm.cantidad) || 0) * (Number(this.quickOrderForm.valor_unitario) || 0);
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(total);
+  }
+
+  get quickOrderLimite(): number {
+    const r = this.quickOrderRecurso;
+    return r ? r.precio_unitario * r.cantidad : 0;
+  }
+
+  get quickOrderExcede(): number {
+    const total = (Number(this.quickOrderForm.cantidad) || 0) * (Number(this.quickOrderForm.valor_unitario) || 0);
+    return Math.max(0, total - this.quickOrderLimite);
+  }
+
+  get quickOrderLimiteStr(): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(this.quickOrderLimite);
+  }
+
+  get quickOrderExcedeStr(): string {
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(this.quickOrderExcede);
+  }
+
+  onPedirRecurso(r: { id: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number }): void {
+    const today = this.todayStr();
+    const requerida = this.addDays(today, 3);
+    this.quickOrderRecurso = { id: r.id, nombre: r.nombre, nombre_proveedor: r.nombre_proveedor ?? null, precio_unitario: r.precio_unitario, cantidad: r.cantidad };
+    this.quickOrderForm = { proveedor: r.nombre_proveedor ?? '', cantidad: r.cantidad || 1, valor_unitario: r.precio_unitario || 0, fecha_requerida: requerida, fecha_solicitud: today, observacion: '' };
+    this.quickOrderErrors = {};
+    this.showQuickOrderModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeQuickOrder(): void { this.showQuickOrderModal = false; this.quickOrderRecurso = null; this.cdr.detectChanges(); }
+
+  submitQuickOrder(): void {
+    this.quickOrderErrors = {};
+    const f = this.quickOrderForm;
+    if (!f.proveedor.trim()) this.quickOrderErrors['proveedor'] = 'El proveedor es obligatorio';
+    if (!f.cantidad || f.cantidad <= 0) this.quickOrderErrors['cantidad'] = 'Cantidad inválida';
+    if (!f.fecha_requerida) this.quickOrderErrors['fecha_requerida'] = 'Fecha requerida obligatoria';
+    if (this.quickOrderExcede > 0 && !f.observacion.trim()) this.quickOrderErrors['observacion'] = 'Justifica el excedente del presupuesto';
+    if (Object.keys(this.quickOrderErrors).length) { this.cdr.detectChanges(); return; }
+
+    const r = this.quickOrderRecurso!;
+    const valor = Number(f.cantidad) * Number(f.valor_unitario);
+    const fechaSolicitudInt = Number(f.fecha_solicitud.replace(/-/g, ''));
+
+    this.quickOrderSaving = true;
+    this.api.createPedido({
+      fecha_requerida:  f.fecha_requerida,
+      fecha_solicitud:  fechaSolicitudInt,
+      proveedor:        f.proveedor.trim(),
+      detalle:          f.observacion.trim() || null,
+      valor,
+      items: [{ id_detalle_recurso: r.id, cantidad: Number(f.cantidad), valor_unitario: Number(f.valor_unitario) }],
+    }).subscribe({
+      next: () => {
+        this.quickOrderSaving = false;
+        this.orderedResourceIds.add(r.id);
+        this.showQuickOrderModal = false;
+        this.quickOrderRecurso = null;
+        this.cdr.detectChanges();
+      },
+      error: () => { this.quickOrderSaving = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  private todayStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  private addDays(dateStr: string, days: number): string {
+    const d = new Date(dateStr); d.setDate(d.getDate() + days);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
   // ── Task display helpers (API returns objects, template expects strings) ──
 
   getTaskTipoStr(t: any): string {
@@ -245,11 +389,41 @@ export class ProjectDetail implements OnInit {
     return this.project?.insumos?.find((ins: any) => ins.id === id)?.nombre ?? `#${id}`;
   }
 
+  muebleLabel(id: number): string {
+    return this.project?.muebles?.find((m: any) => m.id === id)?.nombre ?? `#${id}`;
+  }
+
   // ── Insumos disponibles del proyecto (para selector en delegación/fase) ───
+  private loadExistingPedidos(id: number): void {
+    this.api.getPedidosByProject(id).subscribe({
+      next: (res: any) => {
+        const pedidos: any[] = Array.isArray(res) ? res : (res?.data ?? []);
+        for (const pedido of pedidos) {
+          for (const item of (pedido.items ?? pedido.detalles ?? [])) {
+            if (item.id_detalle_recurso) this.orderedResourceIds.add(item.id_detalle_recurso);
+          }
+        }
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
   private loadProjectInsumos(id: number): void {
     this.projectSvc.getProjectResources(id).subscribe({
       next: raw => {
+        this.rawRecursos = raw;
         if (this.project) this.project.insumos = this.extractAllInsumos(raw);
+        this.cdr.detectChanges();
+      },
+      error: () => {}
+    });
+  }
+
+  private loadProjectMuebles(id: number): void {
+    this.projectSvc.getProjectMuebles(id).subscribe({
+      next: muebles => {
+        if (this.project) this.project.muebles = muebles ?? [];
         this.cdr.detectChanges();
       },
       error: () => {}
@@ -358,6 +532,33 @@ export class ProjectDetail implements OnInit {
 
   onTipoTareaChange(): void { /* tipo_tarea string se actualiza via ngModel en el form */ }
 
+  // ── Nuevo tipo de tarea (T4.1) ────────────────────────────────────────────
+  showNewTipoInput = false;
+  newTipoLabel = '';
+  newTipoSaving = false;
+
+  createNewTipo(): void {
+    const nombre = this.newTipoLabel.trim();
+    if (!nombre) return;
+    this.newTipoSaving = true;
+    this.catalogSvc.createTipoTarea({ nombre }).subscribe({
+      next: (t: any) => {
+        const item = { id: t.id, nombre: t.nombre ?? nombre };
+        this.tiposTarea = [...this.tiposTarea, item];
+        this.taskForm.id_tipo_tarea = item.id;
+        this.showNewTipoInput = false;
+        this.newTipoLabel = '';
+        this.newTipoSaving = false;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.newTipoSaving = false;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo crear el tipo', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
   // ── Phase modal ────────────────────────────────────────────────────────────
   showPhaseModal = false;
   editingPhaseId: number | null = null;
@@ -389,7 +590,7 @@ export class ProjectDetail implements OnInit {
       fecha_inicio: (fase.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:    (fase.fecha_fin    ?? '').substring(0, 10),
     };
-    this.phaseInsumos = [...(fase.insumos_aplicados ?? [])];
+    this.phaseInsumos = [...(fase.muebles_aplicados ?? fase.insumos_aplicados ?? [])];
     this.resetPhaseConflict();
     this.showPhaseModal = true;
   }
@@ -469,7 +670,7 @@ export class ProjectDetail implements OnInit {
   private doSavePhase(): void {
     const doSave = () => {
       if (this.editingPhaseId !== null) {
-        const updateBody = { ...this.phaseForm, insumos_aplicados: this.phaseInsumos };
+        const updateBody = { ...this.phaseForm, muebles_aplicados: this.phaseInsumos };
         this.projectSvc.updateFase(this.project.id, this.editingPhaseId, updateBody).subscribe({
           next: () => {
             void Swal.fire({ icon: 'success', title: 'Fase actualizada', timer: 1500 });

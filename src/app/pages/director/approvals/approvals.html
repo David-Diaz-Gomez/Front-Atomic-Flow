@@ -27,6 +27,34 @@
     <i class="fa fa-exclamation-circle"></i> {{ error }}
   </div>
 
+  <!-- Solicitudes de recurso pendientes -->
+  <div class="solicitudes-recurso-section" *ngIf="!loadingSolicitudes && solicitudesRecurso.length">
+    <div class="sr-section-header">
+      <i class="fa fa-plus-circle"></i> Solicitudes de nuevo recurso pendientes
+      <span class="sr-count">{{ solicitudesCount }}</span>
+    </div>
+    <div class="sr-row" *ngFor="let sol of solicitudesRecurso">
+      <div class="sr-info">
+        <span class="sr-proyecto">
+          <i class="fa fa-briefcase"></i>
+          <span *ngIf="sol.codigo_proyecto" class="sr-codigo">#{{ sol.codigo_proyecto }}</span>
+          {{ sol.nombre_proyecto }}
+        </span>
+        <span class="sr-nombre">{{ sol.nombre }}</span>
+        <span class="sr-meta">{{ sol.tipo_recurso }} · {{ sol.cantidad }} ud · {{ formatCOP(sol.precio_unitario) }}</span>
+        <span class="sr-obs" *ngIf="sol.observaciones">{{ sol.observaciones }}</span>
+      </div>
+      <div class="sr-actions">
+        <button class="btn-sr-ok" (click)="aprobarSolicitudRecurso(sol)">
+          <i class="fa fa-check"></i> Aprobar
+        </button>
+        <button class="btn-sr-no" (click)="rechazarSolicitudRecurso(sol)">
+          <i class="fa fa-times"></i> Rechazar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Cards -->
   <div class="approval-list" *ngIf="!loading && projects.length > 0">
     <div class="approval-card" *ngFor="let p of projects" [ngClass]="'card-' + p.estado">
@@ -36,7 +64,7 @@
         <!-- Card header -->
         <div class="card-header">
           <div class="card-title-block">
-            <h3>{{ p.nombre }}</h3>
+            <h3>{{ p.centro_costos ? '#' + p.centro_costos + ' · ' : '' }}{{ p.nombre }}</h3>
             <p class="client-name"><i class="fa fa-building-o"></i> {{ p.cliente.razon_social }}</p>
           </div>
           <span class="estado-chip" [ngClass]="'chip-' + p.estado">
@@ -114,11 +142,13 @@
           <!-- Proveedores -->
           <div class="budget-table-wrap" *ngIf="activeBudgetSection === 'proveedores'">
             <table class="budget-view-table">
-              <thead><tr><th>Mueble</th><th>Nombre</th><th>Observaciones</th><th>Precio/u</th><th>Cant.</th><th class="right">Total</th></tr></thead>
+              <thead><tr><th>Mueble</th><th>Nombre</th><th>Proveedor</th><th>Observaciones</th><th>Precio/u</th><th>Cant.</th><th class="right">Total</th></tr></thead>
               <tbody>
                 <tr *ngFor="let r of p.budget.proveedores">
                   <td><span class="mueble-tag" *ngIf="r.mueble_nombre">{{ r.mueble_nombre }}</span><span class="muted" *ngIf="!r.mueble_nombre">—</span></td>
-                  <td>{{ r.nombre }}</td><td class="muted">{{ r.observaciones || '—' }}</td>
+                  <td>{{ r.nombre }}</td>
+                  <td class="muted">{{ r.nombre_proveedor || '—' }}</td>
+                  <td class="muted">{{ r.observaciones || '—' }}</td>
                   <td class="right">{{ formatCOP(r.precio_unitario) }}</td>
                   <td class="center">{{ r.cantidad }}</td>
                   <td class="right total-cell">{{ formatCOP(r.valor_total) }}</td>

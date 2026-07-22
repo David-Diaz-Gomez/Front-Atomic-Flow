@@ -9,9 +9,10 @@ import { CoordHome }          from './home/home';
 import { CoordProjectDetail } from './project-detail/project-detail';
 import { CoordGantt }         from './gantt/gantt';
 import { CoordEvidences }     from './evidences/evidences';
+import { CoordEstadosCompra } from './estados-compra/estados-compra';
 
 @NgModule({
-  declarations: [CoordHome, CoordProjectDetail, CoordGantt, CoordEvidences],
+  declarations: [CoordHome, CoordProjectDetail, CoordGantt, CoordEvidences, CoordEstadosCompra],
   imports: [CommonModule, FormsModule, RouterModule, SharedModule, CoordinatorRoutingModule],
 })
 export class CoordinatorModule {}

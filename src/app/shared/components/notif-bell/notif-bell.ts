@@ -1,4 +1,4 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { NotificationService, AppNotif } from '../../services/notification.service';
 
@@ -11,27 +11,64 @@ import { NotificationService, AppNotif } from '../../services/notification.servi
 export class NotifBellComponent {
   showPanel = false;
 
-  constructor(public notifSvc: NotificationService, private router: Router) {}
+  constructor(
+    public notifSvc: NotificationService,
+    private router: Router,
+    private cdr: ChangeDetectorRef,
+  ) {}
 
   toggle(): void { this.showPanel = !this.showPanel; }
 
-  markAll(): void { this.notifSvc.markAllRead(); this.showPanel = false; }
+  markAll(): void { this.notifSvc.markAllRead(); }
 
-  onClick(n: AppNotif): void {
+  /** Checkbox click: marca/desmarca individualmente sin navegar */
+  toggleRead(n: AppNotif, event: MouseEvent): void {
+    event.stopPropagation();
+    if (n.leida) return; // ya leída — no hacer nada al hacer click en el check
+    this.notifSvc.markRead(n.id);
+    this.cdr.detectChanges();
+  }
+
+  /** Click en el cuerpo del ítem: navega Y marca como leída solo esa */
+  navigate(n: AppNotif): void {
     this.notifSvc.markRead(n.id);
     this.showPanel = false;
-    const routes: Record<string, string> = {
-      tarea_completada:    '/dashboard/coordinator/evidences',
-      evidencia_subida:    '/dashboard/director/evidencias',
-      fase_completada:     '/dashboard/director/home',
-      proyecto_completado: '/dashboard/admin/home',
-      asignacion:          '/dashboard/superoperario/home',
-      reasignacion:        '/dashboard/superoperario/home',
-      recordatorio:        '/dashboard/superoperario/home',
-      comentario:          '/dashboard/superoperario/home',
-    };
-    const route = routes[n.tipo];
-    if (route) void this.router.navigateByUrl(route);
+
+    const pid = n.proyecto_id;
+    const role = this.roleId;
+
+    if (role === 3) {
+      if (['tarea_completada', 'tarea_en_revision', 'evidencia', 'evidencia_subida'].includes(n.tipo)) {
+        void this.router.navigateByUrl('/dashboard/coordinator/evidences');
+      } else if (['dependencia_resuelta', 'cambio_fechas', 'asignacion', 'reasignacion'].includes(n.tipo)) {
+        void this.router.navigateByUrl(pid ? `/dashboard/coordinator/project/${pid}` : '/dashboard/coordinator/home');
+      } else {
+        void this.router.navigateByUrl('/dashboard/coordinator/home');
+      }
+      return;
+    }
+
+    if (role === 2) {
+      if (['evidencia_subida', 'evidencia', 'tarea_completada', 'tarea_en_revision'].includes(n.tipo)) {
+        void this.router.navigateByUrl(pid ? `/dashboard/director/project/${pid}` : '/dashboard/director/evidencias');
+      } else if (n.tipo === 'fase_completada') {
+        void this.router.navigateByUrl(pid ? `/dashboard/director/project/${pid}` : '/dashboard/director/home');
+      } else if (n.tipo === 'proyecto_completado') {
+        void this.router.navigateByUrl('/dashboard/director/home');
+      } else {
+        void this.router.navigateByUrl('/dashboard/director/home');
+      }
+      return;
+    }
+
+    if (role === 1) { void this.router.navigateByUrl('/dashboard/admin/projects'); return; }
+
+    void this.router.navigateByUrl('/dashboard/superoperario/home');
+  }
+
+  private get roleId(): number {
+    try { return JSON.parse(localStorage.getItem('currentUser') ?? 'null')?.roleId ?? 0; }
+    catch { return 0; }
   }
 
   @HostListener('document:click', ['$event'])
@@ -42,7 +79,9 @@ export class NotifBellComponent {
   iconFor(tipo: string): string {
     const map: Record<string, string> = {
       tarea_completada:    'fa-check-circle',
+      tarea_en_revision:   'fa-eye',
       evidencia_subida:    'fa-camera',
+      evidencia:           'fa-camera',
       fase_completada:     'fa-flag-checkered',
       proyecto_completado: 'fa-trophy',
       asignacion:          'fa-user-plus',
@@ -50,6 +89,8 @@ export class NotifBellComponent {
       comentario:          'fa-comment',
       recordatorio:        'fa-clock-o',
       fase_delegada:       'fa-share-square-o',
+      dependencia_resuelta:'fa-unlock',
+      cambio_fechas:       'fa-calendar-times-o',
       sistema:             'fa-bell-o',
     };
     return map[tipo] ?? 'fa-bell-o';

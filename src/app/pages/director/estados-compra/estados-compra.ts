@@ -1,12 +1,19 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import Swal from 'sweetalert2';
 import { Api } from '../../../core/services/api';
 import { ProjectService } from '../../../shared/services/project.service';
 
+// Normaliza texto quitando tildes y pasando a minúsculas para búsqueda tolerante
+function normalizeStr(s: string): string {
+  return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+
 interface PedidoItem {
   id: number;
   id_pedido: number;
-  id_detalle_recurso: number;
+  id_detalle_recurso: number | null;
+  nombre_recurso_libre: string | null;
   cantidad: number;
   valor_unitario: number;
   observacion: string | null;
@@ -26,18 +33,20 @@ interface Pedido {
   detalle: string | null;
   id_estado_pedido: number;
   estado: string;
-  id_proyecto: number;
-  nombre_proyecto: string;
-  centro_costos: string;
-  estado_proyecto: string;
+  id_proyecto: number | null;
+  nombre_proyecto: string | null;
+  codigo_proyecto: string | null;
+  centro_costos: string | null;
+  estado_proyecto: string | null;
   items: PedidoItem[];
 }
 
 interface ProyectoGroup {
-  id_proyecto: number;
+  id_proyecto: number | null;
   nombre_proyecto: string;
-  centro_costos: string;
-  estado_proyecto: string;
+  codigo_proyecto: string | null;
+  centro_costos: string | null;
+  estado_proyecto: string | null;
   pedidos: Pedido[];
   expanded: boolean;
 }
@@ -45,10 +54,12 @@ interface ProyectoGroup {
 interface RecursoOption {
   id_detalle_recurso: number;
   nombre: string;
+  presupuesto: number;  // precio_unitario × cantidad del presupuesto del proyecto
 }
 
 interface FormItem {
   id_detalle_recurso: number | null;
+  nombre_recurso_libre: string;
   cantidad: number | null;
   valor_unitario: number | null;
   observacion: string;
@@ -105,6 +116,7 @@ export class EstadosCompra implements OnInit {
   allPedidos: Pedido[] = [];
   grupos: ProyectoGroup[] = [];
   gruposFiltrados: ProyectoGroup[] = [];
+  borradores: Pedido[] = [];
 
   loading = true;
   filterSearch = '';
@@ -143,6 +155,37 @@ export class EstadosCompra implements OnInit {
     fecha_compra: '',
   };
 
+  // ── Confirmar borrador ────────────────────────────────────────────────────
+  showConfirmBorradorModal = false;
+  confirmingBorrador: Pedido | null = null;
+  confirmingBorrador$ = false;
+  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '', valor_aprobado_unitario: 0 };
+
+  // ── Estado badge menú ─────────────────────────────────────────────────────
+  openEstadoMenuId: number | null = null;
+
+  // ── Modal Nuevo Recurso (solicitud) ───────────────────────────────────────
+  showNuevoRecursoModal = false;
+  savingNuevoRecurso = false;
+  nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null as number | null, cantidad: null as number | null, observaciones: '', id_mueble: null as number | null };
+  nuevoRecursoSubmitted = false;
+  muebles: any[] = [];
+  loadingMuebles = false;
+
+  // ── Filtro rápido por proyecto ────────────────────────────────────────────
+  filterProyectoId: string = '';  // '' = todos
+  proyectosDisponibles: { key: string; label: string }[] = [];
+
+  // ── Paginación UI (client-side sobre grupos) ──────────────────────────────
+  uiPageSize = 8;
+  uiPage = 0;
+  get uiTotalPages(): number { return Math.ceil(this.gruposFiltrados.length / this.uiPageSize); }
+  get gruposPaginados(): ProyectoGroup[] {
+    return this.gruposFiltrados.slice(this.uiPage * this.uiPageSize, (this.uiPage + 1) * this.uiPageSize);
+  }
+  prevUiPage(): void { if (this.uiPage > 0) { this.uiPage--; this.cdr.detectChanges(); } }
+  nextUiPage(): void { if (this.uiPage < this.uiTotalPages - 1) { this.uiPage++; this.cdr.detectChanges(); } }
+
   proyectos: any[] = [];
   proyectosFiltrados: any[] = [];
   proyectoSearch = '';
@@ -150,6 +193,14 @@ export class EstadosCompra implements OnInit {
 
   recursos: RecursoOption[] = [];
   loadingRecursos = false;
+
+  // Proveedores existentes para autocomplete
+  proveedores: string[] = [];
+  proveedoresFiltrados: string[] = [];
+  showProveedorDropdown = false;
+
+  // "Sin proyecto": items con nombre libre
+  sinProyecto = false;
 
   form = {
     id_proyecto:     null as number | null,
@@ -198,7 +249,7 @@ export class EstadosCompra implements OnInit {
     const f = this.form;
     const e: Record<string, string> = {};
 
-    if (!f.id_proyecto)
+    if (!this.sinProyecto && !f.id_proyecto)
       e['proyecto'] = 'Selecciona un proyecto';
     if (!f.proveedor.trim())
       e['proveedor'] = 'El proveedor es obligatorio';
@@ -212,9 +263,16 @@ export class EstadosCompra implements OnInit {
       e['items'] = 'Agrega al menos un recurso al pedido';
 
     f.items.forEach((item, i) => {
-      if (!item.id_detalle_recurso)        e[`item_r_${i}`] = 'Selecciona un recurso';
+      if (this.sinProyecto) {
+        if (!item.nombre_recurso_libre?.trim()) e[`item_r_${i}`] = 'Nombre del recurso requerido';
+      } else {
+        if (!item.id_detalle_recurso) e[`item_r_${i}`] = 'Selecciona un recurso';
+      }
       if (!item.cantidad || item.cantidad <= 0) e[`item_c_${i}`] = 'Cantidad requerida';
       if (item.valor_unitario === null || item.valor_unitario < 0) e[`item_v_${i}`] = 'Valor inválido';
+      // Observación obligatoria cuando supera el presupuesto
+      if (!this.sinProyecto && this.itemExcede(item) && !item.observacion?.trim())
+        e[`item_o_${i}`] = 'Justifica por qué se supera el presupuesto';
     });
 
     f.extras.forEach((ex, i) => {
@@ -229,21 +287,38 @@ export class EstadosCompra implements OnInit {
     return Object.keys(this.formErrors).length === 0;
   }
 
+  // Recurso pre-seleccionado al navegar desde project-detail
+  private _pendingRecurso: { id_detalle_recurso: number; nombre: string; nombre_proveedor?: string | null; precio_unitario: number; cantidad: number } | null = null;
+
   constructor(
     private api: Api,
     private projectSvc: ProjectService,
+    private route: ActivatedRoute,
+    private router: Router,
     private cdr: ChangeDetectorRef
-  ) {}
+  ) {
+    // navigation state solo está disponible en el constructor
+    const nav = this.router.getCurrentNavigation();
+    this._pendingRecurso = nav?.extras?.state?.['recurso'] ?? null;
+  }
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    this.load();
+    const proyectoId = this.route.snapshot.queryParamMap.get('abrirPedido');
+    if (proyectoId) {
+      this.openModal(Number(proyectoId));
+    }
+  }
 
   load(): void {
     this.loading = true;
     this.api.getPedidos(this.page).subscribe({
       next: (res: any) => {
-        this.allPedidos = res.data ?? [];
-        this.total      = res.total ?? 0;
-        this.totalPages = res.totalPages ?? 1;
+        const todos: Pedido[] = res.data ?? [];
+        this.borradores  = todos.filter(p => p.id_estado_pedido === 6);
+        this.allPedidos  = todos.filter(p => p.id_estado_pedido !== 6);
+        this.total       = res.total ?? 0;
+        this.totalPages  = res.totalPages ?? 1;
         this.buildGroups();
         this.loading = false;
         this.cdr.detectChanges();
@@ -257,40 +332,57 @@ export class EstadosCompra implements OnInit {
   }
 
   buildGroups(): void {
-    const map = new Map<number, ProyectoGroup>();
+    const map = new Map<number | null, ProyectoGroup>();
     for (const p of this.allPedidos) {
-      if (!map.has(p.id_proyecto)) {
-        map.set(p.id_proyecto, {
-          id_proyecto:     p.id_proyecto,
-          nombre_proyecto: p.nombre_proyecto,
-          centro_costos:   p.centro_costos,
-          estado_proyecto: p.estado_proyecto,
+      const key = p.id_proyecto ?? null;
+      if (!map.has(key)) {
+        map.set(key, {
+          id_proyecto:     key,
+          nombre_proyecto: p.nombre_proyecto ?? 'Sin Proyecto',
+          codigo_proyecto: p.codigo_proyecto ?? null,
+          centro_costos:   p.centro_costos ?? null,
+          estado_proyecto: p.estado_proyecto ?? null,
           pedidos:         [],
           expanded:        true,
         });
       }
-      map.get(p.id_proyecto)!.pedidos.push(p);
+      map.get(key)!.pedidos.push(p);
     }
     this.grupos = Array.from(map.values());
+
+    // Construir lista para el filtro rápido de proyecto
+    this.proyectosDisponibles = this.grupos.map(g => ({
+      key: g.id_proyecto === null ? 'null' : String(g.id_proyecto),
+      label: g.codigo_proyecto ? `#${g.codigo_proyecto} ${g.nombre_proyecto}` : g.nombre_proyecto,
+    }));
+
     this.applyFilters();
   }
 
   applyFilters(): void {
-    const search = this.filterSearch.toLowerCase().trim();
+    const q = normalizeStr(this.filterSearch);
     const estado = this.filterEstado;
+    const proyId = this.filterProyectoId;
 
     this.gruposFiltrados = this.grupos
+      .filter(g => {
+        if (!proyId) return true;
+        const gKey = g.id_proyecto === null ? 'null' : String(g.id_proyecto);
+        return gKey === proyId;
+      })
       .map(g => {
         const pedidos = g.pedidos.filter(p => {
           const matchEstado = estado
             ? String(p.id_estado_pedido) === estado
             : p.id_estado_pedido !== 5;
 
-          const matchSearch = !search ||
-            p.nombre_proyecto.toLowerCase().includes(search) ||
-            p.proveedor.toLowerCase().includes(search) ||
-            (p.detalle ?? '').toLowerCase().includes(search) ||
-            p.items.some(i => i.nombre_recurso.toLowerCase().includes(search));
+          const matchSearch = !q ||
+            normalizeStr(p.nombre_proyecto ?? '').includes(q) ||
+            normalizeStr(p.codigo_proyecto ?? '').includes(q) ||
+            normalizeStr(p.centro_costos ?? '').includes(q) ||
+            normalizeStr(p.proveedor ?? '').includes(q) ||
+            normalizeStr(p.detalle ?? '').includes(q) ||
+            p.items.some(i => normalizeStr(i.nombre_recurso).includes(q));
 
           return matchEstado && matchSearch;
         });
@@ -298,6 +390,7 @@ export class EstadosCompra implements OnInit {
       })
       .filter(g => g.pedidos.length > 0);
 
+    this.uiPage = 0;
     this.cdr.detectChanges();
   }
 
@@ -314,12 +407,13 @@ export class EstadosCompra implements OnInit {
 
   // ── Modal crear ───────────────────────────────────────────────────────────
 
-  openModal(): void {
+  openModal(preProyectoId?: number | null): void {
     this.submitted = false;
+    this.sinProyecto = false;
     this.form = {
-      id_proyecto: null,
-      proveedor: '',
-      fecha_solicitud: '',
+      id_proyecto: preProyectoId ?? null,
+      proveedor: this._pendingRecurso?.nombre_proveedor ?? '',
+      fecha_solicitud: new Date().toISOString().split('T')[0],
       fecha_requerida: '',
       detalle: '',
       items: [],
@@ -328,6 +422,7 @@ export class EstadosCompra implements OnInit {
     this.recursos = [];
     this.proyectoSearch = '';
     this.showProyectoDropdown = false;
+    this.showProveedorDropdown = false;
     this.showModal = true;
 
     if (!this.proyectos.length) {
@@ -335,21 +430,71 @@ export class EstadosCompra implements OnInit {
         next: r => {
           this.proyectos = r.data ?? [];
           this.proyectosFiltrados = this.proyectos;
+          if (preProyectoId) {
+            const proy = this.proyectos.find(p => p.id === preProyectoId);
+            if (proy) {
+              this.proyectoSearch = this.proyectoLabel(proy);
+              this.onProyectoChange();
+            }
+          }
           this.cdr.detectChanges();
         },
         error: () => {},
       });
     } else {
       this.proyectosFiltrados = this.proyectos;
+      if (preProyectoId) {
+        const proy = this.proyectos.find(p => p.id === preProyectoId);
+        if (proy) { this.proyectoSearch = this.proyectoLabel(proy); this.onProyectoChange(); }
+      }
     }
+
+    if (!this.proveedores.length) {
+      this.api.getProveedoresPedido().subscribe({
+        next: list => { this.proveedores = list; this.cdr.detectChanges(); },
+        error: () => {},
+      });
+    }
+  }
+
+  proyectoLabel(p: any): string {
+    return p.codigo ? `#${p.codigo} ${p.nombre}` : p.nombre;
+  }
+
+  toggleSinProyecto(): void {
+    this.sinProyecto = !this.sinProyecto;
+    this.form.id_proyecto = null;
+    this.proyectoSearch = '';
+    this.recursos = [];
+    this.form.items = [{ id_detalle_recurso: null, nombre_recurso_libre: '', cantidad: null, valor_unitario: null, observacion: '' }];
+    this.cdr.detectChanges();
+  }
+
+  onProveedorInput(): void {
+    const q = normalizeStr(this.form.proveedor);
+    this.proveedoresFiltrados = q
+      ? this.proveedores.filter(p => normalizeStr(p).includes(q))
+      : this.proveedores;
+    this.showProveedorDropdown = !!this.proveedoresFiltrados.length;
+    this.cdr.detectChanges();
+  }
+
+  selectProveedor(p: string): void {
+    this.form.proveedor = p;
+    this.showProveedorDropdown = false;
+    this.cdr.detectChanges();
+  }
+
+  blurProveedor(): void {
+    setTimeout(() => { this.showProveedorDropdown = false; this.cdr.detectChanges(); }, 150);
   }
 
   closeModal(): void { this.showModal = false; }
 
   onProyectoSearchInput(): void {
-    const q = this.proyectoSearch.toLowerCase().trim();
+    const q = normalizeStr(this.proyectoSearch);
     this.proyectosFiltrados = q
-      ? this.proyectos.filter(p => p.nombre.toLowerCase().includes(q))
+      ? this.proyectos.filter(p => normalizeStr(this.proyectoLabel(p)).includes(q) || normalizeStr(p.centro_costos ?? '').includes(q))
       : this.proyectos;
     this.showProyectoDropdown = true;
     this.cdr.detectChanges();
@@ -357,7 +502,7 @@ export class EstadosCompra implements OnInit {
 
   selectProyecto(p: any): void {
     this.form.id_proyecto = p.id;
-    this.proyectoSearch   = p.nombre;
+    this.proyectoSearch   = this.proyectoLabel(p);
     this.showProyectoDropdown = false;
     this.onProyectoChange();
   }
@@ -378,10 +523,28 @@ export class EstadosCompra implements OnInit {
           const obs = r.observaciones;
           const esJson = obs ? (() => { try { JSON.parse(obs); return true; } catch { return false; } })() : false;
           const label = obs && !esJson ? `${r.nombre_recurso} — ${obs}` : r.nombre_recurso;
-          return { id_detalle_recurso: r.id_detalle_recurso, nombre: label };
+          return {
+            id_detalle_recurso: r.id_detalle_recurso,
+            nombre: label,
+            presupuesto: Number(r.precio_unitario ?? 0) * Number(r.cantidad ?? 0),
+          };
         });
         this.loadingRecursos = false;
-        this.addItem();
+
+        const pr = this._pendingRecurso;
+        if (pr) {
+          // Pre-seleccionar el recurso específico con sus cantidades/precio del presupuesto
+          this.form.items = [{
+            id_detalle_recurso: pr.id_detalle_recurso,
+            nombre_recurso_libre: '',
+            cantidad: pr.cantidad,
+            valor_unitario: pr.precio_unitario,
+            observacion: '',
+          }];
+          this._pendingRecurso = null;
+        } else {
+          this.addItem();
+        }
         this.cdr.detectChanges();
       },
       error: () => { this.loadingRecursos = false; this.cdr.detectChanges(); },
@@ -391,7 +554,7 @@ export class EstadosCompra implements OnInit {
   // ── Items ────────────────────────────────────────────────────────────────
 
   addItem(): void {
-    this.form.items.push({ id_detalle_recurso: null, cantidad: null, valor_unitario: null, observacion: '' });
+    this.form.items.push({ id_detalle_recurso: null, nombre_recurso_libre: '', cantidad: null, valor_unitario: null, observacion: '' });
     this.cdr.detectChanges();
   }
 
@@ -424,10 +587,11 @@ export class EstadosCompra implements OnInit {
       valor:           this.calculatedValor,
       detalle:         [f.detalle, this.autoDetalle].filter(s => s && s.trim()).join(' | ') || null,
       items: f.items.map(i => ({
-        id_detalle_recurso: i.id_detalle_recurso!,
-        cantidad:           i.cantidad!,
-        valor_unitario:     i.valor_unitario!,
-        observacion:        i.observacion || null,
+        id_detalle_recurso:  this.sinProyecto ? null : i.id_detalle_recurso,
+        nombre_recurso_libre: this.sinProyecto ? (i.nombre_recurso_libre || null) : null,
+        cantidad:            i.cantidad!,
+        valor_unitario:      i.valor_unitario!,
+        observacion:         i.observacion || null,
       })),
     }).subscribe({
       next: () => {
@@ -588,6 +752,57 @@ export class EstadosCompra implements OnInit {
     });
   }
 
+  // ── Confirmar borrador ────────────────────────────────────────────────────
+  openConfirmBorrador(b: Pedido): void {
+    this.confirmingBorrador = b;
+    const cantTotal = b.cantidad_solicitada || 1;
+    const aprobado = b.valor > 0 ? Math.round(b.valor / cantTotal) : 0;
+    this.confirmBorradorForm = {
+      proveedor:      b.proveedor !== 'Pendiente' ? b.proveedor : '',
+      valor_unitario: aprobado,
+      cantidad:       cantTotal,
+      fecha_requerida: b.fecha_requerida ? b.fecha_requerida.substring(0, 10) : '',
+      valor_aprobado_unitario: aprobado,
+    };
+    this.showConfirmBorradorModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeConfirmBorrador(): void {
+    this.showConfirmBorradorModal = false;
+    this.confirmingBorrador = null;
+  }
+
+  submitConfirmBorrador(): void {
+    if (!this.confirmingBorrador) return;
+    const f = this.confirmBorradorForm;
+    if (!f.proveedor.trim() || !f.fecha_requerida || f.valor_unitario <= 0) {
+      this.cdr.detectChanges();
+      return;
+    }
+    if (f.valor_aprobado_unitario > 0 && f.valor_unitario > f.valor_aprobado_unitario) {
+      this.cdr.detectChanges();
+      return;
+    }
+    this.confirmingBorrador$ = true;
+    const valor = f.valor_unitario * f.cantidad;
+    this.api.updatePedido(this.confirmingBorrador.id, {
+      proveedor:       f.proveedor.trim(),
+      valor,
+      fecha_requerida: f.fecha_requerida,
+      id_estado_pedido: 4,
+    }).subscribe({
+      next: () => {
+        this.confirmingBorrador$ = false;
+        this.showConfirmBorradorModal = false;
+        this.confirmingBorrador = null;
+        this.load();
+        this.cdr.detectChanges();
+      },
+      error: () => { this.confirmingBorrador$ = false; this.cdr.detectChanges(); },
+    });
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private dateToInt(dateStr: string): number {
@@ -635,7 +850,131 @@ export class EstadosCompra implements OnInit {
     return `${item.nombre_recurso} — ${obs}`;
   }
 
-  estadoProyectoLabel(e: string): string {
+  estadoProyectoLabel(e: string | null): string {
+    if (!e) return '';
     return ({ en_produccion: 'En Producción', en_revision: 'En Revisión', aprobado: 'Aprobado', completado: 'Completado', borrador: 'Borrador' } as any)[e] ?? e;
+  }
+
+  // ── Presupuesto helpers ───────────────────────────────────────────────────
+
+  getPresupuesto(idDetalleRecurso: number | null): number {
+    if (!idDetalleRecurso) return 0;
+    return this.recursos.find(r => r.id_detalle_recurso === idDetalleRecurso)?.presupuesto ?? 0;
+  }
+
+  itemTotal(item: FormItem): number {
+    return (Number(item.cantidad) || 0) * (Number(item.valor_unitario) || 0);
+  }
+
+  itemExcede(item: FormItem): boolean {
+    const pres = this.getPresupuesto(item.id_detalle_recurso);
+    if (!pres) return false;
+    return this.itemTotal(item) > pres;
+  }
+
+  // ── Modal Nuevo Recurso ───────────────────────────────────────────────────
+
+  openNuevoRecursoModal(): void {
+    this.nuevoRecursoForm = { nombre: '', tipo_recurso: 'materia_prima', precio_unitario: null, cantidad: null, observaciones: '', id_mueble: null };
+    this.nuevoRecursoSubmitted = false;
+    this.showNuevoRecursoModal = true;
+    this.muebles = [];
+    if (this.form.id_proyecto) {
+      this.loadingMuebles = true;
+      this.projectSvc.getProjectMuebles(this.form.id_proyecto).subscribe({
+        next: (list: any[]) => { this.muebles = list ?? []; this.loadingMuebles = false; this.cdr.detectChanges(); },
+        error: () => { this.loadingMuebles = false; },
+      });
+    }
+    this.cdr.detectChanges();
+  }
+
+  closeNuevoRecursoModal(): void {
+    this.showNuevoRecursoModal = false;
+  }
+
+  submitNuevoRecurso(): void {
+    this.nuevoRecursoSubmitted = true;
+    const f = this.nuevoRecursoForm;
+    if (!f.nombre.trim() || !f.precio_unitario || !f.cantidad) {
+      this.cdr.detectChanges();
+      return;
+    }
+    if (!this.form.id_proyecto && !this.sinProyecto) return;
+
+    this.savingNuevoRecurso = true;
+
+    // Primero guardamos el pedido como borrador para tener su id
+    const hoy = new Date().toISOString().split('T')[0];
+    const pedidoBody: any = {
+      fecha_solicitud: this.dateToInt(this.form.fecha_solicitud || hoy),
+      fecha_requerida: this.form.fecha_requerida || hoy,
+      proveedor: this.form.proveedor || 'Pendiente',
+      valor: (f.precio_unitario ?? 0) * (f.cantidad ?? 1),
+      id_estado_pedido: 6,  // Borrador
+      items: [{ nombre_recurso_libre: f.nombre, cantidad: f.cantidad!, valor_unitario: f.precio_unitario!, id_detalle_recurso: null }],
+    };
+
+    this.api.createPedido(pedidoBody).subscribe({
+      next: (pedidoRes: any) => {
+        const idPedido = pedidoRes?.id ?? pedidoRes?.data?.id;
+        this.api.createSolicitudRecurso(this.form.id_proyecto!, {
+          nombre: f.nombre.trim(),
+          tipo_recurso: f.tipo_recurso,
+          precio_unitario: f.precio_unitario!,
+          cantidad: f.cantidad!,
+          observaciones: f.observaciones || undefined,
+          id_pedido: idPedido ?? null,
+          id_mueble: f.id_mueble ?? null,
+        }).subscribe({
+          next: () => {
+            this.savingNuevoRecurso = false;
+            this.showNuevoRecursoModal = false;
+            this.closeModal();
+            this.load();
+            Swal.fire({
+              icon: 'info', title: 'Solicitud enviada',
+              text: 'El pedido quedó como Borrador hasta que se apruebe el recurso en "Mi Proyecto".',
+              confirmButtonColor: '#0052cc',
+            });
+          },
+          error: () => { this.savingNuevoRecurso = false; this.cdr.detectChanges(); },
+        });
+      },
+      error: () => { this.savingNuevoRecurso = false; this.cdr.detectChanges(); },
+    });
+  }
+
+  // ── Estado menú ───────────────────────────────────────────────────────────
+
+  toggleEstadoMenu(pedidoId: number, event: MouseEvent): void {
+    event.stopPropagation();
+    this.openEstadoMenuId = this.openEstadoMenuId === pedidoId ? null : pedidoId;
+    this.cdr.detectChanges();
+  }
+
+  closeEstadoMenus(): void {
+    this.openEstadoMenuId = null;
+    this.cdr.detectChanges();
+  }
+
+  getEstadoTransitions(currentId: number): { id: number; label: string }[] {
+    const all = [
+      { id: 4, label: 'Solicitud Pedido' },
+      { id: 1, label: 'Compra Realizada' },
+      { id: 3, label: 'En Bodega Incompleto' },
+      { id: 2, label: 'En Bodega Completo' },
+      { id: 5, label: 'Inhabilitado' },
+    ];
+    return all.filter(s => s.id !== currentId);
+  }
+
+  changeEstado(pedido: Pedido, newEstadoId: number, event: MouseEvent): void {
+    event.stopPropagation();
+    this.openEstadoMenuId = null;
+    this.api.updateEstadoPedido(pedido.id, newEstadoId).subscribe({
+      next: () => { this.load(); },
+      error: () => {},
+    });
   }
 }

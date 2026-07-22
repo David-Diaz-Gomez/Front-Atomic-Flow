@@ -2,7 +2,7 @@
 
   <div class="ev-header">
     <h1><i class="fa fa-camera"></i> Evidencias</h1>
-    <span class="ev-sub">Tareas completadas por operarios esperando evidencia</span>
+    <span class="ev-sub">Tareas que requieren verificación o evidencia fotográfica</span>
   </div>
 
   <div class="ev-loading" *ngIf="loading">
@@ -21,18 +21,28 @@
       </div>
       <div class="ev-card__body">
         <span class="ev-card__name">{{ t.nombre }}</span>
+        <span class="ev-card__estado" [class.ev-estado--revision]="t.estado === 'en_revision'"
+              [class.ev-estado--done]="t.estado === 'completada'">
+          <i class="fa" [ngClass]="t.estado === 'en_revision' ? 'fa-hourglass-half' : 'fa-check-circle'"></i>
+          {{ estadoLabel(t.estado) }}
+        </span>
         <span class="ev-card__meta">
           <i class="fa fa-briefcase"></i> {{ t.proyecto }} &nbsp;·&nbsp;
           <i class="fa fa-sitemap"></i> {{ t.fase }}
         </span>
         <span class="ev-card__op">
           <i class="fa fa-user"></i> {{ t.operario ?? operarioNombre(t.id_operario) }}
-          completó a las <strong>{{ formatDateTime(t.completado_en) }}</strong>
+          <ng-container *ngIf="t.completado_en"> · marcó a las <strong>{{ formatDateTime(t.completado_en) }}</strong></ng-container>
         </span>
       </div>
       <div class="ev-card__actions">
+        <button class="btn-verificar" (click)="verificarTarea(t)"
+                *ngIf="t.estado === 'en_revision'"
+                title="Verificar sin subir evidencia">
+          <i class="fa fa-check-circle"></i> Verificar
+        </button>
         <button class="btn-evidencia" (click)="openEvidModal(t)">
-          <i class="fa fa-camera"></i> Subir evidencias
+          <i class="fa fa-camera"></i> {{ t.estado === 'en_revision' ? 'Evidencia + Verificar' : 'Subir evidencias' }}
         </button>
         <button class="btn-reasignar" (click)="openReasignModal(t)">
           <i class="fa fa-refresh"></i> Reasignar
@@ -81,7 +91,15 @@
     </div>
     <div class="ev-modal__footer">
       <button class="btn-cancel" (click)="closeEvidModal()">Cancelar</button>
+      <button class="btn-verificar-solo" (click)="subirYVerificar()"
+              *ngIf="evidTarea?.estado === 'en_revision'"
+              [disabled]="evidSaving"
+              title="Verificar y completar (sube evidencia si hay archivos seleccionados)">
+        <i class="fa fa-check-circle"></i>
+        {{ selectedFiles.length ? 'Subir evidencia y verificar' : 'Verificar sin evidencia' }}
+      </button>
       <button class="btn-primary" (click)="subirEvidencias()"
+              *ngIf="evidTarea?.estado !== 'en_revision'"
               [disabled]="!selectedFiles.length || evidSaving">
         <i class="fa fa-upload"></i>
         {{ evidSaving ? 'Subiendo...' : 'Subir ' + selectedFiles.length + ' foto(s)' }}
