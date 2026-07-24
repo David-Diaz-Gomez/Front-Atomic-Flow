@@ -159,7 +159,7 @@ export class EstadosCompra implements OnInit {
   showConfirmBorradorModal = false;
   confirmingBorrador: Pedido | null = null;
   confirmingBorrador$ = false;
-  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '', valor_aprobado_unitario: 0 };
+  confirmBorradorForm = { proveedor: '', valor_unitario: 0, cantidad: 0, fecha_requerida: '', valor_aprobado_unitario: 0, observacion: '' };
 
   // ── Estado badge menú ─────────────────────────────────────────────────────
   openEstadoMenuId: number | null = null;
@@ -755,14 +755,14 @@ export class EstadosCompra implements OnInit {
   // ── Confirmar borrador ────────────────────────────────────────────────────
   openConfirmBorrador(b: Pedido): void {
     this.confirmingBorrador = b;
-    const cantTotal = b.cantidad_solicitada || 1;
-    const aprobado = b.valor > 0 ? Math.round(b.valor / cantTotal) : 0;
+    const aprobado = b.items?.[0]?.valor_unitario ?? 0;
     this.confirmBorradorForm = {
-      proveedor:      b.proveedor !== 'Pendiente' ? b.proveedor : '',
-      valor_unitario: aprobado,
-      cantidad:       cantTotal,
-      fecha_requerida: b.fecha_requerida ? b.fecha_requerida.substring(0, 10) : '',
+      proveedor:               b.proveedor !== 'Pendiente' ? b.proveedor : '',
+      valor_unitario:          aprobado,
+      cantidad:                b.cantidad_solicitada || 1,
+      fecha_requerida:         b.fecha_requerida ? b.fecha_requerida.substring(0, 10) : '',
       valor_aprobado_unitario: aprobado,
+      observacion:             '',
     };
     this.showConfirmBorradorModal = true;
     this.cdr.detectChanges();
@@ -773,6 +773,12 @@ export class EstadosCompra implements OnInit {
     this.confirmingBorrador = null;
   }
 
+  get confirmBorradorExcede(): boolean {
+    const f = this.confirmBorradorForm;
+    if (!f.valor_aprobado_unitario) return false;
+    return (f.valor_unitario * f.cantidad) > (f.valor_aprobado_unitario * (this.confirmingBorrador?.cantidad_solicitada || 1));
+  }
+
   submitConfirmBorrador(): void {
     if (!this.confirmingBorrador) return;
     const f = this.confirmBorradorForm;
@@ -780,17 +786,19 @@ export class EstadosCompra implements OnInit {
       this.cdr.detectChanges();
       return;
     }
-    if (f.valor_aprobado_unitario > 0 && f.valor_unitario > f.valor_aprobado_unitario) {
+    if (this.confirmBorradorExcede && !f.observacion.trim()) {
       this.cdr.detectChanges();
       return;
     }
     this.confirmingBorrador$ = true;
     const valor = f.valor_unitario * f.cantidad;
     this.api.updatePedido(this.confirmingBorrador.id, {
-      proveedor:       f.proveedor.trim(),
+      proveedor:          f.proveedor.trim(),
       valor,
-      fecha_requerida: f.fecha_requerida,
-      id_estado_pedido: 4,
+      cantidad_solicitada: f.cantidad,
+      fecha_requerida:    f.fecha_requerida,
+      detalle:            f.observacion.trim() || null,
+      id_estado_pedido:   4,
     }).subscribe({
       next: () => {
         this.confirmingBorrador$ = false;

@@ -288,7 +288,7 @@ export class Api {
     );
   }
 
-  updatePedido(id: number, body: { fecha_compra?: string | null; id_estado_pedido?: number; proveedor?: string; valor?: number; fecha_requerida?: string }): Observable<any> {
+  updatePedido(id: number, body: { fecha_compra?: string | null; id_estado_pedido?: number; proveedor?: string; valor?: number; fecha_requerida?: string; detalle?: string | null; cantidad_solicitada?: number }): Observable<any> {
     return this.http.put<any>(`${this.baseUrl}/pedidos/${id}`, body).pipe(
       tap(() => Swal.fire({ icon: 'success', title: '¡Pedido actualizado!', timer: 1500, showConfirmButton: false })),
       catchError(err => { this.notifyError('No se pudo actualizar el pedido.'); return throwError(() => err); })
