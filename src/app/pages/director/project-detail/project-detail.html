@@ -192,8 +192,27 @@
                     <i class="fa fa-cog"></i> Automático
                   </span>
                 </div>
+                <!-- Chips removibles: solo admin, para poder quitar sin abrir el panel -->
+                <div class="assign-chips" *ngIf="isAdmin && (t.operarios?.length || t.maquinarias?.length)">
+                  <span class="achip achip-op" *ngFor="let op of t.operarios">
+                    <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
+                    <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
+                    <button class="achip-rm" (click)="removeOperario(t, op.id)"><i class="fa fa-times"></i></button>
+                  </span>
+                  <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
+                    <i class="fa fa-cog"></i> {{ m.nombre }}
+                    <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
+                    <button class="achip-rm" (click)="removeMaquina(t, m.id)"><i class="fa fa-times"></i></button>
+                  </span>
+                </div>
               </div>
               <span class="task-badge" [ngClass]="getTareaBadgeClass(t)" [title]="getTareaTooltip(t)">{{ getTareaBadgeLabel(t) }}</span>
+              <div class="task-actions" *ngIf="isAdmin && t.estado !== 'completada'">
+                <button class="btn-task-assign" (click)="openAssign(t, fase)" [disabled]="t.bloqueada_por_movimiento"
+                        [title]="t.bloqueada_por_movimiento ? 'Reprograma las fechas de esta tarea antes de asignar recursos' : 'Asignar operarios, maquinaria e insumos'">
+                  <i class="fa fa-plus"></i> Asignar
+                </button>
+              </div>
               <div class="task-actions" *ngIf="canManagePhases && (t.estado === 'pendiente' || t.estado === 'asignada' || t.estado === 'bloqueada')">
                 <button class="btn-task-action" (click)="openEditTask(fase, t)" title="Editar tarea">
                   <i class="fa fa-pencil"></i>
@@ -603,6 +622,405 @@
       <button class="btn-qo-submit" (click)="submitQuickOrder()" [disabled]="quickOrderSaving">
         <i class="fa fa-paper-plane"></i> {{ quickOrderSaving ? 'Enviando...' : 'Registrar pedido' }}
       </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PANEL LATERAL: Asignación de recursos (solo admin) ═══════════════════ -->
+<div class="assign-overlay" *ngIf="showAssignPanel" (click)="closeAssign()">
+  <div class="assign-panel" (click)="$event.stopPropagation()">
+
+    <div class="assign-header">
+      <div>
+        <h3>Asignar recursos</h3>
+        <p class="assign-task-name"><i class="fa fa-tasks"></i> {{ assignTask?.nombre }}</p>
+        <p class="assign-task-dates"><i class="fa fa-calendar"></i> {{ formatDate(assignTask?.fecha_inicio??'') }} — {{ formatDate(assignTask?.fecha_fin??'') }}</p>
+      </div>
+      <button class="panel-close" (click)="closeAssign()"><i class="fa fa-times"></i></button>
+    </div>
+
+    <div class="panel-tabs">
+      <button [class.active]="assignTab==='operario'"   (click)="assignTab='operario'"><i class="fa fa-user"></i> Operarios</button>
+      <button [class.active]="assignTab==='maquinaria'" (click)="assignTab='maquinaria'"><i class="fa fa-cog"></i> Maquinaria</button>
+      <button [class.active]="assignTab==='insumos'"    (click)="assignTab='insumos'"><i class="fa fa-cube"></i> Insumos</button>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- ── TAB: OPERARIOS ────────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='operario'">
+
+        <div class="current-assigns" *ngIf="assignTask?.operarios?.length">
+          <h4 class="section-mini-title">Operarios ya asignados</h4>
+          <div class="assign-chips">
+            <span class="achip achip-op" *ngFor="let op of assignTask!.operarios">
+              <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }} ({{ op.hora_inicio }}–{{ op.hora_fin }})
+            </span>
+          </div>
+        </div>
+
+        <div class="avail-section">
+          <h4 class="section-mini-title">
+            <i class="fa fa-calendar"></i> Disponibilidad de operarios
+            <span class="legend-row">
+              <span class="leg-own"></span> Este proy.
+              <span class="leg-busy"></span> Otro proy.
+              <span class="leg-queued"></span> En cola
+              <span class="leg-prop"></span> Propuesta
+              <span class="leg-conflict"></span> Conflicto
+            </span>
+          </h4>
+          <div class="avail-scroll">
+            <table class="avail-table">
+              <thead>
+                <tr>
+                  <th class="avail-op-col">Operario</th>
+                  <th class="avail-day-col" *ngFor="let d of taskDays">
+                    {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let op of operarios">
+                  <td class="avail-op-cell">
+                    <div class="op-select-row">
+                      <span class="op-name">{{ op.nombre }} {{ op.apellido }}</span>
+                      <button class="btn-select-op" [class.selected]="opForm.operario_id===op.id"
+                              (click)="opForm.operario_id=op.id; onOperarioOrHoursChange()">
+                        {{ opForm.operario_id===op.id ? 'Elegido' : 'Elegir' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="avail-timeline-cell" *ngFor="let d of taskDays">
+                    <div class="timeline-track" (click)="openCellModal('op', op, toStr(d))">
+                      <div class="hour-tick" *ngFor="let h of HOURS"
+                           [style.left.%]="((h - DAY_START) / DAY_H) * 100">
+                      </div>
+                      <div class="busy-block"
+                           *ngFor="let b of getBusyBlocks(op.id, toStr(d))"
+                           [ngStyle]="blockStyle(b.hi, b.hf)"
+                           [class.block-own-project]="b.ownProject"
+                           [title]="b.info">
+                      </div>
+                      <ng-container *ngIf="opForm.operario_id === op.id">
+                        <div class="pending-slot-block"
+                             *ngFor="let pb of getPendingOpBlocks(toStr(d))"
+                             [ngStyle]="blockStyle(pb.hi, pb.hf)"
+                             [style.background]="slotColor(pb.idx)"
+                             [title]="'Cola #' + (pb.idx+1) + ': ' + pendingOpSlots[pb.idx].hora_inicio + '–' + pendingOpSlots[pb.idx].hora_fin">
+                        </div>
+                      </ng-container>
+                      <div class="proposed-block"
+                           *ngIf="opForm.operario_id===op.id && isOpDateSelected(toStr(d))"
+                           [ngStyle]="proposedBlockStyle()"
+                           [class.proposed-conflict]="proposedOverlaps(op.id, toStr(d))">
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="assign-form">
+          <h4 class="section-mini-title"><i class="fa fa-plus-circle"></i> Nueva asignación</h4>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Operario *</label>
+              <select [(ngModel)]="opForm.operario_id" (ngModelChange)="onOperarioOrHoursChange()">
+                <option [ngValue]="null" disabled>Seleccionar...</option>
+                <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Hora inicio</label>
+              <input type="time" [(ngModel)]="opForm.hora_inicio" (ngModelChange)="onOperarioOrHoursChange()" min="07:00" max="18:00">
+            </div>
+            <div class="form-field">
+              <label>Hora fin</label>
+              <input type="time" [(ngModel)]="opForm.hora_fin" (ngModelChange)="onOperarioOrHoursChange()" min="07:00" max="18:00">
+            </div>
+          </div>
+          <div class="dates-pick">
+            <label>Días (dentro del rango de la tarea):</label>
+            <div class="day-chips">
+              <button class="day-chip" *ngFor="let d of taskDays"
+                      [class.chip-selected]="isOpDateSelected(toStr(d))"
+                      [class.chip-conflict]="opForm.operario_id && proposedOverlaps(opForm.operario_id, toStr(d))"
+                      (click)="toggleOpDate(toStr(d))">
+                {{ dayName(d) }} {{ dayLabel(d) }}
+                <i class="fa fa-exclamation" *ngIf="opForm.operario_id && proposedOverlaps(opForm.operario_id, toStr(d))"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="pending-slots-section" *ngIf="pendingOpSlots.length">
+            <label class="section-mini-title"><i class="fa fa-list-ul"></i> Horarios pendientes ({{ pendingOpSlots.length }})</label>
+            <div class="pending-slot-chips">
+              <div class="pending-slot-chip" *ngFor="let s of pendingOpSlots; let i = index">
+                <i class="fa fa-clock-o"></i>
+                <span>{{ s.hora_inicio }}–{{ s.hora_fin }}</span>
+                <span class="slot-days">{{ s.fechas.length }} día(s)</span>
+                <button class="slot-remove" (click)="removeOpSlot(i)"><i class="fa fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-add-slot" (click)="addOpSlot()">
+            <i class="fa fa-plus"></i> Agregar otro horario / día
+          </button>
+
+          <button class="btn-verify" (click)="checkOpConflicts()" [disabled]="opConflict==='checking' || !opForm.operario_id">
+            <i class="fa" [ngClass]="opConflict==='checking'?'fa-spinner fa-spin':'fa-shield'"></i>
+            {{ opConflict==='checking' ? 'Verificando...' : 'Verificar choques' }}
+          </button>
+          <div class="conflict-ok"   *ngIf="opConflict==='ok'"><i class="fa fa-check-circle"></i> {{ opConflictMsg }}</div>
+          <div class="conflict-warn" *ngIf="opConflict==='conflict'">
+            <i class="fa fa-exclamation-triangle"></i> {{ opConflictMsg }}
+            <ul class="conflict-list">
+              <li *ngFor="let c of opConflictDetails"><i class="fa fa-calendar-times-o"></i> {{ c.fecha }}: {{ c.info }}</li>
+            </ul>
+          </div>
+
+          <button class="btn-save-assign" (click)="saveOperario()">
+            <i class="fa fa-save"></i> Guardar todo
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── TAB: MAQUINARIA ───────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='maquinaria'">
+
+        <div class="current-assigns" *ngIf="assignTask?.maquinarias?.length">
+          <h4 class="section-mini-title">Maquinaria ya asignada</h4>
+          <div class="assign-chips">
+            <span class="achip achip-maq" *ngFor="let m of assignTask!.maquinarias">
+              <i class="fa fa-cog"></i> {{ m.nombre }} ({{ m.hora_inicio }}–{{ m.hora_fin }})
+            </span>
+          </div>
+        </div>
+
+        <div class="avail-section">
+          <h4 class="section-mini-title">
+            <i class="fa fa-calendar"></i> Disponibilidad de maquinaria
+            <span class="legend-row">
+              <span class="leg-own"></span> Este proy.
+              <span class="leg-busy"></span> Otra
+              <span class="leg-queued"></span> En cola
+              <span class="leg-prop"></span> Propuesta
+              <span class="leg-conflict"></span> Conflicto
+            </span>
+          </h4>
+          <div class="avail-scroll">
+            <table class="avail-table">
+              <thead>
+                <tr>
+                  <th class="avail-op-col">Máquina</th>
+                  <th class="avail-day-col" *ngFor="let d of taskDays">
+                    {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let maq of maquinas" [class.row-selected]="maqForm.maquinaria_id === maq.id">
+                  <td class="avail-op-cell">
+                    <div class="op-select-row">
+                      <span class="op-name">{{ maq.nombre }}</span>
+                      <button class="btn-select-op"
+                              [class.selected]="maqForm.maquinaria_id === maq.id"
+                              (click)="maqForm.maquinaria_id = maq.id">
+                        {{ maqForm.maquinaria_id === maq.id ? 'Elegida' : 'Elegir' }}
+                      </button>
+                    </div>
+                  </td>
+                  <td class="avail-timeline-cell" *ngFor="let d of taskDays">
+                    <div class="timeline-track" (click)="openCellModal('maq', maq, toStr(d))">
+                      <div class="hour-tick" *ngFor="let h of HOURS"
+                           [style.left.%]="((h - DAY_START) / DAY_H) * 100"></div>
+                      <div class="busy-block"
+                           *ngFor="let b of getMaqBusyBlocks(maq.id, toStr(d))"
+                           [ngStyle]="blockStyle(b.hi, b.hf)"
+                           [class.block-own-project]="b.ownProject"
+                           [title]="b.info">
+                      </div>
+                      <ng-container *ngIf="maqForm.maquinaria_id === maq.id">
+                        <div class="pending-slot-block"
+                             *ngFor="let pb of getPendingMaqBlocks(toStr(d))"
+                             [ngStyle]="blockStyle(pb.hi, pb.hf)"
+                             [style.background]="slotColor(pb.idx)"
+                             [title]="'Cola #' + (pb.idx+1) + ': ' + pendingMaqSlots[pb.idx].hora_inicio + '–' + pendingMaqSlots[pb.idx].hora_fin">
+                        </div>
+                      </ng-container>
+                      <div class="proposed-block"
+                           *ngIf="maqForm.maquinaria_id === maq.id && isMaqDateSelected(toStr(d))"
+                           [ngStyle]="maqProposedBlockStyle()"
+                           [class.proposed-conflict]="maqProposedOverlaps(maq.id, toStr(d))">
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="assign-form">
+          <h4 class="section-mini-title"><i class="fa fa-plus-circle"></i> Configurar asignación</h4>
+          <div class="form-row">
+            <div class="form-field">
+              <label>Maquinaria *</label>
+              <select [(ngModel)]="maqForm.maquinaria_id">
+                <option [ngValue]="null" disabled>Seleccionar...</option>
+                <option *ngFor="let m of maquinas" [ngValue]="m.id">{{ m.nombre }}</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label>Hora inicio</label>
+              <input type="time" [(ngModel)]="maqForm.hora_inicio" min="07:00" max="18:00">
+            </div>
+            <div class="form-field">
+              <label>Hora fin</label>
+              <input type="time" [(ngModel)]="maqForm.hora_fin" min="07:00" max="18:00">
+            </div>
+          </div>
+
+          <div class="dates-pick">
+            <label>Días:</label>
+            <div class="day-chips">
+              <button class="day-chip" *ngFor="let d of taskDays"
+                      [class.chip-selected]="isMaqDateSelected(toStr(d))"
+                      [class.chip-conflict]="maqForm.maquinaria_id && maqProposedOverlaps(maqForm.maquinaria_id, toStr(d))"
+                      (click)="toggleMaqDate(toStr(d))">
+                {{ dayName(d) }} {{ dayLabel(d) }}
+                <i class="fa fa-exclamation"
+                   *ngIf="maqForm.maquinaria_id && maqProposedOverlaps(maqForm.maquinaria_id, toStr(d))"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="pending-slots-section" *ngIf="pendingMaqSlots.length">
+            <label class="section-mini-title"><i class="fa fa-list-ul"></i> Horarios pendientes ({{ pendingMaqSlots.length }})</label>
+            <div class="pending-slot-chips">
+              <div class="pending-slot-chip" *ngFor="let s of pendingMaqSlots; let i = index">
+                <i class="fa fa-clock-o"></i>
+                <span>{{ s.hora_inicio }}–{{ s.hora_fin }}</span>
+                <span class="slot-days">{{ s.fechas.length }} día(s)</span>
+                <button class="slot-remove" (click)="removeMaqSlot(i)"><i class="fa fa-times"></i></button>
+              </div>
+            </div>
+          </div>
+
+          <button class="btn-add-slot" (click)="addMaqSlot()">
+            <i class="fa fa-plus"></i> Agregar otro horario / día
+          </button>
+
+          <div class="op-optional-section">
+            <h4 class="section-mini-title" style="margin-top:14px">
+              <i class="fa fa-user-o"></i> Operario que opera la máquina
+              <span class="optional-badge">Opcional</span>
+            </h4>
+            <select [(ngModel)]="maqForm.operario_id" style="width:100%;margin-bottom:8px">
+              <option [ngValue]="null">— Sin operario (proceso automático) —</option>
+              <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
+            </select>
+
+            <ng-container *ngIf="maqForm.operario_id">
+              <div class="avail-scroll" style="max-height:100px">
+                <table class="avail-table" style="min-width:unset">
+                  <thead>
+                    <tr>
+                      <th class="avail-op-col" style="width:90px">Operario</th>
+                      <th class="avail-day-col" *ngFor="let d of taskDays">
+                        {{ dayName(d) }}<br><span class="avail-day-num">{{ dayLabel(d) }}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <ng-container *ngFor="let op of operarios">
+                      <tr *ngIf="op.id === maqForm.operario_id">
+                        <td class="avail-op-cell">
+                          <span class="op-name">{{ op.nombre }}<br>{{ op.apellido }}</span>
+                        </td>
+                        <td class="avail-timeline-cell" *ngFor="let d of taskDays">
+                          <div class="timeline-track" (click)="openCellModal('op', op, toStr(d))">
+                            <div class="hour-tick" *ngFor="let h of HOURS"
+                                 [style.left.%]="((h - DAY_START) / DAY_H) * 100"></div>
+                            <div class="busy-block"
+                                 *ngFor="let b of getBusyBlocks(op.id, toStr(d))"
+                                 [ngStyle]="blockStyle(b.hi, b.hf)"
+                                 [class.block-own-project]="b.ownProject"
+                                 [title]="b.info">
+                            </div>
+                            <div class="proposed-block"
+                                 *ngIf="isMaqDateSelected(toStr(d))"
+                                 [ngStyle]="maqProposedBlockStyle()"
+                                 [class.proposed-conflict]="proposedOverlaps(op.id, toStr(d))">
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </ng-container>
+                  </tbody>
+                </table>
+              </div>
+            </ng-container>
+            <p class="maq-note" *ngIf="!maqForm.operario_id">
+              <i class="fa fa-info-circle"></i> Sin operario: la máquina se considera proceso automático.
+            </p>
+          </div>
+
+          <button class="btn-save-assign" (click)="saveMaquina()">
+            <i class="fa fa-save"></i> Guardar todo
+          </button>
+        </div>
+      </ng-container>
+
+      <!-- ── TAB: INSUMOS ──────────────────────────────────────────────────── -->
+      <ng-container *ngIf="assignTab==='insumos'">
+        <div class="insumos-assign">
+          <h4 class="section-mini-title"><i class="fa fa-cube"></i> Insumos aplicados a esta tarea</h4>
+          <p class="insumos-note">Marca los materiales del proyecto que se usan en esta tarea. No es necesario indicar cantidades.</p>
+          <div class="panel-insumo-list" *ngIf="project">
+            <label class="panel-insumo-item" *ngFor="let ins of project.insumos">
+              <input type="checkbox" [checked]="isAssignInsumoSelected(ins.id)" (change)="toggleAssignInsumo(ins.id)">
+              <div class="panel-insumo-body">
+                <span class="panel-insumo-name">{{ ins.nombre }}</span>
+                <span class="panel-insumo-badge">{{ ins.tipo }}</span>
+              </div>
+              <i class="fa fa-check-circle panel-insumo-icon" *ngIf="isAssignInsumoSelected(ins.id)"></i>
+            </label>
+          </div>
+          <div class="insumos-selected-count" *ngIf="assignTask">
+            {{ assignTask.insumos_aplicados.length }} insumo(s) vinculado(s) a esta tarea
+          </div>
+          <button class="btn-save-assign" (click)="saveInsumosAsignados()">
+            <i class="fa fa-save"></i> Guardar insumos
+          </button>
+        </div>
+      </ng-container>
+
+    </div><!-- /panel-body -->
+  </div><!-- /assign-panel -->
+</div><!-- /assign-overlay -->
+
+<!-- ══ MODAL: Detalle de celda (calendario disponibilidad) ═══════════════════ -->
+<div class="modal-overlay assign-modal-overlay" *ngIf="showCellModal" (click)="closeCellModal()">
+  <div class="modal-box assign-modal-box modal-sm" (click)="$event.stopPropagation()">
+    <div class="modal-header assign-modal-header">
+      <h3><i class="fa fa-clock-o"></i> {{ cellModalTitle }}</h3>
+      <button class="modal-close" (click)="closeCellModal()"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body assign-modal-body">
+      <ul class="cell-modal-list" *ngIf="cellModalItems.length; else cellModalEmpty">
+        <li *ngFor="let it of cellModalItems">
+          <span class="cell-modal-hora">{{ it.hora }}</span>
+          <span class="cell-modal-nombre">{{ it.nombre }}</span>
+        </li>
+      </ul>
+      <ng-template #cellModalEmpty>
+        <p class="cell-modal-empty">Sin asignaciones para este día.</p>
+      </ng-template>
     </div>
   </div>
 </div>

@@ -10,6 +10,9 @@
       <div class="user-role-badge d-none-mobile">
         <span class="dot"></span> {{ currentUser?.role }}
       </div>
+      <div class="viewing-as-badge d-none-mobile" *ngIf="viewingAsRoleName">
+        Viendo como: {{ viewingAsRoleName }}
+      </div>
     </div>
   </div>
 

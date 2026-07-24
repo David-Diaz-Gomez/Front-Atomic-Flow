@@ -134,58 +134,80 @@ export class Gantt implements OnInit {
     const userId = this.apiSvc.getCurrentUserId();
 
     this.projectSvc.getProjects({ director: userId, limit: 50 }).subscribe({
-  next: ({ data }) => {
+      next: ({ data }) => {
+        // ✅ FILTRAR POR APROBACIÓN REAL
+        const approved = data.filter((p: any) => Number(p.aprobado) === 1);
 
-    console.log('Proyectos obtenidos:', data);
+        // construir shells — id siempre como número para que los comparadores === funcionen
+        this.projects = approved.map((p: any) => ({
+          id: Number(p.id),
+          nombre: p.nombre,
+          fecha_inicio: p.fecha_inicio ?? '',
+          fecha_fin: p.fecha_fin ?? '',
+          fases: [],
+        }));
 
-    // ✅ FILTRAR POR APROBACIÓN REAL
-    const approved = data.filter((p: any) => {
-      return Number(p.aprobado) === 1;
+        // El deep-link desde Vista General (?proyecto=X) puede apuntar a un proyecto
+        // que no está en "mis proyectos aprobados" (de otro director, o aún sin
+        // aprobar) — en vez de caer al primero de la lista o mostrar nada, se carga
+        // ese proyecto puntual y se agrega a la lista para que también quede seleccionable.
+        if (preselectId && !this.projects.find(p => p.id === preselectId)) {
+          this.loadDeepLinkedProject(preselectId);
+          return;
+        }
+
+        if (!this.projects.length) {
+          this.loading = false;
+          this.error = 'No hay proyectos aprobados con fases disponibles.';
+          this.cdr.detectChanges();
+          return;
+        }
+
+        this.selectedProjectId = preselectId ?? this.projects[0]?.id ?? null;
+
+        if (this.selectedProjectId) {
+          this.loadProjectFull(this.selectedProjectId);
+        } else {
+          this.loading = false;
+        }
+      },
+
+      error: () => {
+        this.error = 'No se pudieron cargar los proyectos.';
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
     });
-
-    console.log(
-      approved.length
-        ? 'Proyectos aprobados encontrados:'
-        : 'No se encontraron proyectos aprobados.',
-      approved
-    );
-
-    if (!approved.length) {
-      this.loading = false;
-      this.error = 'No hay proyectos aprobados con fases disponibles.';
-      this.cdr.detectChanges();
-      return;
-    }
-
-    // construir shells — id siempre como número para que los comparadores === funcionen
-    this.projects = approved.map((p: any) => ({
-      id: Number(p.id),
-      nombre: p.nombre,
-      fecha_inicio: p.fecha_inicio ?? '',
-      fecha_fin: p.fecha_fin ?? '',
-      fases: [],
-    }));
-
-    console.log('Proyectos cargados en gantt:', this.projects);
-
-    const targetId = preselectId && this.projects.find(p => p.id === preselectId)
-      ? preselectId
-      : this.projects[0]?.id ?? null;
-    this.selectedProjectId = targetId;
-
-    if (this.selectedProjectId) {
-      this.loadProjectFull(this.selectedProjectId);
-    } else {
-      this.loading = false;
-    }
-  },
-
-  error: () => {
-    this.error = 'No se pudieron cargar los proyectos.';
-    this.loading = false;
-    this.cdr.detectChanges();
   }
-});
+
+  private loadDeepLinkedProject(id: number): void {
+    this.projectSvc.getProject(id).subscribe({
+      next: (p: any) => {
+        if (!p) {
+          this.error = 'Proyecto no encontrado.';
+          this.loading = false;
+          this.cdr.detectChanges();
+          return;
+        }
+        this.projects = [
+          {
+            id: Number(p.id),
+            nombre: p.nombre,
+            fecha_inicio: p.fecha_inicio ?? '',
+            fecha_fin: p.fecha_fin ?? '',
+            fases: [],
+          },
+          ...this.projects,
+        ];
+        this.selectedProjectId = Number(p.id);
+        this.loadProjectFull(this.selectedProjectId);
+      },
+      error: () => {
+        this.error = 'No se pudo cargar el proyecto solicitado.';
+        this.loading = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   loadProjectFull(id: number): void {

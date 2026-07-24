@@ -16,6 +16,9 @@ export const roleGuard: CanActivateFn = (route: ActivatedRouteSnapshot) => {
   try {
     const user = JSON.parse(localStorage.getItem('currentUser') ?? 'null');
     const roleId: number = user?.roleId;
+    // El Administrador puede navegar cualquier subárbol (director, coordinador, etc.) —
+    // conserva su rol real, la vista de Director/Coordinador es solo un cambio de sidebar.
+    if (roleId === 1) return true;
     if (roleId && allowedRoles.includes(roleId)) return true;
 
     const own = roleRoutes[roleId];

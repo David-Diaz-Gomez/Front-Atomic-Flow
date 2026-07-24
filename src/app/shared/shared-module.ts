@@ -9,6 +9,7 @@ import { NotifBellComponent } from './components/notif-bell/notif-bell';
 import { GanttGeneral } from './components/gantt-general/gantt-general';
 import { PlantillasFases } from './components/plantillas-fases/plantillas-fases';
 import { RecursosDetalle } from './components/recursos-detalle/recursos-detalle';
+import { RoleViewSwitcher } from './components/role-view-switcher/role-view-switcher';
 
 @NgModule({
   declarations: [
@@ -18,6 +19,7 @@ import { RecursosDetalle } from './components/recursos-detalle/recursos-detalle'
     GanttGeneral,
     PlantillasFases,
     RecursosDetalle,
+    RoleViewSwitcher,
   ],
   imports: [
     CommonModule,
@@ -31,6 +33,7 @@ import { RecursosDetalle } from './components/recursos-detalle/recursos-detalle'
     GanttGeneral,
     PlantillasFases,
     RecursosDetalle,
+    RoleViewSwitcher,
   ],
 })
 export class SharedModule {}

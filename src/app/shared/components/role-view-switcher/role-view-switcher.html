@@ -1,0 +1,11 @@
+<div class="role-view-switcher" *ngIf="isRealAdmin">
+  <label for="role-view-select">Vista</label>
+  <select
+    id="role-view-select"
+    class="role-view-select"
+    [ngModel]="effectiveRoleId"
+    (ngModelChange)="onChangeView($event)"
+  >
+    <option *ngFor="let opt of options" [value]="opt.roleId">{{ opt.label }}</option>
+  </select>
+</div>

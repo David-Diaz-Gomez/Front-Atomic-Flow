@@ -8,8 +8,15 @@ import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
 import { NotificationService } from '../../../shared/services/notification.service';
 import { Api } from '../../../core/services/api';
+import { ViewRoleService } from '../../../core/services/view-role.service';
 
 interface PhaseMachineOcc { nombre: string; porcentaje: number; estado: 'ok' | 'alta' | 'saturada'; }
+
+// ── Panel de asignación (exclusivo para el admin actuando como Director —
+// el director normal solo delega la fase, el coordinador ya no existe como vista) ──
+const HOURS = [7,8,9,10,11,12,13,14,15,16,17,18];
+const DAY_START = 7; const DAY_H = 11;
+const DAYS_SHORT = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 
 const ESTADO_LABELS: Record<string, string> = {
   borrador: 'Borrador', rechazado: 'Rechazado',
@@ -57,6 +64,42 @@ export class ProjectDetail implements OnInit, OnDestroy {
   quickOrderErrors: Record<string, string> = {};
   orderedResourceIds = new Set<number>();  // recursos con al menos un pedido en esta sesión
 
+  // ── Panel de asignación (solo admin) ────────────────────────────────────────
+  operarios: any[] = [];
+  maquinas:  any[] = [];
+  showAssignPanel = false;
+  assignTask: any = null;
+  assignFase: any = null;
+  assignTab: 'operario' | 'maquinaria' | 'insumos' = 'operario';
+
+  opForm = { operario_id: null as number | null, hora_inicio: '08:00', hora_fin: '18:00' };
+  opSelectedDates: string[] = [];
+  opConflict: 'idle' | 'checking' | 'ok' | 'conflict' = 'idle';
+  opConflictMsg = '';
+  opConflictDetails: Array<{ fecha: string; info: string }> = [];
+  pendingOpSlots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [];
+
+  maqForm = { maquinaria_id: null as number | null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null as number | null };
+  maqSelectedDates: string[] = [];
+  pendingMaqSlots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [];
+
+  taskDays: Date[] = [];
+  private opOccCache:  any[] = [];
+  private maqOccCache: any[] = [];
+
+  readonly HOURS     = HOURS;
+  readonly DAY_START = DAY_START;
+  readonly DAY_H     = DAY_H;
+
+  showCellModal = false;
+  cellModalTitle = '';
+  cellModalItems: Array<{ hora: string; nombre: string }> = [];
+
+  readonly SLOT_COLORS = ['#f59e0b', '#7c3aed', '#0891b2', '#db2777', '#0d9488'];
+  slotColor(i: number): string { return this.SLOT_COLORS[i % this.SLOT_COLORS.length]; }
+
+  get isAdmin(): boolean { return this.viewRoleService.isRealAdmin(); }
+
   constructor(
     private router: Router,
     private route: ActivatedRoute,
@@ -64,6 +107,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
     private catalogSvc: CatalogService,
     private notifSvc: NotificationService,
     private api: Api,
+    private viewRoleService: ViewRoleService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
@@ -73,6 +117,10 @@ export class ProjectDetail implements OnInit, OnDestroy {
       const id = parseInt(this.route.snapshot.paramMap.get('id') ?? '0', 10);
       if (id) this.loadProject(id);
       this.catalogSvc.getTiposTarea().subscribe({ next: t => { this.tiposTarea = t; this.cdr.detectChanges(); }, error: () => {} });
+      if (this.isAdmin) {
+        this.projectSvc.getOperarios().subscribe({ next: d => { this.operarios = d; this.cdr.detectChanges(); }, error: () => {} });
+        this.projectSvc.getMaquinaria().subscribe({ next: d => { this.maquinas = d; this.cdr.detectChanges(); }, error: () => {} });
+      }
       this._notifSub = this.notifSvc.newNotif$.subscribe(n => {
         if (['tarea_completada', 'tarea_en_revision'].includes(n.tipo) && this.project &&
             (!n.proyecto_id || n.proyecto_id === this.project.id)) {
@@ -84,13 +132,53 @@ export class ProjectDetail implements OnInit, OnDestroy {
 
   ngOnDestroy(): void { this._notifSub?.unsubscribe(); }
 
+  private normalizeTarea(t: any): any {
+    return {
+      ...t,
+      operarios: (t.operarios ?? t.asignados ?? []).map((o: any) => ({
+        id: o.id ?? o.id_usuario, nombre: o.nombre ?? '', apellido: o.apellido ?? '',
+        hora_inicio: o.hora_inicio ?? '07:00', hora_fin: o.hora_fin ?? '18:00', fechas: o.fechas ?? [],
+      })),
+      maquinarias: (t.maquinarias ?? t.maquinaria ?? []).map((m: any) => ({
+        id: m.id ?? m.id_maquinaria, nombre: m.nombre ?? '',
+        hora_inicio: m.hora_inicio ?? '07:00', hora_fin: m.hora_fin ?? '18:00', fechas: m.fechas ?? [],
+      })),
+      insumos_aplicados: (t.insumos_aplicados ?? (t.insumos ?? []).map((i: any) => i.id ?? i)),
+    };
+  }
+
   loadProject(id: number): void {
     this.loading = true;
     this.error = '';
     this.projectSvc.getProjectFull(id).subscribe({
       next: project => {
+        project.fases = (project.fases ?? []).map((f: any) => ({
+          ...f,
+          tareas: (f.tareas ?? []).map((t: any) => this.normalizeTarea(t)),
+        }));
         this.project = project;
         if (project.fases?.length) this.expandedFases.add(project.fases[0].id);
+
+        // Si el panel de asignación estaba abierto, la referencia a assignTask apunta
+        // al objeto viejo. Se busca la tarea actualizada y se recalcula taskDays para
+        // que el calendario muestre las fechas correctas.
+        if (this.showAssignPanel && this.assignTask) {
+          const oldId = this.assignTask.id;
+          let found: any = null;
+          for (const f of project.fases) {
+            found = (f.tareas ?? []).find((t: any) => t.id === oldId);
+            if (found) break;
+          }
+          if (found) {
+            this.assignTask = found;
+            this.taskDays = this.buildDateRange(found.fecha_inicio, found.fecha_fin);
+            this.opSelectedDates = this.taskDays.map((d: Date) => this.toStr(d));
+            this.maqSelectedDates = this.taskDays.map((d: Date) => this.toStr(d));
+          } else {
+            this.closeAssign();
+          }
+        }
+
         this.loading = false;
         this.cdr.detectChanges();
         this.loadResourceSummary(id);
@@ -968,4 +1056,312 @@ export class ProjectDetail implements OnInit, OnDestroy {
     const prog = fase.tareas.filter((t: any) => t.estado === 'en_progreso').length;
     return `${done}/${total} completadas${prog ? `, ${prog} en progreso` : ''}`;
   }
+
+  // ── Panel de asignación (exclusivo admin) ───────────────────────────────────
+  // El director normal solo planifica y delega la fase al coordinador; como el
+  // admin ya no tiene una vista Coordinador propia, este panel replica la
+  // asignación de operarios/maquinaria/insumos que antes solo existía ahí.
+  openAssign(task: any, fase: any): void {
+    this.assignTask = task; this.assignFase = fase;
+    this.assignTab  = 'operario';
+    this.opForm     = { operario_id: null, hora_inicio: '08:00', hora_fin: '18:00' };
+    this.maqForm    = { maquinaria_id: null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null };
+    this.opConflict = 'idle'; this.opConflictMsg = ''; this.opConflictDetails = [];
+    this.opOccCache = []; this.maqOccCache = [];
+    this.pendingOpSlots  = [];
+    this.pendingMaqSlots = [];
+    this.taskDays         = this.buildDateRange(task.fecha_inicio, task.fecha_fin);
+    this.opSelectedDates  = this.taskDays.map(d => this.toStr(d));
+    this.maqSelectedDates = this.taskDays.map(d => this.toStr(d));
+    this.showAssignPanel  = true;
+
+    const desde = String(task.fecha_inicio ?? '').substring(0, 10);
+    const hasta  = String(task.fecha_fin   ?? '').substring(0, 10);
+    if (desde && hasta) {
+      this.projectSvc.getOperarioOccupancy(desde, hasta).subscribe({ next: d => { this.opOccCache  = d; this.cdr.detectChanges(); }, error: () => {} });
+      this.projectSvc.getMaqOccupancy(desde, hasta).subscribe({       next: d => { this.maqOccCache = d; this.cdr.detectChanges(); }, error: () => {} });
+    }
+  }
+
+  closeAssign(): void { this.showAssignPanel = false; this.assignTask = null; }
+
+  getBusyBlocks(operarioId: number, dateStr: string): Array<{ hi: number; hf: number; info: string; ownProject: boolean }> {
+    const op  = this.opOccCache.find((o: any) => o.id === operarioId);
+    const dia = (op?.dias ?? []).find((d: any) => d.fecha === dateStr);
+    if (!dia) return [];
+    return (dia.bloques ?? dia.tareas ?? []).map((b: any) => ({
+      hi:   this.normHour(b.hora_inicio),
+      hf:   this.normHour(b.hora_fin),
+      info: `${b.proyecto ?? ''}: ${b.nombre ?? b.tarea ?? ''}`,
+      ownProject: b.proyecto_id === this.project?.id,
+    }));
+  }
+
+  getMaqBusyBlocks(maqId: number, dateStr: string): Array<{ hi: number; hf: number; info: string; ownProject: boolean }> {
+    const maq = this.maqOccCache.find((m: any) => m.id === maqId);
+    const dia = (maq?.dias ?? []).find((d: any) => d.fecha === dateStr);
+    if (!dia) return [];
+    return (dia.bloques ?? dia.tareas ?? []).map((b: any) => ({
+      hi:   this.normHour(b.hora_inicio),
+      hf:   this.normHour(b.hora_fin),
+      info: `${b.proyecto ?? ''}: ${b.nombre ?? b.tarea ?? ''}`,
+      ownProject: b.proyecto_id === this.project?.id,
+    }));
+  }
+
+  openCellModal(tipo: 'op' | 'maq', resource: any, dateStr: string): void {
+    const items: Array<{ hora: string; nombre: string }> = [];
+    const busy = tipo === 'op' ? this.getBusyBlocks(resource.id, dateStr) : this.getMaqBusyBlocks(resource.id, dateStr);
+    busy.forEach(b => items.push({ hora: `${this.fmtHour(b.hi)}–${this.fmtHour(b.hf)}`, nombre: b.info }));
+
+    if (tipo === 'op' && this.opForm.operario_id === resource.id) {
+      this.getPendingOpBlocks(dateStr).forEach(pb => {
+        const slot = this.pendingOpSlots[pb.idx];
+        items.push({ hora: `${slot.hora_inicio}–${slot.hora_fin}`, nombre: `En cola #${pb.idx + 1} (nueva asignación)` });
+      });
+      if (this.isOpDateSelected(dateStr)) {
+        items.push({ hora: `${this.opForm.hora_inicio}–${this.opForm.hora_fin}`, nombre: 'Propuesta (nueva asignación)' });
+      }
+    }
+
+    if (tipo === 'maq' && this.maqForm.maquinaria_id === resource.id) {
+      this.getPendingMaqBlocks(dateStr).forEach(pb => {
+        const slot = this.pendingMaqSlots[pb.idx];
+        items.push({ hora: `${slot.hora_inicio}–${slot.hora_fin}`, nombre: `En cola #${pb.idx + 1} (nueva asignación)` });
+      });
+      if (this.isMaqDateSelected(dateStr)) {
+        items.push({ hora: `${this.maqForm.hora_inicio}–${this.maqForm.hora_fin}`, nombre: 'Propuesta (nueva asignación)' });
+      }
+    }
+
+    items.sort((a, b) => a.hora.localeCompare(b.hora));
+
+    const nombreRecurso = tipo === 'op' ? `${resource.nombre} ${resource.apellido}` : resource.nombre;
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const fecha = new Date(y, (m ?? 1) - 1, d ?? 1);
+    this.cellModalTitle = `${nombreRecurso} — ${this.dayName(fecha)} ${this.dayLabel(fecha)}`;
+    this.cellModalItems = items;
+    this.showCellModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeCellModal(): void { this.showCellModal = false; this.cdr.detectChanges(); }
+
+  blockStyle(hi: number, hf: number): Record<string, string> {
+    return { left: `${((hi - DAY_START) / DAY_H) * 100}%`, width: `${((hf - hi) / DAY_H) * 100}%` };
+  }
+  proposedBlockStyle():    Record<string, string> { return this.blockStyle(this.timeToNum(this.opForm.hora_inicio),  this.timeToNum(this.opForm.hora_fin));  }
+  maqProposedBlockStyle(): Record<string, string> { return this.blockStyle(this.timeToNum(this.maqForm.hora_inicio), this.timeToNum(this.maqForm.hora_fin)); }
+
+  proposedOverlaps(operarioId: number, dateStr: string): boolean {
+    if (!this.opSelectedDates.includes(dateStr)) return false;
+    const hi = this.timeToNum(this.opForm.hora_inicio), hf = this.timeToNum(this.opForm.hora_fin);
+    return this.getBusyBlocks(operarioId, dateStr).some(b => hi < b.hf && hf > b.hi);
+  }
+  maqProposedOverlaps(maqId: number, dateStr: string): boolean {
+    if (!this.maqSelectedDates.includes(dateStr)) return false;
+    const hi = this.timeToNum(this.maqForm.hora_inicio), hf = this.timeToNum(this.maqForm.hora_fin);
+    return this.getMaqBusyBlocks(maqId, dateStr).some(b => hi < b.hf && hf > b.hi);
+  }
+
+  onOperarioOrHoursChange(): void { this.opConflict = 'idle'; this.opConflictMsg = ''; this.opConflictDetails = []; }
+
+  checkOpConflicts(): void {
+    if (!this.opForm.operario_id) { void Swal.fire('Atención', 'Selecciona un operario primero', 'warning'); return; }
+    this.opConflict = 'checking'; this.cdr.detectChanges();
+    const hi = this.timeToNum(this.opForm.hora_inicio), hf = this.timeToNum(this.opForm.hora_fin);
+    const conflicts: Array<{ fecha: string; info: string }> = [];
+    for (const d of this.opSelectedDates) {
+      for (const b of this.getBusyBlocks(this.opForm.operario_id!, d)) {
+        if (hi < b.hf && hf > b.hi) conflicts.push({ fecha: d, info: b.info });
+      }
+    }
+    this.opConflict        = conflicts.length ? 'conflict' : 'ok';
+    this.opConflictMsg     = conflicts.length ? `Hay ${conflicts.length} choque(s) de horario.` : 'Horario disponible en todos los días seleccionados.';
+    this.opConflictDetails = conflicts;
+    this.cdr.detectChanges();
+  }
+
+  addOpSlot(): void {
+    if (!this.opSelectedDates.length) { void Swal.fire('Atención', 'Selecciona al menos un día', 'warning'); return; }
+    this.pendingOpSlots.push({ fechas: [...this.opSelectedDates], hora_inicio: this.opForm.hora_inicio, hora_fin: this.opForm.hora_fin });
+    this.opSelectedDates = this.taskDays.map(d => this.toStr(d));
+    this.opForm.hora_inicio = '08:00'; this.opForm.hora_fin = '18:00';
+    this.opConflict = 'idle'; this.opConflictDetails = [];
+    this.cdr.detectChanges();
+  }
+  removeOpSlot(i: number): void { this.pendingOpSlots.splice(i, 1); this.cdr.detectChanges(); }
+
+  addMaqSlot(): void {
+    if (!this.maqSelectedDates.length) { void Swal.fire('Atención', 'Selecciona al menos un día', 'warning'); return; }
+    this.pendingMaqSlots.push({ fechas: [...this.maqSelectedDates], hora_inicio: this.maqForm.hora_inicio, hora_fin: this.maqForm.hora_fin });
+    this.maqSelectedDates = this.taskDays.map(d => this.toStr(d));
+    this.maqForm.hora_inicio = '08:00'; this.maqForm.hora_fin = '18:00';
+    this.cdr.detectChanges();
+  }
+  removeMaqSlot(i: number): void { this.pendingMaqSlots.splice(i, 1); this.cdr.detectChanges(); }
+
+  private reloadOccupancy(): void {
+    const desde = String(this.assignTask?.fecha_inicio ?? '').substring(0, 10);
+    const hasta  = String(this.assignTask?.fecha_fin   ?? '').substring(0, 10);
+    if (!desde || !hasta) return;
+    this.projectSvc.getOperarioOccupancy(desde, hasta).subscribe({ next: d => { this.opOccCache  = d; this.cdr.detectChanges(); }, error: () => {} });
+    this.projectSvc.getMaqOccupancy(desde, hasta).subscribe({       next: d => { this.maqOccCache = d; this.cdr.detectChanges(); }, error: () => {} });
+  }
+
+  saveOperario(): void {
+    if (!this.opForm.operario_id || !this.assignTask || !this.assignFase) {
+      void Swal.fire('Atención', 'Selecciona un operario', 'warning'); return;
+    }
+    const slots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [...this.pendingOpSlots];
+    if (this.opSelectedDates.length) slots.push({ fechas: [...this.opSelectedDates], hora_inicio: this.opForm.hora_inicio, hora_fin: this.opForm.hora_fin });
+    if (!slots.length) { void Swal.fire('Atención', 'Agrega al menos un horario', 'warning'); return; }
+
+    const doSave = () => {
+      const op = this.operarios.find(o => o.id === this.opForm.operario_id);
+      let done = 0;
+      for (const slot of slots) {
+        this.projectSvc.assignOperario(this.assignFase!.id, this.assignTask!.id, {
+          id_usuario: this.opForm.operario_id, hora_inicio: slot.hora_inicio,
+          hora_fin: slot.hora_fin, fechas: slot.fechas,
+        }).subscribe({
+          next: () => {
+            if (op && done === 0) {
+              this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+              if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
+            }
+            done++;
+            if (done === slots.length) {
+              this.opForm = { operario_id: null, hora_inicio: '08:00', hora_fin: '18:00' };
+              this.pendingOpSlots = [];
+              this.opConflict = 'idle'; this.opConflictDetails = [];
+              void Swal.fire({ icon: 'success', title: 'Operario asignado', timer: 1500 });
+              this.reloadOccupancy();
+              this.cdr.detectChanges();
+            }
+          },
+          error: err => void Swal.fire('Error', err?.error?.message ?? 'No se pudo asignar', 'error'),
+        });
+      }
+    };
+    if (this.opConflict === 'conflict') {
+      void Swal.fire({ title: 'Choque de horario', icon: 'warning', html: '<p>El operario tiene ocupación. Puedes forzar la asignación.</p>', showCancelButton: true, confirmButtonText: 'Forzar asignación', cancelButtonText: 'Revisar', confirmButtonColor: '#00A859' }).then(r => { if (r.isConfirmed) doSave(); });
+    } else { doSave(); }
+  }
+
+  saveMaquina(): void {
+    if (!this.maqForm.maquinaria_id || !this.assignTask || !this.assignFase) {
+      void Swal.fire('Atención', 'Selecciona maquinaria', 'warning'); return;
+    }
+    const slots: Array<{ fechas: string[]; hora_inicio: string; hora_fin: string }> = [...this.pendingMaqSlots];
+    if (this.maqSelectedDates.length) slots.push({ fechas: [...this.maqSelectedDates], hora_inicio: this.maqForm.hora_inicio, hora_fin: this.maqForm.hora_fin });
+    if (!slots.length) { void Swal.fire('Atención', 'Agrega al menos un horario', 'warning'); return; }
+
+    let done = 0;
+    for (const slot of slots) {
+      this.projectSvc.assignMaquinaria(this.assignFase.id, this.assignTask.id, {
+        id_maquinaria: this.maqForm.maquinaria_id, hora_inicio: slot.hora_inicio,
+        hora_fin: slot.hora_fin, fechas: slot.fechas, id_operario: this.maqForm.operario_id ?? null,
+      }).subscribe({
+        next: () => {
+          const maq = this.maquinas.find(m => m.id === this.maqForm.maquinaria_id);
+          if (maq && done === 0) {
+            this.assignTask!.maquinarias.push({ id: maq.id, nombre: maq.nombre, hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+            if (this.maqForm.operario_id) {
+              const op = this.operarios.find(o => o.id === this.maqForm.operario_id);
+              if (op && !this.assignTask!.operarios.some((o: any) => o.id === op.id))
+                this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+            }
+            if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
+          }
+          done++;
+          if (done === slots.length) {
+            this.maqForm = { maquinaria_id: null, hora_inicio: '08:00', hora_fin: '18:00', operario_id: null };
+            this.pendingMaqSlots = [];
+            void Swal.fire({ icon: 'success', title: 'Maquinaria asignada', timer: 1500 });
+            this.reloadOccupancy();
+            this.cdr.detectChanges();
+          }
+        },
+        error: err => void Swal.fire('Error', err?.error?.message ?? 'No se pudo asignar', 'error'),
+      });
+    }
+  }
+
+  saveInsumosAsignados(): void {
+    if (!this.assignTask || !this.assignFase) return;
+    this.projectSvc.saveInsumos(this.assignFase.id, this.assignTask.id, this.assignTask.insumos_aplicados).subscribe({
+      next:  () => void Swal.fire({ icon: 'success', title: 'Insumos guardados', timer: 1500 }),
+      error: () => void Swal.fire({ icon: 'success', title: 'Insumos guardados (local)', timer: 1500 }),
+    });
+  }
+
+  toggleAssignInsumo(id: number): void {
+    if (!this.assignTask) return;
+    const i = this.assignTask.insumos_aplicados.indexOf(id);
+    i === -1 ? this.assignTask.insumos_aplicados.push(id) : this.assignTask.insumos_aplicados.splice(i, 1);
+  }
+  isAssignInsumoSelected(id: number): boolean { return this.assignTask?.insumos_aplicados?.includes(id) ?? false; }
+
+  removeOperario(task: any, opId: number): void {
+    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+    if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
+    task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
+    if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+    this.cdr.detectChanges();
+  }
+
+  removeMaquina(task: any, maqId: number): void {
+    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+    if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
+    task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
+    if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+    this.cdr.detectChanges();
+  }
+
+  toggleOpDate(d: string): void {
+    const i = this.opSelectedDates.indexOf(d); i === -1 ? this.opSelectedDates.push(d) : this.opSelectedDates.splice(i, 1);
+    this.onOperarioOrHoursChange();
+  }
+  toggleMaqDate(d: string): void {
+    const i = this.maqSelectedDates.indexOf(d); i === -1 ? this.maqSelectedDates.push(d) : this.maqSelectedDates.splice(i, 1);
+  }
+  isOpDateSelected(d: string):  boolean { return this.opSelectedDates.includes(d); }
+  isMaqDateSelected(d: string): boolean { return this.maqSelectedDates.includes(d); }
+
+  buildDateRange(from: string, to: string, max = 14): Date[] {
+    const result: Date[] = [];
+    const cur = new Date(`${String(from).substring(0, 10)}T00:00:00`);
+    const end = new Date(`${String(to).substring(0, 10)}T00:00:00`);
+    while (cur <= end && result.length < max) { result.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
+    return result;
+  }
+  private timeToNum(t: string): number { const [h, m] = t.split(':').map(Number); return (h ?? 0) + (m ?? 0) / 60; }
+
+  private normHour(val: any): number {
+    if (typeof val === 'string') return this.timeToNum(val);
+    if (typeof val === 'number' && val > 0 && val < 1) return Math.round(val * 24 * 100) / 100;
+    return typeof val === 'number' ? val : 0;
+  }
+
+  getPendingOpBlocks(dateStr: string): Array<{ hi: number; hf: number; idx: number }> {
+    return this.pendingOpSlots
+      .map((s, i) => s.fechas.includes(dateStr) ? { hi: this.timeToNum(s.hora_inicio), hf: this.timeToNum(s.hora_fin), idx: i } : null)
+      .filter((b): b is { hi: number; hf: number; idx: number } => b !== null);
+  }
+
+  getPendingMaqBlocks(dateStr: string): Array<{ hi: number; hf: number; idx: number }> {
+    return this.pendingMaqSlots
+      .map((s, i) => s.fechas.includes(dateStr) ? { hi: this.timeToNum(s.hora_inicio), hf: this.timeToNum(s.hora_fin), idx: i } : null)
+      .filter((b): b is { hi: number; hf: number; idx: number } => b !== null);
+  }
+
+  fmtHour(h: number): string {
+    const hh = Math.floor(h);
+    const mm = Math.round((h - hh) * 60);
+    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+  }
+  toStr(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+  dayLabel(d: Date):   string { return String(d.getDate()); }
+  dayName(d: Date):    string { return DAYS_SHORT[d.getDay()] ?? ''; }
 }
