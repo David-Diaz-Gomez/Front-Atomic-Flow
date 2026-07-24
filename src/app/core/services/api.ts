@@ -309,6 +309,31 @@ export class Api {
     );
   }
 
+  // ── Analytics ─────────────────────────────────────────────────────────────
+
+  private analyticsParams(tipo: string, filters: { id_proyecto?: number; estado?: string; fecha_inicio?: string; fecha_fin?: string }): HttpParams {
+    let params = tipo ? new HttpParams().set('tipo', tipo) : new HttpParams();
+    if (filters.id_proyecto) params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.estado)      params = params.set('estado', filters.estado);
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)   params = params.set('fecha_fin', filters.fecha_fin);
+    return params;
+  }
+
+  getOcupacionRecursos(tipo: 'operarios' | 'maquinaria', filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_proyecto: number; nombre_proyecto: string; total_horas: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/ocupacion`, { params: this.analyticsParams(tipo, filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  // ── Solicitudes de recurso ────────────────────────────────────────────────
+
   createSolicitudRecurso(idProyecto: number, body: { nombre: string; tipo_recurso: string; precio_unitario: number; cantidad: number; observaciones?: string; id_pedido?: number | null; id_mueble?: number | null }): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/proyectos/${idProyecto}/solicitud-recurso`, body).pipe(
       catchError(err => { this.notifyError('No se pudo crear la solicitud.'); return throwError(() => err); })
@@ -321,6 +346,102 @@ export class Api {
       catchError(() => of([]))
     );
   }
+
+  getPresupuesto(filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_proyecto: number; nombre_proyecto: string; presupuesto_proyectado: number; gasto_real: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/presupuesto`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getRankingRecursos(tipo: 'operarios' | 'maquinaria', filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ id_recurso: number; nombre: string; total_horas: number; total_tareas: number }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/ranking`, { params: this.analyticsParams(tipo, filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getManoDeObra(filters: { estado?: string; id_proyecto?: number }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.estado)      params = params.set('estado', filters.estado);
+    if (filters.id_proyecto) params = params.set('id_proyecto', filters.id_proyecto.toString());
+    return this.http.get<any>(`${this.baseUrl}/reportes/mano-de-obra`, { params }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getPagoOperarios(filters: { estado?: string; id_proyecto?: number; fecha_inicio?: string; fecha_fin?: string }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters.estado)       params = params.set('estado', filters.estado);
+    if (filters.id_proyecto)  params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
+    return this.http.get<any>(`${this.baseUrl}/reportes/pago-operarios`, { params }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  getCambiosSistema(filters: { fecha_inicio?: string; fecha_fin?: string; tipo?: string; page?: number; limit?: number }): Observable<{ data: any[]; pagination: any }> {
+    let params = new HttpParams();
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
+    if (filters.tipo)         params = params.set('tipo', filters.tipo);
+    if (filters.page)         params = params.set('page', filters.page.toString());
+    if (filters.limit)        params = params.set('limit', filters.limit.toString());
+    return this.http.get<any>(`${this.baseUrl}/reportes/cambios-sistema`, { params }).pipe(
+      map((r: any) => ({ data: r?.data ?? [], pagination: r?.pagination ?? {} })),
+      catchError(() => of({ data: [], pagination: {} }))
+    );
+  }
+
+  getKpisEstadoTareas(filters: {
+    id_proyecto?: number;
+    estado?: string;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{ tareas_completadas: number; tareas_no_completadas: number; tareas_entregadas_retraso: number; tareas_bloqueadas: number } | null> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/kpis-estado-tareas`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? null),
+      catchError(() => of(null))
+    );
+  }
+
+  getProyectosPorEstado(filters: { fecha_inicio?: string; fecha_fin?: string }): Observable<{ proyectos_activos: number; proyectos_en_revision: number; proyectos_finalizados: number } | null> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/proyectos-por-estado`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? null),
+      catchError(() => of(null))
+    );
+  }
+
+  getFasesPorAvance(filters: {
+    id_proyecto: number;
+    fecha_inicio?: string;
+    fecha_fin?: string;
+  }): Observable<{
+    id_fase: number; nombre_fase: string; total_tareas: number;
+    pendientes: { valor: number; pct: number };
+    en_progreso: { valor: number; pct: number };
+    completadas: { valor: number; pct: number };
+  }[]> {
+    return this.http.get<any>(`${this.baseUrl}/analytics/fases-avance`, { params: this.analyticsParams('', filters) }).pipe(
+      map((r: any) => r?.data ?? []),
+      catchError(() => of([]))
+    );
+  }
+
+  // ── Solicitudes de recurso ────────────────────────────────────────────────
 
   aprobarSolicitudRecurso(id: number): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/solicitudes-recurso/${id}/aprobar`, {}).pipe(
@@ -368,9 +489,9 @@ export class Api {
   getMenuForRole(roleId: number): any[] {
     const menus: any = {
       1: [
-        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/home' },
         { title: 'Usuarios',       icon: 'fa-users',        route: '/dashboard/admin/users' },
-        { title: 'Vista General',  icon: 'fa-globe',        route: '/dashboard/admin/vista-general' },
+        { title: 'Dashboard',      icon: 'fa-bar-chart',    route: '/dashboard/admin/reports' },
+        { title: 'Reportes',       icon: 'fa-file-text-o',  route: '/dashboard/admin/reportes' },
       ],
       2: [
         { title: 'Mis Proyectos',  icon: 'fa-briefcase',    route: '/dashboard/director/home' },

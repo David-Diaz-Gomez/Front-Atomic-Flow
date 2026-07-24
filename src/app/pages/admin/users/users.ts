@@ -88,7 +88,8 @@ export class Users implements OnInit {
           rh: u.RH ?? u.rh,
 
           id_tipo_documento:
-            u.ID_Tipo_Documento ?? u.id_tipo_documento
+            u.ID_Tipo_Documento ?? u.id_tipo_documento,
+          valor_hora: u.valor_hora ?? null
         }));
 
         console.log("USUARIOS FINALES:", this.users);
@@ -125,7 +126,7 @@ export class Users implements OnInit {
 
   // --- ACCIONES (Sin cambios, pero asegúrate de que el HTML llame a onFilterChange) ---
   initUser() {
-    return { id: null, numero_documento: '', id_tipo_doc: null, nombre: '', apellido: '', correo: '', telefono: '', direccion: '', rh: 'O+', arl: '', eps: '', id_rol: null };
+    return { id: null, numero_documento: '', id_tipo_doc: null, nombre: '', apellido: '', correo: '', telefono: '', direccion: '', rh: 'O+', arl: '', eps: '', id_rol: null, valor_hora: null };
   }
 
   openModal(user: any = null) {
@@ -143,6 +144,7 @@ export class Users implements OnInit {
         arl: user.arl,
         eps: user.eps,
         id_rol: user.id_rol_usuario,
+        valor_hora: user.valor_hora ?? null,
       };
     } else {
       this.editingUser = this.initUser();

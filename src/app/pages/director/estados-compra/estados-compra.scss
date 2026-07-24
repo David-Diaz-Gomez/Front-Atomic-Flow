@@ -986,10 +986,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
   color: #334155;
   padding: 3px 0 3px 4px;
-  i { color: #0052cc; margin-right: 4px; font-size: 11px; }
+}
+
+.pr-item-name {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  i { color: #0052cc; margin-right: 4px; font-size: 11px; flex-shrink: 0; }
 }
 
 .pr-item-nums {

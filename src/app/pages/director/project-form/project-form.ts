@@ -105,12 +105,13 @@ export class ProjectForm implements OnInit {
     fecha_inicio: string; fecha_fin: string;
     id_cliente: number | null;
     id_coordinador: number | null;
+    id_director_asignado: number | null;
     id_director_revision: number | null;
     link_trello: string;
   } = {
     nombre: '', codigo: '', descripcion: '', centro_costos: '',
     fecha_inicio: '', fecha_fin: '',
-    id_cliente: null, id_coordinador: null, id_director_revision: null,
+    id_cliente: null, id_coordinador: null, id_director_asignado: null, id_director_revision: null,
     link_trello: ''
   };
 
@@ -207,6 +208,13 @@ export class ProjectForm implements OnInit {
         this.coordinators = coordinators;
         this.directors    = directors;
         this.buildTipoIds(tipos);
+        // Solo se autoselecciona si el usuario logueado es efectivamente un Director
+        // (aparece en el catálogo). Si no (p. ej. un Administrador creando el proyecto
+        // desde la vista Director), queda sin asignar y debe elegirse manualmente.
+        const currentUserId = this.apiSvc.getCurrentUserId();
+        if (this.directors.some(d => d.id === currentUserId)) {
+          this.form.id_director_asignado = currentUserId;
+        }
         this.loadingCatalogs = false;
         this.cdr.detectChanges();
       },
@@ -249,6 +257,7 @@ export class ProjectForm implements OnInit {
             fecha_fin:            this.toDateStr(project.fecha_fin),
             id_cliente:           project.cliente?.id          ?? project.id_cliente          ?? null,
             id_coordinador:       project.coordinador?.id      ?? project.id_coordinador      ?? null,
+            id_director_asignado: project.director_asignado?.id ?? project.id_director_asignado ?? null,
             id_director_revision: project.director_revision?.id ?? project.id_director_revision ?? null,
             link_trello:          project.link_trello  ?? '',
           };
@@ -609,9 +618,11 @@ export class ProjectForm implements OnInit {
     if (!this.form.id_cliente) {
       void Swal.fire('Atención', 'Selecciona un cliente', 'warning'); return;
     }
+    if (!this.form.id_director_asignado) {
+      void Swal.fire('Atención', 'Selecciona el Director asignado del proyecto', 'warning'); return;
+    }
 
     this.saving = true;
-    const userId = this.apiSvc.getCurrentUserId();
     const projectBody: any = {
       nombre:               this.form.nombre,
       codigo:               this.form.codigo || null,
@@ -620,7 +631,7 @@ export class ProjectForm implements OnInit {
       fecha_inicio:         this.form.fecha_inicio,
       fecha_fin:            this.form.fecha_fin,
       id_cliente:           this.form.id_cliente,
-      id_director_asignado: userId,
+      id_director_asignado: this.form.id_director_asignado,
       id_director_revision: this.form.id_director_revision,
       link_trello:          this.form.link_trello || null,
     };
