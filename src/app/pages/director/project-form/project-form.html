@@ -63,6 +63,15 @@
           </div>
         </div>
 
+        <!-- Director Asignado -->
+        <div class="form-group">
+          <label>Director Asignado *</label>
+          <select [(ngModel)]="form.id_director_asignado">
+            <option [ngValue]="null" disabled>Seleccionar director...</option>
+            <option *ngFor="let d of directors" [ngValue]="d.id">{{ d.nombre }} {{ d.apellido }}</option>
+          </select>
+        </div>
+
         <!-- Director de Revisión -->
         <div class="form-group">
           <label>Director de Revisión</label>

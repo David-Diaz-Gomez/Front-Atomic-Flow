@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { Api } from '../../../core/services/api'; // Asegúrate de que la ruta sea correcta
 import { NotificationService } from '../../../shared/services/notification.service';
+import { ViewRoleService } from '../../../core/services/view-role.service';
 import Swal from 'sweetalert2';
 
 @Component({
@@ -16,7 +17,12 @@ export class Login {
   isLoading = false;
 
   // 👈 TIENES que inyectar el apiService aquí
-  constructor(private apiService: Api, private router: Router, private notifSvc: NotificationService) {}
+  constructor(
+    private apiService: Api,
+    private router: Router,
+    private notifSvc: NotificationService,
+    private viewRoleService: ViewRoleService
+  ) {}
 
   // login.ts
 
@@ -35,6 +41,9 @@ onLogin() {
       
       if (res.success) {
         this.notifSvc.reconnect();
+        // Cada login nuevo debe arrancar en el rol real, no en la última vista
+        // (Director/Otros roles) que el admin haya dejado activa en una sesión previa.
+        this.viewRoleService.reset();
 
         // 1. Verificación de cambio de contraseña
         if (res.user.mustChange === 1 || res.user.mustChange === true) {
