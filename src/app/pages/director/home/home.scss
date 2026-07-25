@@ -201,6 +201,7 @@
         &.estado-completado    { background: rgba(16,185,129,0.8); color: #fff }
         &.estado-rechazado     { background: rgba(239,68,68,0.8); color: #fff }
         &.estado-pausado       { background: rgba(156,163,175,0.8); color: #fff }
+        &.estado-inactiva      { background: rgba(239,68,68,0.7); color: #fff }
       }
 
       .card-body {
@@ -287,8 +288,11 @@
           align-items: center;
           justify-content: center;
           gap: 5px;
-          &.btn-ver  { background: var(--atomo-gradient); color: #000; &:hover { filter: brightness(1.05); } }
-          &.btn-edit { background: #f4f7f7; color: var(--text-dark); &:hover { background: #e8ecec; } }
+          &.btn-ver      { background: var(--atomo-gradient); color: #000; &:hover { filter: brightness(1.05); } }
+          &.btn-edit     { background: #f4f7f7; color: var(--text-dark); &:hover { background: #e8ecec; } }
+          &.btn-inactivar { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca;
+                            &:hover:not([disabled]) { background: #ef4444; color: #fff; }
+                            &[disabled] { opacity: .6; cursor: default; } }
         }
       }
     }

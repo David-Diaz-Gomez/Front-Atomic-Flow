@@ -695,11 +695,6 @@ export class ProjectDetail implements OnInit, OnDestroy {
     if (fi > ff) {
       void Swal.fire('Atención', 'La fecha de inicio no puede ser posterior a la de fin.', 'warning'); return;
     }
-    if (this.project && (fi < this.project.fecha_inicio || ff > this.project.fecha_fin)) {
-      void Swal.fire('Fuera de rango',
-        `Las fechas deben estar dentro del proyecto: ${this.project.fecha_inicio} → ${this.project.fecha_fin}.`,
-        'warning'); return;
-    }
     this.phaseConflictState = 'checking';
     this.phaseMachineOcc = [];
     this.projectSvc.validateFaseDates(this.project.id, {

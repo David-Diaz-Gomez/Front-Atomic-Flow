@@ -59,6 +59,7 @@ export class SuperOpHome implements OnInit, OnDestroy {
 
   showTaskModal = false;
   selectedTarea: TareaKiosko | null = null;
+  selectedTaskDate = '';
 
   showInactivityModal = false;
   countdown = 30;
@@ -380,8 +381,17 @@ export class SuperOpHome implements OnInit, OnDestroy {
 
   // ── Task modal ────────────────────────────────────────────────────────────
 
-  openTask(t: TareaKiosko): void {
-    if (!this.isFiltered) return;
+  /** Helper for template: dateKey for a given Date */
+  taskDayKey(d: Date): string { return toDateKey(d); }
+
+  get isSelectedTaskFuture(): boolean {
+    if (!this.selectedTaskDate) return false;
+    return this.selectedTaskDate > this.todayRealKey;
+  }
+
+  openTask(t: TareaKiosko, dateKey?: string): void {
+    this.selectedTaskDate = dateKey ?? this.todayKey;
+if (!this.isFiltered) return;
     this.selectedTarea = { ...t }; this.showTaskModal = true; this.cdr.detectChanges();
   }
   closeTask(): void { this.showTaskModal = false; this.selectedTarea = null; this.cdr.detectChanges(); }
@@ -392,7 +402,9 @@ export class SuperOpHome implements OnInit, OnDestroy {
     this.api.completarTarea(this.selectedTarea.id, this.filteredOperario.id).subscribe({
       next: (res: any) => {
         this.isLoading = false;
-        const nuevoEstado = res?.estado ?? 'en_progreso';
+        const data = res?.data ?? res;
+        const nuevoEstado = data?.estado ?? 'en_progreso';
+        const pendientes: number | null | undefined = data?.pendientes;
         const now = new Date().toISOString();
         const updateList = (list: TareaKiosko[]) => {
           const t = list.find(x => x.id === this.selectedTarea!.id);
@@ -400,8 +412,8 @@ export class SuperOpHome implements OnInit, OnDestroy {
             t.estado = nuevoEstado;
             t.yo_complete = true;
             if (nuevoEstado === 'en_revision') t.completado_en = now;
-            t.operarios_completados = res?.pendientes != null
-              ? (t.total_operarios - res.pendientes)
+            t.operarios_completados = pendientes != null
+              ? (t.total_operarios - pendientes)
               : t.total_operarios;
           }
         };
@@ -411,8 +423,8 @@ export class SuperOpHome implements OnInit, OnDestroy {
           this.selectedTarea.estado = nuevoEstado;
           this.selectedTarea.yo_complete = true;
           if (nuevoEstado === 'en_revision') this.selectedTarea.completado_en = now;
-          this.selectedTarea.operarios_completados = res?.pendientes != null
-            ? (this.selectedTarea.total_operarios - res.pendientes)
+          this.selectedTarea.operarios_completados = pendientes != null
+            ? (this.selectedTarea.total_operarios - pendientes)
             : this.selectedTarea.total_operarios;
         }
         this.cdr.detectChanges();
@@ -468,6 +480,6 @@ export class SuperOpHome implements OnInit, OnDestroy {
   }
   completadaHora(iso: string | null): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('es-CO', { hour:'2-digit', minute:'2-digit' });
+    return new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
   }
 }

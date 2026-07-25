@@ -182,7 +182,7 @@
                      [style.border-color]="getColor(item.task.id_operario) + '44'"
                      [class.wg-event--done]="item.task.estado === 'completada'"
                      [class.wg-event--clickable]="isFiltered"
-                     (click)="openTask(item.task)">
+                     (click)="openTask(item.task, taskDayKey(d))">
                   <div class="wg-event__bar"></div>
                   <div class="wg-event__body">
                     <span class="wg-event__name">{{ item.task.nombre }}</span>
@@ -271,12 +271,15 @@
         </div>
       </div>
       <div class="task-modal__footer">
-        <!-- Pendiente: puedo marcarla -->
+        <!-- Pendiente: puedo marcarla (solo si no es día futuro) -->
         <button class="btn-completar"
-                *ngIf="!selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'"
+                *ngIf="!selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision' && !isSelectedTaskFuture"
                 (click)="marcarCompletada()" [disabled]="isLoading">
           <i class="fa fa-check"></i> {{ isLoading ? 'Guardando...' : 'Marcar como Completada' }}
         </button>
+        <div class="completada-msg" *ngIf="!selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision' && isSelectedTaskFuture">
+          <i class="fa fa-clock-o"></i> Esta tarea es de un día futuro — no se puede marcar aún
+        </div>
         <!-- Yo ya completé pero otros aún no -->
         <div class="completada-msg mi-parte-msg"
              *ngIf="selectedTarea?.yo_complete && selectedTarea?.estado !== 'completada' && selectedTarea?.estado !== 'en_revision'">

@@ -102,7 +102,7 @@ export class Approvals implements OnInit {
     this.projectSvc.getProjects({ limit: 100 }).subscribe({
       next: ({ data }) => {
         const pending = data.filter(p =>
-          ['en_revision', 'Por Validar', 'rechazado'].includes(p.estado ?? '')
+          ['en_revision', 'Por Validar'].includes(p.estado ?? '')
         );
 
         this.projects = pending.map(p => ({
@@ -247,7 +247,7 @@ export class Approvals implements OnInit {
       if (!result.isConfirmed) return;
       this.projectSvc.approveProject(project.id, true).subscribe({
         next: () => {
-          project.estado = 'aprobado';
+          this.projects = this.projects.filter(p => p.id !== project.id);
           void Swal.fire({ icon: 'success', title: '¡Aprobado!', text: `"${project.nombre}" fue aprobado.`, timer: 2000 });
           this.cdr.detectChanges();
         },
@@ -274,8 +274,7 @@ export class Approvals implements OnInit {
     this.projectSvc.changeProjectStatus(this.rejectingProject.id, 'rechazado').subscribe({
       next: () => {
         if (this.rejectingProject) {
-          this.rejectingProject.estado = 'rechazado';
-          this.rejectingProject.observaciones_rechazo = this.rejectObservaciones;
+          this.projects = this.projects.filter(p => p.id !== this.rejectingProject!.id);
         }
         void Swal.fire({ icon: 'info', title: 'Rechazado', text: 'El proyecto fue devuelto con observaciones.', timer: 2000 });
         this.closeRejectModal();

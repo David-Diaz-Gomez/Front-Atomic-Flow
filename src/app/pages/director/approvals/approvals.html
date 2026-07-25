@@ -11,8 +11,6 @@
   <!-- Stats -->
   <div class="approval-stats">
     <div class="astat pending"><i class="fa fa-clock-o"></i><span class="astat-num">{{ pendingCount }}</span><span class="astat-label">Pendiente(s)</span></div>
-    <div class="astat approved"><i class="fa fa-check"></i><span class="astat-num">{{ approvedCount }}</span><span class="astat-label">Aprobado(s)</span></div>
-    <div class="astat rejected"><i class="fa fa-times"></i><span class="astat-num">{{ rejectedCount }}</span><span class="astat-label">Rechazado(s)</span></div>
   </div>
 
   <!-- Loading -->
@@ -228,15 +226,9 @@
         <!-- /budget-detail -->
 
         <!-- Actions -->
-        <div class="card-actions" *ngIf="p.estado === 'en_revision'">
+        <div class="card-actions">
           <button class="btn-approve" (click)="approve(p)"><i class="fa fa-check"></i> Aprobar</button>
           <button class="btn-reject" (click)="openRejectModal(p)"><i class="fa fa-times"></i> Rechazar</button>
-        </div>
-        <div class="resolved-badge approved-badge" *ngIf="p.estado === 'aprobado'">
-          <i class="fa fa-check-circle"></i> Proyecto Aprobado
-        </div>
-        <div class="resolved-badge rejected-badge" *ngIf="p.estado === 'rechazado'">
-          <i class="fa fa-times-circle"></i> Proyecto Rechazado
         </div>
 
       </div>

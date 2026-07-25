@@ -12,6 +12,7 @@ const ESTADO_LABELS: Record<string, string> = {
   borrador: 'Borrador', en_revision: 'En Revisión', rechazado: 'Rechazado',
   aprobado: 'Aprobado', en_produccion: 'En Producción', pausado: 'Pausado',
   completado: 'Completado', finalizado: 'Finalizado', cancelado: 'Cancelado',
+  inactiva: 'Inactiva',
   'Por Validar': 'Por Validar', 'En Desarrollo': 'En Desarrollo',
 };
 
@@ -30,6 +31,7 @@ export class Home implements OnInit, OnDestroy {
   filterEstado = '';
   loading = true;
   error = '';
+  inactivandoId: number | null = null;
   private refreshSub: Subscription | null = null;
 
   get stats() {
@@ -95,6 +97,24 @@ export class Home implements OnInit, OnDestroy {
   goToEdit(id: number): void   { this.router.navigate(['/dashboard/director/project-new'], { queryParams: { id } }); }
   goToNew(): void              { this.router.navigate(['/dashboard/director/project-new']); }
   goToEvidencias(): void       { this.router.navigate(['/dashboard/director/evidencias']); }
+
+  inactivarProyecto(p: any): void {
+    if (!confirm(`¿Inactivar el proyecto "${p.nombre}"? Esta acción no se puede deshacer.`)) return;
+    this.inactivandoId = p.id;
+    this.projectSvc.inactivarProyecto(p.id).subscribe({
+      next: () => {
+        p.estado = 'inactiva';
+        this.applyFilters();
+        this.inactivandoId = null;
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        alert(err?.error?.error?.message ?? 'No se pudo inactivar el proyecto.');
+        this.inactivandoId = null;
+        this.cdr.detectChanges();
+      }
+    });
+  }
 
   getEstadoLabel(estado: string | null | undefined): string {
     if (!estado) return 'Sin estado';

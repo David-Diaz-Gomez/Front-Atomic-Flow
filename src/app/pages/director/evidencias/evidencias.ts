@@ -76,7 +76,8 @@ export class DirectorEvidencias implements OnInit {
   fmt(iso: string): string {
     if (!iso) return '—';
     const d = new Date(iso);
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const hora = d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${hora}`;
   }
 
   minutosEntre(a: string, b: string): string {

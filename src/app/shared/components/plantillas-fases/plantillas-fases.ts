@@ -48,9 +48,9 @@ interface TareaEditable {
 }
 
 function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().substring(0, 10);
+  const [y, m, d] = dateStr.substring(0, 10).split('-').map(Number);
+  const date = new Date(y, (m ?? 1) - 1, (d ?? 1) + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 const TIPOS_FALLBACK = ['Carpintería','Impresiones','Diseño','Montaje','Logística','Revisión','Instalación','Pintura','Eléctrico','Otro'];
@@ -130,29 +130,35 @@ export class PlantillasFases implements OnInit {
   }
 
   buildFasesFromPlantilla(p: Plantilla): void {
+    const clamp = (d: string) => {
+      if (this.proyectoFechaFin && d > this.proyectoFechaFin) return this.proyectoFechaFin;
+      if (this.proyectoFechaInicio && d < this.proyectoFechaInicio) return this.proyectoFechaInicio;
+      return d;
+    };
     let cursor = this.proyectoFechaInicio;
     this.fases = p.fases.map((f) => {
-      const faseInicio = cursor;
-      const faseFin    = addDays(cursor, f.duracion_dias - 1);
+      const faseInicio = clamp(cursor);
+      const faseFin    = clamp(addDays(cursor, f.duracion_dias - 1));
       let tareasCursor = faseInicio;
 
       const tareas: TareaEditable[] = f.tareas.map((t, idx) => {
-        const tFin = addDays(tareasCursor, t.duracion_dias - 1);
+        const tFin = clamp(addDays(tareasCursor, t.duracion_dias - 1));
+        const tInicio = clamp(tareasCursor);
         const tarea: TareaEditable = {
           nombre:         t.nombre,
           descripcion:    t.descripcion ?? '',
           tipo_tarea:     t.tipo_tarea.replace(/\[|\]/g, '').trim(),
-          fecha_inicio:   tareasCursor,
+          fecha_inicio:   tInicio,
           fecha_fin:      tFin,
           hora_inicio:    t.hora_inicio,
           hora_fin:       t.hora_fin,
           depende_de_idx: idx > 0 ? idx - 1 : null,
         };
-        tareasCursor = addDays(tFin, 1);
+        tareasCursor = addDays(addDays(tareasCursor, t.duracion_dias - 1), 1);
         return tarea;
       });
 
-      cursor = addDays(faseFin, 1);
+      cursor = addDays(addDays(cursor, f.duracion_dias - 1), 1);
       return { nombre: f.nombre, descripcion: f.descripcion ?? '', fecha_inicio: faseInicio, fecha_fin: faseFin, tareas, expanded: true };
     });
   }
@@ -160,11 +166,11 @@ export class PlantillasFases implements OnInit {
   // ── Edit helpers ──────────────────────────────────────────────────────────
 
   emptyFase(): FaseEditable {
-    return { nombre: '', descripcion: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaInicio, tareas: [], expanded: true };
+    return { nombre: '', descripcion: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaFin || this.proyectoFechaInicio, tareas: [], expanded: true };
   }
 
   emptyTarea(): TareaEditable {
-    return { nombre: '', descripcion: '', tipo_tarea: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaInicio, hora_inicio: '07:00', hora_fin: '17:00', depende_de_idx: null };
+    return { nombre: '', descripcion: '', tipo_tarea: '', fecha_inicio: this.proyectoFechaInicio, fecha_fin: this.proyectoFechaFin || this.proyectoFechaInicio, hora_inicio: '07:00', hora_fin: '17:00', depende_de_idx: null };
   }
 
   addFase(): void { this.fases.push(this.emptyFase()); this.cdr.detectChanges(); }

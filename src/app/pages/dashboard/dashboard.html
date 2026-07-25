@@ -7,7 +7,7 @@
     <div class="main-viewport">
       <div class="main-topbar">
         <app-role-view-switcher></app-role-view-switcher>
-        <app-notif-bell></app-notif-bell>
+        <app-notif-bell *ngIf="!isKiosk"></app-notif-bell>
       </div>
       <main class="content-area">
         <router-outlet></router-outlet>

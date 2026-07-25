@@ -62,6 +62,7 @@
       <option value="aprobado">Aprobado</option>
       <option value="en_produccion">En Producción</option>
       <option value="completado">Completado</option>
+      <option value="inactiva">Inactiva</option>
     </select>
   </div>
 
@@ -108,8 +109,13 @@
         <button class="btn-action btn-ver" (click)="goToDetail(p.id)">
           <i class="fa fa-eye"></i> Ver Detalle
         </button>
-        <button class="btn-action btn-edit" (click)="goToEdit(p.id)">
+        <button class="btn-action btn-edit" (click)="goToEdit(p.id)" *ngIf="p.estado !== 'inactiva'">
           <i class="fa fa-pencil"></i> Editar
+        </button>
+        <button class="btn-action btn-inactivar" (click)="inactivarProyecto(p)"
+                *ngIf="p.estado === 'borrador'"
+                [disabled]="inactivandoId === p.id">
+          <i class="fa fa-ban"></i> {{ inactivandoId === p.id ? 'Inactivando...' : 'Inactivar' }}
         </button>
       </div>
     </div>

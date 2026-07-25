@@ -863,26 +863,27 @@ export class ProjectForm implements OnInit {
     const finish = () => {
       this.saving = false;
 
-      // Proyecto en producción: cambiar de fechas/insumos no debe regresarlo a "en_revision"
-      // tal cual — depende de qué cambió.
-      if (sendToReview && projectId && this.isEdit && this.originalEstado === 'en_produccion') {
+      // Proyectos ya aprobados o en producción: solo enviar a revisión si cambiaron recursos
+      const isApprovedOrProduction = this.isEdit && projectId
+        && ['aprobado', 'en_produccion'].includes(this.originalEstado ?? '');
+
+      if (sendToReview && isApprovedOrProduction) {
         const datesChanged = this.form.fecha_inicio !== this.originalFechaInicio
           || this.form.fecha_fin !== this.originalFechaFin;
         const resourcesChanged = this.buildBudgetSnapshot() !== this.originalBudgetSnapshot;
 
         if (resourcesChanged) {
-          // Cambios en materiales/insumos sobre un proyecto en producción → requiere re-aprobación
           this.projectSvc.changeProjectStatus(projectId, 'en_revision').subscribe({ error: () => {} });
           this.projectSvc.notifyResourceChange(projectId).subscribe({ error: () => {} });
           void Swal.fire({
             icon: 'info', title: 'Cambios enviados a revisión',
-            text: 'El proyecto está en producción y se modificaron materiales/insumos. Se notificó a los directores para su re-aprobación.',
+            text: 'Se modificaron materiales/insumos. Se notificó a los directores para su re-aprobación.',
             timer: 3000,
           }).then(() => void this.router.navigate(['/dashboard/director/home']));
           return;
         }
 
-        if (datesChanged) {
+        if (datesChanged && this.originalEstado === 'en_produccion') {
           this.projectSvc.updateProjectDates(projectId, {
             fecha_inicio: this.form.fecha_inicio, fecha_fin: this.form.fecha_fin,
           }).subscribe({ error: () => {} });
@@ -894,6 +895,7 @@ export class ProjectForm implements OnInit {
           return;
         }
 
+        // Cambios no-dinero (nombre, director, descripción, fechas en estado aprobado): guardar sin cambiar estado
         void Swal.fire({ icon: 'success', title: '¡Listo!', text: 'Proyecto actualizado correctamente', timer: 2500 })
           .then(() => void this.router.navigate(['/dashboard/director/home']));
         return;
