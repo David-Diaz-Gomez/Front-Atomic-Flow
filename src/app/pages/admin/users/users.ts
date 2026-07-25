@@ -158,6 +158,11 @@ export class Users implements OnInit {
       return;
     }
 
+    if (this.editingUser.valor_hora !== null && Number(this.editingUser.valor_hora) < 0) {
+      Swal.fire('Atención', 'El valor por hora no puede ser negativo.', 'warning');
+      return;
+    }
+
     // El servicio api.ts ahora decide si es POST o PUT basado en el ID
     this.api.saveUser(this.editingUser).subscribe({
       next: (res) => {

@@ -23,37 +23,34 @@
           </select>
         </div>
 
-        <!-- Filtros solo visibles en tab "Por Operario" -->
-        <ng-container *ngIf="activeTab === 'operario'">
-          <div class="filter-field proyecto-field">
-            <label>Proyecto</label>
-            <div class="proyecto-autocomplete">
-              <input type="text" class="filter-select"
-                [(ngModel)]="filtroProyectoText"
-                (ngModelChange)="showProyectoDropdown = true"
-                (focus)="showProyectoDropdown = true"
-                (blur)="onProyectoBlur()"
-                placeholder="Todos los proyectos"
-                autocomplete="off">
-              <button class="proyecto-clear" *ngIf="filtroProyectoText" (mousedown)="clearProyecto()">
-                <i class="fa fa-times"></i>
-              </button>
-              <div class="proyecto-dropdown" *ngIf="showProyectoDropdown && proyectosBusqueda.length > 0">
-                <div class="proyecto-option" *ngFor="let p of proyectosBusqueda" (mousedown)="selectProyecto(p)">
-                  {{ p.nombre }}
-                </div>
+        <div class="filter-field proyecto-field">
+          <label>Proyecto</label>
+          <div class="proyecto-autocomplete">
+            <input type="text" class="filter-select"
+              [(ngModel)]="filtroProyectoText"
+              (ngModelChange)="showProyectoDropdown = true"
+              (focus)="showProyectoDropdown = true"
+              (blur)="onProyectoBlur()"
+              placeholder="Todos los proyectos"
+              autocomplete="off">
+            <button class="proyecto-clear" *ngIf="filtroProyectoText" (mousedown)="clearProyecto()">
+              <i class="fa fa-times"></i>
+            </button>
+            <div class="proyecto-dropdown" *ngIf="showProyectoDropdown && proyectosBusqueda.length > 0">
+              <div class="proyecto-option" *ngFor="let p of proyectosBusqueda" (mousedown)="selectProyecto(p)">
+                {{ p.nombre }}
               </div>
             </div>
           </div>
-          <div class="filter-field">
-            <label>Desde</label>
-            <input type="date" class="filter-select" [(ngModel)]="filtroFechaInicio" (ngModelChange)="loadPago()">
-          </div>
-          <div class="filter-field">
-            <label>Hasta</label>
-            <input type="date" class="filter-select" [(ngModel)]="filtroFechaFin" (ngModelChange)="loadPago()">
-          </div>
-        </ng-container>
+        </div>
+        <div class="filter-field">
+          <label>Desde</label>
+          <input type="date" class="filter-select" [(ngModel)]="filtroFechaInicio" [max]="filtroFechaFin" (ngModelChange)="onFechaInicioChange()">
+        </div>
+        <div class="filter-field">
+          <label>Hasta</label>
+          <input type="date" class="filter-select" [(ngModel)]="filtroFechaFin" [min]="filtroFechaInicio" (ngModelChange)="onFechaFinChange()">
+        </div>
       </div>
 
       <!-- Tabs -->
@@ -285,11 +282,11 @@
         </div>
         <div class="filter-field">
           <label>Desde</label>
-          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaInicio" (ngModelChange)="onCambiosFilterChange()">
+          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaInicio" [max]="cambiosFechaFin" (ngModelChange)="onCambiosFechaInicioChange()">
         </div>
         <div class="filter-field">
           <label>Hasta</label>
-          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaFin" (ngModelChange)="onCambiosFilterChange()">
+          <input type="date" class="filter-select" [(ngModel)]="cambiosFechaFin" [min]="cambiosFechaInicio" (ngModelChange)="onCambiosFechaFinChange()">
         </div>
       </div>
     </div>
@@ -307,6 +304,10 @@
       <div class="table-card" *ngIf="cambiosData.length > 0">
         <div class="table-card-header">
           <span class="table-count">{{ cambiosTotalRecords }} cambio{{ cambiosTotalRecords !== 1 ? 's' : '' }}</span>
+          <button class="btn-excel" (click)="downloadCambiosExcel()" [disabled]="loadingCambiosExcel">
+            <i class="fa" [ngClass]="loadingCambiosExcel ? 'fa-spinner fa-spin' : 'fa-download'"></i>
+            {{ loadingCambiosExcel ? 'Generando...' : 'Descargar Excel' }}
+          </button>
         </div>
         <div class="audit-feed">
           <div class="audit-row" *ngFor="let c of cambiosData">

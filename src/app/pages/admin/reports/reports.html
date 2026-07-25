@@ -44,11 +44,11 @@
     </div>
     <div class="filter-field">
       <label>Desde</label>
-      <input type="date" class="filter-date" [(ngModel)]="filtroFechaInicio" (ngModelChange)="onFilterChange()">
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaInicio" [max]="filtroFechaFin" (ngModelChange)="onFechaInicioChange()">
     </div>
     <div class="filter-field">
       <label>Hasta</label>
-      <input type="date" class="filter-date" [(ngModel)]="filtroFechaFin" (ngModelChange)="onFilterChange()">
+      <input type="date" class="filter-date" [(ngModel)]="filtroFechaFin" [min]="filtroFechaInicio" (ngModelChange)="onFechaFinChange()">
     </div>
   </div>
 
@@ -149,7 +149,7 @@
     <div class="section-grid section-grid-1" *ngIf="activeTab === 'grafico'">
       <div class="chart-card chart-card-wide">
         <div class="chart-card-header">
-          <h3>Horas por Proyecto — {{ tipoRecurso === 'maquinaria' ? 'Maquinaria' : 'Operarios' }}</h3>
+          <h3>{{ ocupacionChartTitle }}</h3>
           <span class="chart-sub" *ngIf="tipoRecurso === 'operarios'">
             <i class="fa fa-info-circle"></i> Tiempo real: asignación → entrega de evidencia
           </span>

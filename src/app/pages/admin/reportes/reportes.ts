@@ -29,7 +29,7 @@ export class Reportes implements OnInit, OnDestroy {
   // ── Tabs ──────────────────────────────────────────────────────────────────
   activeTab: TabMO = 'proyecto';
 
-  // ── Filtros exclusivos del tab Operario ───────────────────────────────────
+  // ── Filtros de fecha (compartidos por ambos tabs) ──────────────────────────
   filtroFechaInicio: string = '';
   filtroFechaFin: string = '';
 
@@ -52,6 +52,7 @@ export class Reportes implements OnInit, OnDestroy {
   cambiosLimit = 5;
   cambiosTotalPages = 1;
   cambiosTotalRecords = 0;
+  loadingCambiosExcel = false;
 
   constructor(
     private api: Api,
@@ -98,7 +99,7 @@ export class Reportes implements OnInit, OnDestroy {
     this.loadingMO = true;
     this.moChart?.destroy();
     this.moChart = null;
-    this.api.getManoDeObra(this.currentFilters).subscribe({
+    this.api.getManoDeObra(this.filters).subscribe({
       next: (data) => {
         this.moData = data;
         this.loadingMO = false;
@@ -111,7 +112,7 @@ export class Reportes implements OnInit, OnDestroy {
 
   loadPago(): void {
     this.loadingPago = true;
-    this.api.getPagoOperarios(this.pagoFilters).subscribe({
+    this.api.getPagoOperarios(this.filters).subscribe({
       next: (data) => { this.pagoData = data; this.loadingPago = false; },
       error: () => { this.pagoData = []; this.loadingPago = false; },
     });
@@ -145,6 +146,21 @@ export class Reportes implements OnInit, OnDestroy {
     this.loadCambios();
   }
 
+  /** "Hasta" nunca puede quedar antes de "Desde" (igual que en el Dashboard General). */
+  onCambiosFechaInicioChange(): void {
+    if (this.cambiosFechaFin && this.cambiosFechaInicio > this.cambiosFechaFin) {
+      this.cambiosFechaFin = this.cambiosFechaInicio;
+    }
+    this.onCambiosFilterChange();
+  }
+
+  onCambiosFechaFinChange(): void {
+    if (this.cambiosFechaInicio && this.cambiosFechaFin < this.cambiosFechaInicio) {
+      this.cambiosFechaFin = this.cambiosFechaInicio;
+    }
+    this.onCambiosFilterChange();
+  }
+
   cambiosPageAnterior(): void {
     if (this.cambiosPage <= 1) return;
     this.cambiosPage--;
@@ -157,14 +173,7 @@ export class Reportes implements OnInit, OnDestroy {
     this.loadCambios();
   }
 
-  private get currentFilters() {
-    return {
-      estado:      this.filtroEstado   || undefined,
-      id_proyecto: this.filtroProyecto || undefined,
-    };
-  }
-
-  private get pagoFilters() {
+  private get filters() {
     return {
       estado:       this.filtroEstado      || undefined,
       id_proyecto:  this.filtroProyecto    || undefined,
@@ -174,6 +183,21 @@ export class Reportes implements OnInit, OnDestroy {
   }
 
   onFilterChange(): void { this.loadAll(); }
+
+  /** "Hasta" nunca puede quedar antes de "Desde" (igual que en el Dashboard General). */
+  onFechaInicioChange(): void {
+    if (this.filtroFechaFin && this.filtroFechaInicio > this.filtroFechaFin) {
+      this.filtroFechaFin = this.filtroFechaInicio;
+    }
+    this.onFilterChange();
+  }
+
+  onFechaFinChange(): void {
+    if (this.filtroFechaInicio && this.filtroFechaFin < this.filtroFechaInicio) {
+      this.filtroFechaFin = this.filtroFechaInicio;
+    }
+    this.onFilterChange();
+  }
 
   setTab(tab: TabMO): void {
     this.activeTab = tab;
@@ -236,6 +260,10 @@ export class Reportes implements OnInit, OnDestroy {
 
   accionIcon(accion: string): string {
     return { CREATE: 'fa-plus-circle', UPDATE: 'fa-pencil', DELETE: 'fa-trash' }[accion] ?? 'fa-circle';
+  }
+
+  accionLabel(accion: string): string {
+    return { CREATE: 'Creó', UPDATE: 'Actualizó', DELETE: 'Eliminó' }[accion as 'CREATE' | 'UPDATE' | 'DELETE'] ?? accion;
   }
 
   accionClass(accion: string): string {
@@ -308,6 +336,39 @@ export class Reportes implements OnInit, OnDestroy {
       { key: 'total_pagado',    label: 'Valor Total (COP)' },
     ];
     this.downloadXlsx(this.pagoData, cols, 'reporte_valor_operarios.xlsx', 'Valor Operarios');
+  }
+
+  // El listado en pantalla está paginado (cambiosLimit = 5): el Excel debe llevar TODOS los
+  // registros que cumplen los filtros actuales, no solo la página visible, así que se pide
+  // de nuevo con un límite alto en vez de reusar cambiosData.
+  downloadCambiosExcel(): void {
+    this.loadingCambiosExcel = true;
+    this.api.getCambiosSistema({
+      fecha_inicio: this.cambiosFechaInicio || undefined,
+      fecha_fin:    this.cambiosFechaFin    || undefined,
+      tipo:         this.cambiosTipo        || undefined,
+      page:         1,
+      limit:        100000,
+    }).subscribe({
+      next: ({ data }) => {
+        this.loadingCambiosExcel = false;
+        const cols = [
+          { key: 'fecha_fmt',       label: 'Fecha' },
+          { key: 'usuario_nombre',  label: 'Usuario' },
+          { key: 'accion_label',    label: 'Acción' },
+          { key: 'entidad',         label: 'Entidad' },
+          { key: 'registro_nombre', label: 'Registro' },
+          { key: 'descripcion',     label: 'Descripción' },
+        ];
+        const rows = data.map(r => ({
+          ...r,
+          fecha_fmt: this.formatDateTime(r.creado_en),
+          accion_label: this.accionLabel(r.accion),
+        }));
+        this.downloadXlsx(rows, cols, 'cambios_sistema.xlsx', 'Cambios');
+      },
+      error: () => { this.loadingCambiosExcel = false; },
+    });
   }
 
   private downloadXlsx(data: any[], cols: { key: string; label: string }[], filename: string, sheetName: string): void {

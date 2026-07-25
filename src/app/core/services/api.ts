@@ -371,10 +371,12 @@ export class Api {
     );
   }
 
-  getManoDeObra(filters: { estado?: string; id_proyecto?: number }): Observable<any[]> {
+  getManoDeObra(filters: { estado?: string; id_proyecto?: number; fecha_inicio?: string; fecha_fin?: string }): Observable<any[]> {
     let params = new HttpParams();
-    if (filters.estado)      params = params.set('estado', filters.estado);
-    if (filters.id_proyecto) params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.estado)       params = params.set('estado', filters.estado);
+    if (filters.id_proyecto)  params = params.set('id_proyecto', filters.id_proyecto.toString());
+    if (filters.fecha_inicio) params = params.set('fecha_inicio', filters.fecha_inicio);
+    if (filters.fecha_fin)    params = params.set('fecha_fin', filters.fecha_fin);
     return this.http.get<any>(`${this.baseUrl}/reportes/mano-de-obra`, { params }).pipe(
       map((r: any) => r?.data ?? []),
       catchError(() => of([]))
