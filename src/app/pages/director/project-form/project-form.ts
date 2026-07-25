@@ -137,6 +137,7 @@ export class ProjectForm implements OnInit {
   coordinators: any[] = [];
   directors: any[] = [];
   loadingCatalogs = false;
+  currentUserName = '';
 
   // tipo_recurso IDs keyed by normalized name — loaded from GET /tipos-recurso
   tipoIds: Record<string, number> = {};
@@ -211,9 +212,12 @@ export class ProjectForm implements OnInit {
         // Solo se autoselecciona si el usuario logueado es efectivamente un Director
         // (aparece en el catálogo). Si no (p. ej. un Administrador creando el proyecto
         // desde la vista Director), queda sin asignar y debe elegirse manualmente.
-        const currentUserId = this.apiSvc.getCurrentUserId();
-        if (this.directors.some(d => d.id === currentUserId)) {
-          this.form.id_director_asignado = currentUserId;
+        const me = this.apiSvc.getCurrentUser();
+        if (me) {
+          this.currentUserName = me.name;
+          if (this.directors.some(d => d.id === me.id)) {
+            this.form.id_director_asignado = me.id;
+          }
         }
         this.loadingCatalogs = false;
         this.cdr.detectChanges();

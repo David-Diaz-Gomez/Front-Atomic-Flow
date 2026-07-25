@@ -3,8 +3,8 @@ import { isPlatformBrowser } from '@angular/common';
 import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
 import { Api } from '../../../core/services/api';
-import Swal from 'sweetalert2';
 import { forkJoin } from 'rxjs';
+import Swal from 'sweetalert2';
 
 const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
@@ -15,11 +15,21 @@ const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
   styleUrl: './evidences.scss',
 })
 export class CoordEvidences implements OnInit {
-  tareas: any[] = [];
+  // Tareas con operarios que marcaron su horario (nuevos pendientes de aprobación)
+  tareasPendientes: any[] = [];
+  // Tareas completadas/en_revision para subir evidencias (flujo legacy)
+  tareasEvidencia: any[] = [];
   loading = true;
   filterProyecto: number | null = null;
+  activeTab: 'pendientes' | 'evidencias' = 'pendientes';
 
-  // Evidence modal
+  // Aprobación forzada modal
+  showForzadaModal = false;
+  forzadaTarea: any = null;
+  forzadaJustificacion = '';
+  forzadaSaving = false;
+
+  // Evidence modal (evidencias legacy)
   showEvidModal = false;
   evidTarea: any = null;
   selectedFiles: File[] = [];
@@ -36,6 +46,8 @@ export class CoordEvidences implements OnInit {
   dispLoading = false;
   reasignSaving = false;
 
+  approvingId: string | null = null; // `${tareaId}_${idUsuario}` mientras se aprueba
+
   constructor(
     private projectSvc: ProjectService,
     private catalogSvc: CatalogService,
@@ -48,24 +60,100 @@ export class CoordEvidences implements OnInit {
     return isPlatformBrowser(this.pid) && window.innerWidth <= 768;
   }
 
+  get pendienteCount(): number {
+    return this.tareasPendientes.reduce((acc, t) => acc + t.operarios.filter((o: any) => o.pendiente_aprobacion).length, 0);
+  }
+
   ngOnInit(): void {
-    this.loadTareas();
+    this.loadAll();
     this.catalogSvc.getUsersByRole(4).subscribe({
       next: (d: any[]) => { this.operarios = d; this.cdr.detectChanges(); },
       error: () => {},
     });
   }
 
-  loadTareas(): void {
+  loadAll(): void {
     this.loading = true;
     const idCoord = this.api.getCurrentUserId() ?? 0;
+    let pendDone = false, evidDone = false;
+    const checkDone = () => { if (pendDone && evidDone) { this.loading = false; this.cdr.detectChanges(); } };
+
+    this.projectSvc.getPendientesAprobacion(idCoord, this.filterProyecto ?? undefined).subscribe({
+      next: (d: any[]) => { this.tareasPendientes = d; pendDone = true; checkDone(); },
+      error: () => { pendDone = true; checkDone(); },
+    });
+
     this.projectSvc.getTareasCompletadas(idCoord, this.filterProyecto ?? undefined).subscribe({
-      next: (d: any[]) => { this.tareas = d; this.loading = false; this.cdr.detectChanges(); },
-      error: () => { this.loading = false; this.cdr.detectChanges(); },
+      next: (d: any[]) => { this.tareasEvidencia = d; evidDone = true; checkDone(); },
+      error: () => { evidDone = true; checkDone(); },
     });
   }
 
-  // ── Evidence modal ────────────────────────────────────────────────────────
+  // ── Aprobación individual de operario ─────────────────────────────────────
+
+  aprobarParte(tarea: any, operario: any): void {
+    const key = `${tarea.id}_${operario.id_usuario}`;
+    this.approvingId = key;
+    this.cdr.detectChanges();
+
+    this.projectSvc.aprobarParteOperario(tarea.id, operario.id_usuario).subscribe({
+      next: (res: any) => {
+        this.approvingId = null;
+        // Actualizar en memoria sin recargar todo
+        operario.completado_en = new Date().toISOString();
+        operario.pendiente_aprobacion = false;
+        tarea.aprobados = res.aprobados ?? (tarea.aprobados + 1);
+        tarea.porcentaje = res.porcentaje ?? tarea.porcentaje;
+
+        if (res.completada) {
+          // Remover de pendientes, ya completada
+          this.tareasPendientes = this.tareasPendientes.filter((t: any) => t.id !== tarea.id);
+          void Swal.fire({ icon: 'success', title: `¡Tarea completada! (${tarea.nombre})`, timer: 2000, showConfirmButton: false });
+          this.loadAll();
+        } else {
+          void Swal.fire({ icon: 'success', title: 'Parte aprobada', text: `Progreso: ${res.porcentaje}%`, timer: 1400, showConfirmButton: false });
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.approvingId = null;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo aprobar', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  // ── Aprobación forzada ─────────────────────────────────────────────────────
+
+  openForzadaModal(tarea: any): void {
+    this.forzadaTarea = tarea;
+    this.forzadaJustificacion = '';
+    this.showForzadaModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeForzadaModal(): void { this.showForzadaModal = false; this.forzadaTarea = null; this.cdr.detectChanges(); }
+
+  submitForzada(): void {
+    if (!this.forzadaTarea || !this.forzadaJustificacion.trim()) return;
+    this.forzadaSaving = true;
+    this.projectSvc.aprobarTareaForzada(this.forzadaTarea.id, this.forzadaJustificacion).subscribe({
+      next: () => {
+        this.forzadaSaving = false;
+        this.tareasPendientes = this.tareasPendientes.filter((t: any) => t.id !== this.forzadaTarea!.id);
+        void Swal.fire({ icon: 'success', title: 'Tarea completada (forzada)', timer: 1600, showConfirmButton: false });
+        this.closeForzadaModal();
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.forzadaSaving = false;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  // ── Evidence modal (legacy) ────────────────────────────────────────────────
 
   openEvidModal(t: any): void {
     this.evidTarea = t;
@@ -104,11 +192,10 @@ export class CoordEvidences implements OnInit {
     for (const f of this.selectedFiles) fd.append('imagen', f);
     fd.append('descripcion', this.evidDesc);
     fd.append('id_coordinador', String(this.api.getCurrentUserId() ?? ''));
-
     this.projectSvc.subirEvidencias(this.evidTarea.id, fd).subscribe({
       next: () => {
         this.evidSaving = false;
-        this.tareas = this.tareas.filter(t => t.id !== this.evidTarea!.id);
+        this.tareasEvidencia = this.tareasEvidencia.filter(t => t.id !== this.evidTarea!.id);
         void Swal.fire({ icon: 'success', title: 'Evidencias subidas', timer: 1500, showConfirmButton: false });
         this.closeEvidModal();
         this.cdr.detectChanges();
@@ -121,12 +208,10 @@ export class CoordEvidences implements OnInit {
     });
   }
 
-  /** Sube evidencia Y verifica la tarea en un solo clic (si tiene archivos + está en_revision). */
   subirYVerificar(): void {
     if (!this.evidTarea) return;
     this.evidSaving = true;
     const tarea = this.evidTarea;
-
     const verificar$ = this.projectSvc.completarTarea(tarea.fase_id, tarea.id);
 
     if (this.selectedFiles.length) {
@@ -137,13 +222,13 @@ export class CoordEvidences implements OnInit {
       forkJoin([this.projectSvc.subirEvidencias(tarea.id, fd), verificar$]).subscribe({
         next: () => {
           this.evidSaving = false;
-          this.tareas = this.tareas.filter(t => t.id !== tarea.id);
+          this.tareasEvidencia = this.tareasEvidencia.filter(t => t.id !== tarea.id);
           void Swal.fire({ icon: 'success', title: 'Evidencia subida y tarea verificada', timer: 1800, showConfirmButton: false });
           this.closeEvidModal(); this.cdr.detectChanges();
         },
         error: (err: any) => {
           this.evidSaving = false;
-          void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar la operación', 'error');
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar', 'error');
           this.cdr.detectChanges();
         },
       });
@@ -151,24 +236,23 @@ export class CoordEvidences implements OnInit {
       verificar$.subscribe({
         next: () => {
           this.evidSaving = false;
-          this.tareas = this.tareas.filter(t => t.id !== tarea.id);
+          this.tareasEvidencia = this.tareasEvidencia.filter(t => t.id !== tarea.id);
           void Swal.fire({ icon: 'success', title: 'Tarea verificada y completada', timer: 1500, showConfirmButton: false });
           this.closeEvidModal(); this.cdr.detectChanges();
         },
         error: (err: any) => {
           this.evidSaving = false;
-          void Swal.fire('Error', err?.error?.message ?? 'No se pudo verificar la tarea', 'error');
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo verificar', 'error');
           this.cdr.detectChanges();
         },
       });
     }
   }
 
-  /** Verifica la tarea directamente desde la tarjeta (sin abrir modal de evidencia). */
   verificarTarea(t: any): void {
     void Swal.fire({
       title: '¿Verificar tarea?',
-      html: `<b>${t.nombre}</b><br><small>El operario la marcó como lista. ¿Confirmas sin subir evidencia?</small>`,
+      html: `<b>${t.nombre}</b><br><small>¿Confirmas sin subir evidencia?</small>`,
       icon: 'question', showCancelButton: true,
       confirmButtonText: 'Sí, verificar', cancelButtonText: 'Cancelar',
       confirmButtonColor: '#00A859',
@@ -176,7 +260,7 @@ export class CoordEvidences implements OnInit {
       if (!r.isConfirmed) return;
       this.projectSvc.completarTarea(t.fase_id, t.id).subscribe({
         next: () => {
-          this.tareas = this.tareas.filter(x => x.id !== t.id);
+          this.tareasEvidencia = this.tareasEvidencia.filter(x => x.id !== t.id);
           void Swal.fire({ icon: 'success', title: 'Tarea verificada', timer: 1400, showConfirmButton: false });
           this.cdr.detectChanges();
         },
@@ -210,11 +294,7 @@ export class CoordEvidences implements OnInit {
     if (!this.reasignForm.id_operario || !this.reasignForm.fecha_inicio) return;
     this.dispLoading = true;
     this.projectSvc.getOperarioDisponibilidad(this.reasignForm.id_operario, this.reasignForm.fecha_inicio).subscribe({
-      next: (d: any) => {
-        this.disponibilidad = d;
-        this.dispLoading = false;
-        this.cdr.detectChanges();
-      },
+      next: (d: any) => { this.disponibilidad = d; this.dispLoading = false; this.cdr.detectChanges(); },
       error: () => { this.dispLoading = false; this.cdr.detectChanges(); },
     });
   }
@@ -232,7 +312,7 @@ export class CoordEvidences implements OnInit {
     }).subscribe({
       next: () => {
         this.reasignSaving = false;
-        this.tareas = this.tareas.filter(t => t.id !== this.reasignTarea!.id);
+        this.tareasEvidencia = this.tareasEvidencia.filter(t => t.id !== this.reasignTarea!.id);
         void Swal.fire({ icon: 'success', title: 'Tarea reasignada', timer: 1500, showConfirmButton: false });
         this.closeReasignModal();
         this.cdr.detectChanges();

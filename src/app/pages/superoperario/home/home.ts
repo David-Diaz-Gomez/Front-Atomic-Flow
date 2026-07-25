@@ -74,8 +74,8 @@ export class SuperOpHome implements OnInit, OnDestroy {
   showAnnouncementModal = false;
   currentAnnouncement: { operarioNombre: string; tareas: string[] } | null = null;
   announcementQueue: Array<{ operarioNombre: string; tareas: string[] }> = [];
-  private previousTaskIds = new Set<number>();
-  private previousFilteredTaskIds = new Set<number>();
+  private previousTaskIds = new Set<string>();
+  private previousFilteredTaskIds = new Set<string>();
   private _initialTaskLoad = true;
   private _initialFilteredLoad = true;
   private dismissTimeout: any = null;
@@ -213,34 +213,28 @@ export class SuperOpHome implements OnInit, OnDestroy {
           if (this._initialTaskLoad) {
             this._initialTaskLoad = false;
           } else if (this.kioskMode === 'fijado' && this.dayOffset === 0) {
-            // Only announce in fijado mode viewing today
-            const newTasks = res.filter((t: any) => !this.previousTaskIds.has(t.id));
-            if (newTasks.length > 0) {
-              const byOp = new Map<string, string[]>();
-              for (const t of newTasks) {
-                const name: string = t.operario || 'Operario';
-                if (!byOp.has(name)) byOp.set(name, []);
-                byOp.get(name)!.push(t.nombre);
-              }
-              for (const [operarioNombre, tareas] of byOp) {
-                this.announcementQueue.push({ operarioNombre, tareas });
-              }
-              this.processQueue();
+            // Una notificación por cada horario nuevo (id+hora_inicio como clave única)
+            const newTasks = res.filter((t: any) => !this.previousTaskIds.has(`${t.id}_${t.hora_inicio}`));
+            for (const t of newTasks) {
+              this.announcementQueue.push({ operarioNombre: t.operario || 'Operario', tareas: [t.nombre] });
             }
+            if (newTasks.length > 0) this.processQueue();
           }
-          this.previousTaskIds = new Set(res.map((t: any) => t.id));
+          this.previousTaskIds = new Set(res.map((t: any) => `${t.id}_${t.hora_inicio}`));
           this.tareas = res;
         } else {
-          // Filtered operario — track new tasks for fijado mode
+          // Filtered operario — una notificación por cada horario nuevo
           if (!this._initialFilteredLoad && this.kioskMode === 'fijado' && this.dayOffset === 0) {
-            const newTasks = res.filter((t: any) => !this.previousFilteredTaskIds.has(t.id));
+            const newTasks = res.filter((t: any) => !this.previousFilteredTaskIds.has(`${t.id}_${t.hora_inicio}`));
             if (newTasks.length > 0 && this.filteredOperario) {
-              this.announcementQueue.push({ operarioNombre: this.filteredOperario.nombre, tareas: newTasks.map((t: any) => t.nombre) });
+              for (const t of newTasks) {
+                this.announcementQueue.push({ operarioNombre: this.filteredOperario.nombre, tareas: [t.nombre] });
+              }
               this.processQueue();
             }
           }
           this._initialFilteredLoad = false;
-          this.previousFilteredTaskIds = new Set(res.map((t: any) => t.id));
+          this.previousFilteredTaskIds = new Set(res.map((t: any) => `${t.id}_${t.hora_inicio}`));
           this.filteredTareas = res;
         }
         this.cdr.detectChanges();
@@ -346,12 +340,14 @@ export class SuperOpHome implements OnInit, OnDestroy {
         this.loadTareas(op.id);
         if (this.view === 'semana') this.loadWeekData();
         this.startInactivityWatch();
-        // Post-login queue: show today's assigned tasks in fijado mode
+        // Post-login queue: anunciar cada horario del día individualmente
         if (this.kioskMode === 'fijado') {
           this.api.getSuperOpTareas(this.todayRealKey, op.id).subscribe({
             next: (tasks: any[]) => {
               if (tasks?.length > 0) {
-                this.announcementQueue.push({ operarioNombre: op.nombre, tareas: tasks.map((t: any) => t.nombre) });
+                for (const t of tasks) {
+                  this.announcementQueue.push({ operarioNombre: op.nombre, tareas: [t.nombre] });
+                }
                 this.processQueue();
               }
             },

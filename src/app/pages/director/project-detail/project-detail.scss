@@ -501,6 +501,10 @@
       font-family: var(--font-interface); font-weight: bold; font-size: 0.85rem; color: #000;
       cursor: pointer; transition: 0.2s;
       &:hover { filter: brightness(1.05); }
+      &--template {
+        background: white; border: 2px solid #0052cc; color: #0052cc;
+        &:hover { background: #eff6ff; filter: none; }
+      }
     }
   }
   .fases-locked {

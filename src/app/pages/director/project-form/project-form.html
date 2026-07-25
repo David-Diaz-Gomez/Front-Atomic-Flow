@@ -66,7 +66,13 @@
         <!-- Director Asignado -->
         <div class="form-group">
           <label>Director Asignado *</label>
-          <select [(ngModel)]="form.id_director_asignado">
+          <!-- En modo creación: bloqueado al usuario actual -->
+          <div *ngIf="!isEdit" class="director-self-chip">
+            <i class="fa fa-user-circle"></i> {{ currentUserName || 'Tú' }}
+            <span class="director-self-badge">Tú</span>
+          </div>
+          <!-- En modo edición: dropdown completo -->
+          <select *ngIf="isEdit" [(ngModel)]="form.id_director_asignado">
             <option [ngValue]="null" disabled>Seleccionar director...</option>
             <option *ngFor="let d of directors" [ngValue]="d.id">{{ d.nombre }} {{ d.apellido }}</option>
           </select>

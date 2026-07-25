@@ -60,6 +60,64 @@ textarea.mform-input { resize: vertical; font-family: inherit; }
 .btn-primary { padding: 9px 20px; background: #0052cc; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; &:hover:not(:disabled) { background: #003d99; } &:disabled { opacity: .6; cursor: not-allowed; } }
 .btn-reasign-confirm { padding: 9px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; &:hover:not(:disabled) { background: #b91c1c; } &:disabled { opacity: .6; cursor: not-allowed; } }
 
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+.ev-tabs { display: flex; gap: 6px; margin-bottom: 4px; border-bottom: 2px solid #e2e8f0; padding-bottom: 0; }
+.ev-tab {
+  padding: 9px 18px; border: none; background: transparent; font-size: 13px; font-weight: 600;
+  color: #64748b; cursor: pointer; border-radius: 8px 8px 0 0; position: relative; top: 2px;
+  display: flex; align-items: center; gap: 7px; transition: .15s;
+  &:hover { color: #1e293b; background: #f1f5f9; }
+  &--active { color: #0052cc; background: white; border: 2px solid #e2e8f0; border-bottom-color: white; }
+  &__badge { background: #ef4444; color: white; border-radius: 20px; padding: 0 6px; font-size: 11px; min-width: 18px; text-align: center; &--gray { background: #64748b; } }
+}
+
+// ── Pending approval cards ────────────────────────────────────────────────────
+.pend-card {
+  background: white; border-radius: 14px; box-shadow: 0 1px 6px rgba(0,0,0,.07);
+  overflow: hidden; margin-bottom: 12px;
+  &__head {
+    padding: 14px 18px; border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  &__title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+}
+.pend-name { font-size: 15px; font-weight: 700; color: #1e293b; }
+.pend-meta { font-size: 12px; color: #64748b; display: flex; align-items: center; gap: 6px; i { color: #94a3b8; } }
+
+.pend-progress {
+  display: flex; align-items: center; gap: 8px;
+  &__bar { width: 120px; height: 8px; background: #e2e8f0; border-radius: 99px; overflow: hidden; }
+  &__fill { height: 100%; background: var(--atomo-gradient, linear-gradient(90deg,#8dc63f,#00A859)); border-radius: 99px; transition: width .4s; }
+  &__pct { font-size: 12px; font-weight: 700; color: #1e293b; white-space: nowrap; }
+}
+
+.btn-forzada {
+  padding: 6px 12px; background: #fff8ec; border: 1.5px solid #f59e0b; color: #b45309;
+  border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  &:hover { background: #fef3c7; }
+}
+
+.pend-ops { padding: 6px 18px 14px; display: flex; flex-direction: column; gap: 6px; }
+.pend-op {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 9px; border: 1px solid #e2e8f0; background: #fafafa;
+  &__icon { font-size: 18px; color: #94a3b8; width: 24px; text-align: center; flex-shrink: 0; }
+  &__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  &__nombre { font-size: 13px; font-weight: 600; color: #1e293b; }
+  &__status { font-size: 11px; color: #64748b; strong { color: #1e293b; } &--ok { color: #16a34a; } &--wait { color: #94a3b8; font-style: italic; } }
+  &--pendiente { background: #fff8ec; border-color: #fcd34d; .pend-op__icon { color: #f59e0b; } }
+  &--aprobado { background: #f0fdf4; border-color: #86efac; .pend-op__icon { color: #16a34a; } }
+}
+
+.btn-aprobar {
+  padding: 6px 14px; background: #00A859; color: white; border: none; border-radius: 7px;
+  font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0;
+  &:hover:not(:disabled) { background: #008c49; }
+  &:disabled { opacity: .6; cursor: not-allowed; }
+}
+
+.ev-warn-box { background: #fff8ec; border: 1px solid #fcd34d; border-radius: 10px; padding: 12px 14px; font-size: 13px; color: #92400e; display: flex; align-items: flex-start; gap: 8px; i { flex-shrink: 0; margin-top: 1px; color: #f59e0b; } }
+.btn-forzada-confirm { padding: 9px 20px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; &:hover:not(:disabled) { background: #d97706; } &:disabled { opacity: .6; cursor: not-allowed; } }
+
 // ── Responsive ────────────────────────────────────────────────────────────────
 @media (max-width: 991px) {
   .ev-wrap { padding: 16px; gap: 14px; }

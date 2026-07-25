@@ -458,6 +458,7 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
   isInsumoSelected(id: number): boolean { return this.assignTask?.insumos_aplicados?.includes(id) ?? false; }
 
   removeOperario(task: any, opId: number): void {
+    if (task.estado === 'completada') return;
     const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
     if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
     task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
@@ -468,6 +469,7 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
   }
 
   removeMaquina(task: any, maqId: number): void {
+    if (task.estado === 'completada') return;
     const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
     if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
     task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);

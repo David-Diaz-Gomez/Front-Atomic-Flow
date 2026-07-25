@@ -86,12 +86,12 @@
                   <span class="achip achip-op" *ngFor="let op of t.operarios">
                     <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
                     <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeOperario(t, op.id)"><i class="fa fa-times"></i></button>
+                    <button class="achip-rm" (click)="removeOperario(t, op.id)" *ngIf="t.estado !== 'completada'"><i class="fa fa-times"></i></button>
                   </span>
                   <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
                     <i class="fa fa-cog"></i> {{ m.nombre }}
                     <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeMaquina(t, m.id)"><i class="fa fa-times"></i></button>
+                    <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="t.estado !== 'completada'"><i class="fa fa-times"></i></button>
                   </span>
                   <span class="achip achip-ins" *ngFor="let iid of t.insumos_aplicados">
                     <i class="fa fa-cube"></i> {{ insumoNombre(iid) }}

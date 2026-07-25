@@ -351,6 +351,26 @@ export class ProjectService {
     );
   }
 
+  getPendientesAprobacion(idCoordinador: number, idProyecto?: number): Observable<any[]> {
+    let params = new HttpParams().set('id_coordinador', String(idCoordinador));
+    if (idProyecto) params = params.set('id_proyecto', String(idProyecto));
+    return this.http.get<any>(`${this.base}/coordinador/pendientes-aprobacion`, { params }).pipe(
+      map(r => r?.data ?? r ?? [])
+    );
+  }
+
+  aprobarParteOperario(tareaId: number, idUsuario: number): Observable<any> {
+    return this.http.post<any>(`${this.base}/coordinador/tareas/${tareaId}/aprobar-parte/${idUsuario}`, {}).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
+  aprobarTareaForzada(tareaId: number, justificacion: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/coordinador/tareas/${tareaId}/aprobar-forzada`, { justificacion }).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
   subirEvidencias(tareaId: number, fd: FormData): Observable<any> {
     return this.http.post<any>(`${this.base}/tareas/${tareaId}/evidencias`, fd).pipe(
       map(r => r?.data ?? r)

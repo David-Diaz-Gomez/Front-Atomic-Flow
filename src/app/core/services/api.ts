@@ -23,6 +23,15 @@ export class Api {
     } catch { return null; }
   }
 
+  /** Devuelve id y nombre del usuario activo en sesión. */
+  getCurrentUser(): { id: number; name: string } | null {
+    try {
+      const u = JSON.parse(localStorage.getItem('currentUser') ?? 'null');
+      if (!u?.id) return null;
+      return { id: u.id, name: u.name ?? '' };
+    } catch { return null; }
+  }
+
   /** Devuelve el token de acceso guardado en localStorage. */
   getToken(): string | null {
     return localStorage.getItem('token');
