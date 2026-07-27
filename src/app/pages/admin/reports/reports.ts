@@ -1,6 +1,7 @@
 import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { Chart, registerables } from 'chart.js';
+import { map } from 'rxjs/operators';
 import { ProjectService } from '../../../shared/services/project.service';
 import { Api } from '../../../core/services/api';
 
@@ -46,7 +47,9 @@ export class Reports implements OnInit, OnDestroy {
   activeTab: Tab = 'grafico';
 
   // ── Gráfico de torta (ocupación) ──
-  ocupacionData: { id_proyecto: number; nombre_proyecto: string; total_horas: number }[] = [];
+  // Sin proyecto filtrado: una porción por proyecto. Con proyecto filtrado: una porción
+  // por operario/maquinaria que participó en él (mismo cálculo de horas que el Ranking).
+  ocupacionData: { id: number; nombre: string; total_horas: number }[] = [];
   loadingOcupacion = false;
   private ocupacionChart: Chart | null = null;
 
@@ -199,6 +202,22 @@ export class Reports implements OnInit, OnDestroy {
 
   onFilterChange(): void {
     this.loadAll();
+  }
+
+  /** Si "Desde" queda después de "Hasta", empuja "Hasta" para que no exista un rango inválido. */
+  onFechaInicioChange(): void {
+    if (this.filtroFechaFin && this.filtroFechaInicio > this.filtroFechaFin) {
+      this.filtroFechaFin = this.filtroFechaInicio;
+    }
+    this.onFilterChange();
+  }
+
+  /** "Hasta" nunca puede quedar antes de "Desde": si el usuario elige una fecha anterior, se ajusta a "Desde". */
+  onFechaFinChange(): void {
+    if (this.filtroFechaInicio && this.filtroFechaFin < this.filtroFechaInicio) {
+      this.filtroFechaFin = this.filtroFechaInicio;
+    }
+    this.onFilterChange();
   }
 
   // ── Carga de datos ─────────────────────────────────────────────────────────
@@ -392,7 +411,19 @@ export class Reports implements OnInit, OnDestroy {
 
   loadOcupacion(): void {
     this.loadingOcupacion = true;
-    this.api.getOcupacionRecursos(this.tipoRecurso, this.currentFilters).subscribe({
+
+    // Con un proyecto seleccionado no hay nada que repartir "por proyecto" (sería una sola
+    // porción), así que la torta pasa a mostrar el desglose por recurso dentro de ese proyecto,
+    // reutilizando el mismo endpoint y cálculo de horas que el tab de Ranking.
+    const source$ = this.filtroProyecto
+      ? this.api.getRankingRecursos(this.tipoRecurso, this.currentFilters).pipe(
+          map(rows => rows.map(r => ({ id: r.id_recurso, nombre: r.nombre, total_horas: Number(r.total_horas) }))),
+        )
+      : this.api.getOcupacionRecursos(this.tipoRecurso, this.currentFilters).pipe(
+          map(rows => rows.map(r => ({ id: r.id_proyecto, nombre: r.nombre_proyecto, total_horas: Number(r.total_horas) }))),
+        );
+
+    source$.subscribe({
       next: (data) => {
         this.ocupacionData = data;
         this.loadingOcupacion = false;
@@ -401,6 +432,16 @@ export class Reports implements OnInit, OnDestroy {
       },
       error: () => { this.ocupacionData = []; this.loadingOcupacion = false; this.cdr.detectChanges(); },
     });
+  }
+
+  /** Título del gráfico de torta: "por Proyecto" en general, "por Operario/Maquinaria" cuando hay un proyecto elegido. */
+  get ocupacionChartTitle(): string {
+    const tipoLabel = this.tipoRecurso === 'maquinaria' ? 'Maquinaria' : 'Operarios';
+    if (this.filtroProyecto && this.proyectoSeleccionado) {
+      const recursoLabel = this.tipoRecurso === 'maquinaria' ? 'Maquinaria' : 'Operario';
+      return `Horas por ${recursoLabel} — ${this.proyectoSeleccionado.nombre}`;
+    }
+    return `Horas por Proyecto — ${tipoLabel}`;
   }
 
   loadRanking(): void {
@@ -530,7 +571,7 @@ export class Reports implements OnInit, OnDestroy {
     this.ocupacionChart = null;
     if (!this.ocupacionData.length) return;
 
-    const labels = this.ocupacionData.map(d => d.nombre_proyecto);
+    const labels = this.ocupacionData.map(d => d.nombre);
     const values = this.ocupacionData.map(d => Number(d.total_horas));
     const total  = values.reduce((a, b) => a + b, 0);
     const colors = this.ocupacionData.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]);
