@@ -1,7 +1,6 @@
 import { Component, OnInit, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
 import { ProjectService } from '../../../shared/services/project.service';
-import { CatalogService } from '../../../shared/services/catalog.service';
 import { Api } from '../../../core/services/api';
 import { forkJoin } from 'rxjs';
 import Swal from 'sweetalert2';
@@ -37,20 +36,18 @@ export class CoordEvidences implements OnInit {
   evidSaving = false;
   previews: string[] = [];
 
-  // Reassign modal
-  showReasignModal = false;
-  reasignTarea: any = null;
-  operarios: any[] = [];
-  reasignForm = { id_operario: null as number | null, fecha_inicio: '', fecha_fin: '', hora_inicio: '07:00', hora_fin: '17:00', motivo: '' };
-  disponibilidad: { ocupado: any[]; libre: any[] } | null = null;
-  dispLoading = false;
-  reasignSaving = false;
+  // Rechazar parte (mismo operario, reprograma su horario — no crea tarea nueva)
+  showRechazarModal = false;
+  rechazarTarea: any = null;
+  rechazarOperario: any = null;
+  rechazarForm = { fecha_inicio: '', fecha_fin: '', hora_inicio: '07:00', hora_fin: '17:00', motivo: '' };
+  rechazarSaving = false;
 
   approvingId: string | null = null; // `${tareaId}_${idUsuario}` mientras se aprueba
+  completandoId: number | null = null; // tareaId mientras se completa (botón fantasma)
 
   constructor(
     private projectSvc: ProjectService,
-    private catalogSvc: CatalogService,
     private api: Api,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private pid: object,
@@ -66,10 +63,6 @@ export class CoordEvidences implements OnInit {
 
   ngOnInit(): void {
     this.loadAll();
-    this.catalogSvc.getUsersByRole(4).subscribe({
-      next: (d: any[]) => { this.operarios = d; this.cdr.detectChanges(); },
-      error: () => {},
-    });
   }
 
   loadAll(): void {
@@ -118,6 +111,93 @@ export class CoordEvidences implements OnInit {
       error: (err: any) => {
         this.approvingId = null;
         void Swal.fire('Error', err?.error?.message ?? 'No se pudo aprobar', 'error');
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  // Todas las partes que quedan asignadas ya están aprobadas (puede pasar al desasignar al
+  // último operario sin marcar mientras otro ya estaba aprobado) — nadie disparó el cierre
+  // automático de aprobarParteOperario, así que se ofrece confirmarlo manualmente.
+  completarTareaAprobada(tarea: any): void {
+    void Swal.fire({
+      title: '¿Completar tarea?',
+      html: `Todas las partes de <b>${tarea.nombre}</b> ya están aprobadas.`,
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'Sí, completar', cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#00A859',
+    }).then(r => {
+      if (!r.isConfirmed) return;
+      this.completandoId = tarea.id;
+      this.cdr.detectChanges();
+      this.projectSvc.completarTareaAprobada(tarea.id).subscribe({
+        next: () => {
+          this.completandoId = null;
+          this.tareasPendientes = this.tareasPendientes.filter((t: any) => t.id !== tarea.id);
+          void Swal.fire({ icon: 'success', title: `¡Tarea completada! (${tarea.nombre})`, timer: 2000, showConfirmButton: false });
+          this.cdr.detectChanges();
+        },
+        error: (err: any) => {
+          this.completandoId = null;
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo completar', 'error');
+          this.cdr.detectChanges();
+        },
+      });
+    });
+  }
+
+  // ── Rechazar parte de operario ─────────────────────────────────────────────
+
+  openRechazarModal(tarea: any, operario: any): void {
+    this.rechazarTarea = tarea;
+    this.rechazarOperario = operario;
+    this.rechazarForm = {
+      fecha_inicio: operario.fecha_inicio || this.today(),
+      fecha_fin:    operario.fecha_fin || operario.fecha_inicio || this.today(),
+      hora_inicio:  operario.hora_inicio || '07:00',
+      hora_fin:     operario.hora_fin || '17:00',
+      motivo: '',
+    };
+    this.showRechazarModal = true;
+    this.cdr.detectChanges();
+  }
+
+  closeRechazarModal(): void {
+    this.showRechazarModal = false;
+    this.rechazarTarea = null;
+    this.rechazarOperario = null;
+    this.cdr.detectChanges();
+  }
+
+  submitRechazar(): void {
+    if (!this.rechazarTarea || !this.rechazarOperario || !this.rechazarForm.fecha_inicio) return;
+    this.rechazarSaving = true;
+    const tarea = this.rechazarTarea;
+    const operario = this.rechazarOperario;
+
+    this.projectSvc.rechazarParteOperario(tarea.id, operario.id_usuario, {
+      fecha_inicio: this.rechazarForm.fecha_inicio,
+      fecha_fin:    this.rechazarForm.fecha_fin || this.rechazarForm.fecha_inicio,
+      hora_inicio:  this.rechazarForm.hora_inicio,
+      hora_fin:     this.rechazarForm.hora_fin,
+      motivo:       this.rechazarForm.motivo,
+    }).subscribe({
+      next: () => {
+        this.rechazarSaving = false;
+        // Actualizar en memoria: vuelve a quedar pendiente de entregar, ya no de aprobar
+        operario.marcado_en = null;
+        operario.pendiente_aprobacion = false;
+        operario.fecha_inicio = this.rechazarForm.fecha_inicio;
+        operario.fecha_fin    = this.rechazarForm.fecha_fin || this.rechazarForm.fecha_inicio;
+        operario.hora_inicio  = this.rechazarForm.hora_inicio;
+        operario.hora_fin     = this.rechazarForm.hora_fin;
+        void Swal.fire({ icon: 'success', title: 'Parte rechazada', text: 'Se notificó al operario con el nuevo horario.', timer: 1800, showConfirmButton: false });
+        this.closeRechazarModal();
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.rechazarSaving = false;
+        void Swal.fire('Error', err?.error?.message ?? 'No se pudo rechazar la parte', 'error');
         this.cdr.detectChanges();
       },
     });
@@ -273,57 +353,6 @@ export class CoordEvidences implements OnInit {
     return estado === 'en_revision' ? 'En revisión' : 'Completada';
   }
 
-  // ── Reassign modal ────────────────────────────────────────────────────────
-
-  openReasignModal(t: any): void {
-    this.reasignTarea = t;
-    this.reasignForm = {
-      id_operario: t.id_operario ?? null,
-      fecha_inicio: this.today(),
-      fecha_fin:    this.today(),
-      hora_inicio: '07:00', hora_fin: '17:00', motivo: '',
-    };
-    this.disponibilidad = null;
-    this.showReasignModal = true;
-    this.cdr.detectChanges();
-  }
-
-  closeReasignModal(): void { this.showReasignModal = false; this.reasignTarea = null; this.cdr.detectChanges(); }
-
-  checkDisponibilidad(): void {
-    if (!this.reasignForm.id_operario || !this.reasignForm.fecha_inicio) return;
-    this.dispLoading = true;
-    this.projectSvc.getOperarioDisponibilidad(this.reasignForm.id_operario, this.reasignForm.fecha_inicio).subscribe({
-      next: (d: any) => { this.disponibilidad = d; this.dispLoading = false; this.cdr.detectChanges(); },
-      error: () => { this.dispLoading = false; this.cdr.detectChanges(); },
-    });
-  }
-
-  reasignar(): void {
-    if (!this.reasignTarea || !this.reasignForm.id_operario || !this.reasignForm.fecha_inicio) return;
-    this.reasignSaving = true;
-    this.projectSvc.reasignarTarea(this.reasignTarea.id, {
-      id_operario:  this.reasignForm.id_operario,
-      fecha_inicio: this.reasignForm.fecha_inicio,
-      fecha_fin:    this.reasignForm.fecha_fin || this.reasignForm.fecha_inicio,
-      hora_inicio:  this.reasignForm.hora_inicio,
-      hora_fin:     this.reasignForm.hora_fin,
-      motivo:       this.reasignForm.motivo,
-    }).subscribe({
-      next: () => {
-        this.reasignSaving = false;
-        this.tareasEvidencia = this.tareasEvidencia.filter(t => t.id !== this.reasignTarea!.id);
-        void Swal.fire({ icon: 'success', title: 'Tarea reasignada', timer: 1500, showConfirmButton: false });
-        this.closeReasignModal();
-        this.cdr.detectChanges();
-      },
-      error: (err: any) => {
-        this.reasignSaving = false;
-        void Swal.fire('Error', err?.error?.message ?? 'No se pudo reasignar', 'error');
-        this.cdr.detectChanges();
-      },
-    });
-  }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -335,8 +364,4 @@ export class CoordEvidences implements OnInit {
     return `${d.getDate()} ${MONTHS[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
 
-  operarioNombre(id: number): string {
-    const op = this.operarios.find(o => o.id === id);
-    return op ? `${op.nombre ?? ''} ${op.apellido ?? ''}`.trim() : `#${id}`;
-  }
 }

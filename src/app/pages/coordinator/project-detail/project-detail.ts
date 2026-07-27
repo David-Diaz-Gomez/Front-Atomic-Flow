@@ -155,6 +155,7 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
       operarios: (t.operarios ?? t.asignados ?? []).map((o: any) => ({
         id: o.id ?? o.id_usuario, nombre: o.nombre ?? '', apellido: o.apellido ?? '',
         hora_inicio: o.hora_inicio ?? '07:00', hora_fin: o.hora_fin ?? '18:00', fechas: o.fechas ?? [],
+        marcado_en: o.marcado_en ?? null, completado_en: o.completado_en ?? null,
       })),
       maquinarias: (t.maquinarias ?? t.maquinaria ?? []).map((m: any) => ({
         id: m.id ?? m.id_maquinaria, nombre: m.nombre ?? '',
@@ -860,6 +861,18 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
   estadoTooltip(t: any): string {
     if (t?.estado !== 'bloqueada') return '';
     return t.bloqueada_por_movimiento ? 'Reprogramar fechas' : 'Esperando predecesora';
+  }
+  // Solo bloquea a nivel de tarea si ya es terminal (completada/inactiva) — usado para
+  // maquinaria, que no tiene un "marcado" individual como los operarios.
+  puedeQuitarRecursos(t: any): boolean {
+    return !['completada', 'inactiva'].includes(t?.estado);
+  }
+  // Para operarios además hay que revisar SU propia fila de detalle_tarea: si ya marcó su
+  // parte (o ya fue aprobada), no se puede desasignar aunque la tarea siga en_progreso por
+  // culpa de OTRO operario que sí marcó — antes esto se colaba porque solo se miraba el
+  // estado agregado de la tarea, bloqueando a todos apenas cualquiera marcaba.
+  puedeQuitarOperario(t: any, op: any): boolean {
+    return this.puedeQuitarRecursos(t) && !op?.marcado_en && !op?.completado_en;
   }
   // Mismo criterio que el candado del Gantt: violeta para dependencia normal, rojo para
   // movimiento, neutro si tiene depende_de pero no está bloqueada (ya se cumplió).

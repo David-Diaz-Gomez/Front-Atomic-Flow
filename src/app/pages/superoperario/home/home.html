@@ -117,12 +117,12 @@
              [style.background-color]="getColor(item.task.id_operario) + '22'"
              [style.border-left-color]="getColor(item.task.id_operario)"
              [class.tl-block--clickable]="isFiltered"
-             [class.tl-block--done]="item.task.estado === 'completada'"
+             [class.tl-block--done]="item.task.estado === 'completada' || item.task.yo_complete"
              (click)="openTask(item.task)">
           <span class="tl-block__name">{{ item.task.nombre }}</span>
           <span class="tl-block__time">{{ item.task.hora_inicio }}–{{ item.task.hora_fin }}</span>
           <span class="tl-block__op" *ngIf="!isFiltered">{{ item.task.operario }}</span>
-          <i class="fa fa-check-circle tl-block__done-icon" *ngIf="item.task.estado === 'completada'"></i>
+          <i class="fa fa-check-circle tl-block__done-icon" *ngIf="item.task.estado === 'completada' || item.task.yo_complete"></i>
         </div>
       </div>
     </div>
@@ -180,7 +180,7 @@
                      [style.--event-color]="getColor(item.task.id_operario)"
                      [style.background]="getColor(item.task.id_operario) + '18'"
                      [style.border-color]="getColor(item.task.id_operario) + '44'"
-                     [class.wg-event--done]="item.task.estado === 'completada'"
+                     [class.wg-event--done]="item.task.estado === 'completada' || item.task.yo_complete"
                      [class.wg-event--clickable]="isFiltered"
                      (click)="openTask(item.task, taskDayKey(d))">
                   <div class="wg-event__bar"></div>
@@ -188,7 +188,7 @@
                     <span class="wg-event__name">{{ item.task.nombre }}</span>
                     <span class="wg-event__time">{{ item.task.hora_inicio }}–{{ item.task.hora_fin }}</span>
                     <span class="wg-event__op" *ngIf="!isFiltered">{{ item.task.operario }}</span>
-                    <i class="fa fa-check-circle wg-event__check" *ngIf="item.task.estado === 'completada'"></i>
+                    <i class="fa fa-check-circle wg-event__check" *ngIf="item.task.estado === 'completada' || item.task.yo_complete"></i>
                   </div>
                 </div>
               </ng-container>
@@ -226,7 +226,7 @@
     </div>
     <div class="planner-list" *ngIf="plannerTareas.length">
       <div class="planner-row" *ngFor="let t of plannerTareas"
-           [class.planner-row--done]="t.estado === 'completada'"
+           [class.planner-row--done]="t.estado === 'completada' || t.yo_complete"
            [class.planner-row--clickable]="isFiltered"
            (click)="openTask(t)">
         <div class="planner-color" [style.background]="getColor(t.id_operario)"></div>
@@ -243,8 +243,9 @@
         <div class="planner-status">
           <span class="status-badge" [class]="'status-' + t.estado">{{ estadoLabel(t.estado) }}</span>
           <small *ngIf="t.estado === 'completada' && t.completado_en" class="completada-hora">{{ completadaHora(t.completado_en) }}</small>
+          <small *ngIf="t.yo_complete && t.estado !== 'completada'" class="completada-hora">Tu parte lista</small>
         </div>
-        <i class="fa fa-check-circle planner-done-icon" *ngIf="t.estado === 'completada'"></i>
+        <i class="fa fa-check-circle planner-done-icon" *ngIf="t.estado === 'completada' || t.yo_complete"></i>
       </div>
     </div>
   </div>

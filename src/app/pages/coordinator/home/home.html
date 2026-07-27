@@ -35,10 +35,10 @@
       </div>
     </div>
     <div class="kpi-card kpi-green" (click)="goToEvidences()" style="cursor:pointer">
-      <div class="kpi-icon"><i class="fa fa-camera"></i></div>
+      <div class="kpi-icon"><i class="fa fa-check-square-o"></i></div>
       <div class="kpi-body">
-        <span class="kpi-value">{{ kpi.evidencias_por_revisar }}</span>
-        <span class="kpi-label">Evidencias por revisar</span>
+        <span class="kpi-value">{{ kpi.partes_por_revisar }}</span>
+        <span class="kpi-label">Partes por revisar</span>
       </div>
     </div>
   </div>
@@ -87,10 +87,10 @@
       </div>
     </div>
 
-    <!-- Evidencias recientes -->
+    <!-- Partes por revisar -->
     <div class="panel-card">
       <div class="panel-header">
-        <h2><i class="fa fa-camera"></i> Evidencias recientes
+        <h2><i class="fa fa-check-square-o"></i> Partes por revisar
           <span class="badge-count" *ngIf="noLeidas > 0">{{ noLeidas }} nuevas</span>
         </h2>
         <button class="btn-link" (click)="goToEvidences()">Ver todas <i class="fa fa-arrow-right"></i></button>
@@ -100,7 +100,7 @@
         <div class="ev-item" *ngFor="let e of evidencias" [class.ev-unread]="!e.leida" (click)="markRead(e); goToEvidences()">
           <div class="ev-avatar"><i class="fa fa-user"></i></div>
           <div class="ev-body">
-            <span class="ev-title"><strong>{{ e.operario }}</strong> subió evidencia</span>
+            <span class="ev-title"><strong>{{ e.operario }}</strong> entregó su parte</span>
             <span class="ev-sub">{{ e.tarea }} — {{ e.proyecto }}</span>
             <span class="ev-time">{{ e.hora }}</span>
           </div>
@@ -108,7 +108,7 @@
         </div>
 
         <div class="empty-list" *ngIf="!evidencias.length">
-          <i class="fa fa-inbox"></i> Sin evidencias recientes
+          <i class="fa fa-inbox"></i> Sin partes pendientes de revisión
         </div>
       </div>
     </div>

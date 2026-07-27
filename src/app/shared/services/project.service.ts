@@ -371,6 +371,18 @@ export class ProjectService {
     );
   }
 
+  rechazarParteOperario(tareaId: number, idUsuario: number, body: { fecha_inicio: string; fecha_fin: string; hora_inicio: string; hora_fin: string; motivo?: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/coordinador/tareas/${tareaId}/rechazar-parte/${idUsuario}`, body).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
+  completarTareaAprobada(tareaId: number): Observable<any> {
+    return this.http.post<any>(`${this.base}/coordinador/tareas/${tareaId}/completar-aprobada`, {}).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
   subirEvidencias(tareaId: number, fd: FormData): Observable<any> {
     return this.http.post<any>(`${this.base}/tareas/${tareaId}/evidencias`, fd).pipe(
       map(r => r?.data ?? r)

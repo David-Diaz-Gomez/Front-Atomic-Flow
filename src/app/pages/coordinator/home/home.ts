@@ -19,14 +19,14 @@ export class CoordHome implements OnInit, OnDestroy {
   error = '';
   private refreshSub: Subscription | null = null;
 
-  kpi = { proyectos_activos: 0, fases_pendientes: 0, tareas_sin_asignar: 0, evidencias_por_revisar: 0 };
+  kpi = { proyectos_activos: 0, fases_pendientes: 0, tareas_sin_asignar: 0, partes_por_revisar: 0 };
 
   projects: any[] = [];
   filterEstado = '';
 
   fases: any[] = [];
 
-  // Evidencias recientes (tareas completadas pendientes de evidencia)
+  // Partes individuales que un operario ya marcó (kiosko) y el coordinador aún debe aprobar
   evidencias: any[] = [];
   get noLeidas(): number { return this.evidencias.filter(e => !e.leida).length; }
   markRead(e: any): void { e.leida = true; }
@@ -63,25 +63,32 @@ export class CoordHome implements OnInit, OnDestroy {
           this.kpi.proyectos_activos      = kpi.proyectos_activos      ?? 0;
           this.kpi.fases_pendientes       = kpi.fases_pendientes       ?? 0;
           this.kpi.tareas_sin_asignar     = kpi.tareas_sin_asignar     ?? 0;
-          this.kpi.evidencias_por_revisar = kpi.evidencias_por_revisar ?? 0;
+          this.kpi.partes_por_revisar     = kpi.partes_por_revisar     ?? 0;
           this.cdr.detectChanges();
         }
       }
     });
 
-    // Evidencias recientes — tareas completadas pendientes de evidencia
+    // Partes por revisar — un item por cada operario que ya marcó su horario (kiosko) y
+    // sigue pendiente de aprobación, no por tarea completa (una tarea con 3 operarios puede
+    // tener 1 parte pendiente y 2 ya aprobadas).
     if (userId) {
-      this.projectSvc.getTareasCompletadas(userId).pipe(catchError(() => of([]))).subscribe({
+      this.projectSvc.getPendientesAprobacion(userId).pipe(catchError(() => of([]))).subscribe({
         next: (tareas: any[]) => {
           const prevLeidas = new Set(this.evidencias.filter(e => e.leida).map(e => e.id));
-          this.evidencias = (tareas ?? []).slice(0, 8).map(t => ({
-            id: t.id,
-            operario: t.operario ?? '—',
-            tarea: t.nombre,
-            proyecto: t.proyecto,
-            hora: this.formatDateTime(t.completado_en),
-            leida: prevLeidas.has(t.id),
-          }));
+          const partes = (tareas ?? []).flatMap((t: any) =>
+            (t.operarios ?? [])
+              .filter((op: any) => op.pendiente_aprobacion)
+              .map((op: any) => ({
+                id: `${t.id}_${op.id_usuario}`,
+                operario: op.nombre ?? '—',
+                tarea: t.nombre,
+                proyecto: t.proyecto,
+                hora: this.formatDateTime(op.marcado_en),
+                leida: prevLeidas.has(`${t.id}_${op.id_usuario}`),
+              }))
+          );
+          this.evidencias = partes.slice(0, 8);
           this.cdr.detectChanges();
         }
       });

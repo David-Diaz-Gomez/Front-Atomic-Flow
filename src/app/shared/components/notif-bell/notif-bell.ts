@@ -38,7 +38,7 @@ export class NotifBellComponent {
     const role = this.roleId;
 
     if (role === 3) {
-      if (['tarea_completada', 'tarea_en_revision', 'evidencia', 'evidencia_subida'].includes(n.tipo)) {
+      if (['tarea_completada', 'tarea_en_revision', 'evidencia', 'evidencia_subida', 'tarea_parte_pendiente', 'tarea_parte_aprobada', 'tarea_parte_rechazada'].includes(n.tipo)) {
         void this.router.navigateByUrl('/dashboard/coordinator/evidences');
       } else if (['dependencia_resuelta', 'cambio_fechas', 'asignacion', 'reasignacion'].includes(n.tipo)) {
         void this.router.navigateByUrl(pid ? `/dashboard/coordinator/project/${pid}` : '/dashboard/coordinator/home');
@@ -92,6 +92,9 @@ export class NotifBellComponent {
       dependencia_resuelta:'fa-unlock',
       cambio_fechas:       'fa-calendar-times-o',
       sistema:             'fa-bell-o',
+      tarea_parte_pendiente: 'fa-hourglass-half',
+      tarea_parte_aprobada:  'fa-check-circle',
+      tarea_parte_rechazada: 'fa-undo',
     };
     return map[tipo] ?? 'fa-bell-o';
   }

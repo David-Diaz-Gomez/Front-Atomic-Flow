@@ -78,14 +78,39 @@
                 Aún no ha marcado su horario
               </span>
             </div>
-            <button class="btn-aprobar"
-                    *ngIf="op.pendiente_aprobacion"
-                    [disabled]="approvingId === t.id + '_' + op.id_usuario"
-                    (click)="aprobarParte(t, op)">
-              <i class="fa fa-spinner fa-spin" *ngIf="approvingId === t.id + '_' + op.id_usuario"></i>
-              <i class="fa fa-check" *ngIf="approvingId !== t.id + '_' + op.id_usuario"></i>
-              {{ approvingId === t.id + '_' + op.id_usuario ? 'Aprobando...' : 'Aprobar' }}
-            </button>
+            <div class="pend-op__actions" *ngIf="op.pendiente_aprobacion">
+              <button class="btn-aprobar"
+                      [disabled]="approvingId === t.id + '_' + op.id_usuario"
+                      (click)="aprobarParte(t, op)">
+                <i class="fa fa-spinner fa-spin" *ngIf="approvingId === t.id + '_' + op.id_usuario"></i>
+                <i class="fa fa-check" *ngIf="approvingId !== t.id + '_' + op.id_usuario"></i>
+                {{ approvingId === t.id + '_' + op.id_usuario ? 'Aprobando...' : 'Aprobar' }}
+              </button>
+              <button class="btn-rechazar" (click)="openRechazarModal(t, op)">
+                <i class="fa fa-undo"></i> Rechazar
+              </button>
+            </div>
+          </div>
+
+          <!-- "Operario fantasma": todas las partes que quedan ya están aprobadas, pero
+               nadie disparó el cierre automático (pasa al desasignar al último pendiente
+               mientras los demás ya estaban aprobados). Desaparece solo si se agrega otro
+               operario sin aprobar, porque listo_para_completar vuelve a dar falso. -->
+          <div class="pend-op pend-op--fantasma" *ngIf="t.listo_para_completar">
+            <div class="pend-op__icon"><i class="fa fa-check-circle"></i></div>
+            <div class="pend-op__info">
+              <span class="pend-op__nombre">Todas las partes fueron aprobadas</span>
+              <span class="pend-op__status pend-op__status--ok">Lista para completar</span>
+            </div>
+            <div class="pend-op__actions">
+              <button class="btn-aprobar"
+                      [disabled]="completandoId === t.id"
+                      (click)="completarTareaAprobada(t)">
+                <i class="fa fa-spinner fa-spin" *ngIf="completandoId === t.id"></i>
+                <i class="fa fa-check-circle" *ngIf="completandoId !== t.id"></i>
+                {{ completandoId === t.id ? 'Completando...' : 'Completar tarea' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -116,7 +141,7 @@
               <i class="fa fa-sitemap"></i> {{ t.fase }}
             </span>
             <span class="ev-card__op">
-              <i class="fa fa-user"></i> {{ t.operario ?? operarioNombre(t.id_operario) }}
+              <i class="fa fa-user"></i> {{ t.operarios?.length ? t.operarios.join(', ') : 'Sin operarios asignados' }}
               <ng-container *ngIf="t.completado_en"> · marcó a las <strong>{{ formatDateTime(t.completado_en) }}</strong></ng-container>
             </span>
           </div>
@@ -128,9 +153,6 @@
             </button>
             <button class="btn-evidencia" (click)="openEvidModal(t)">
               <i class="fa fa-camera"></i> {{ t.estado === 'en_revision' ? 'Evidencia + Verificar' : 'Subir evidencias' }}
-            </button>
-            <button class="btn-reasignar" (click)="openReasignModal(t)">
-              <i class="fa fa-refresh"></i> Reasignar
             </button>
           </div>
         </div>
@@ -227,78 +249,49 @@
   </div>
 </div>
 
-<!-- Modal: Reasignar -->
-<div class="modal-overlay" *ngIf="showReasignModal" (click)="closeReasignModal()">
+<!-- Modal: Rechazar parte de operario -->
+<div class="modal-overlay" *ngIf="showRechazarModal" (click)="closeRechazarModal()">
   <div class="ev-modal ev-modal--reasign" (click)="$event.stopPropagation()">
     <div class="ev-modal__header">
-      <h3><i class="fa fa-refresh"></i> Reasignar tarea</h3>
-      <span class="ev-modal__task">{{ reasignTarea?.nombre }}</span>
-      <button class="modal-close" (click)="closeReasignModal()"><i class="fa fa-times"></i></button>
+      <h3><i class="fa fa-undo"></i> Rechazar parte</h3>
+      <span class="ev-modal__task">{{ rechazarTarea?.nombre }} — {{ rechazarOperario?.nombre }}</span>
+      <button class="modal-close" (click)="closeRechazarModal()"><i class="fa fa-times"></i></button>
     </div>
     <div class="ev-modal__body">
-      <div class="mform-group">
-        <label>Operario *</label>
-        <select [(ngModel)]="reasignForm.id_operario" class="mform-input"
-                (ngModelChange)="disponibilidad = null">
-          <option [ngValue]="null">— Seleccionar operario —</option>
-          <option *ngFor="let op of operarios" [ngValue]="op.id">{{ op.nombre }} {{ op.apellido }}</option>
-        </select>
-      </div>
       <div class="mform-row">
         <div class="mform-group">
           <label>Fecha inicio *</label>
-          <input type="date" [(ngModel)]="reasignForm.fecha_inicio" class="mform-input"
-                 (ngModelChange)="disponibilidad = null">
+          <input type="date" [(ngModel)]="rechazarForm.fecha_inicio" class="mform-input">
         </div>
         <div class="mform-group">
           <label>Fecha fin</label>
-          <input type="date" [(ngModel)]="reasignForm.fecha_fin" class="mform-input"
-                 [min]="reasignForm.fecha_inicio">
+          <input type="date" [(ngModel)]="rechazarForm.fecha_fin" class="mform-input"
+                 [min]="rechazarForm.fecha_inicio">
         </div>
       </div>
       <div class="mform-row">
         <div class="mform-group">
           <label>Hora inicio</label>
-          <input type="time" [(ngModel)]="reasignForm.hora_inicio" class="mform-input">
+          <input type="time" [(ngModel)]="rechazarForm.hora_inicio" class="mform-input">
         </div>
         <div class="mform-group">
           <label>Hora fin</label>
-          <input type="time" [(ngModel)]="reasignForm.hora_fin" class="mform-input">
-        </div>
-      </div>
-      <button class="btn-check-disp"
-              (click)="checkDisponibilidad()"
-              [disabled]="!reasignForm.id_operario || !reasignForm.fecha_inicio || dispLoading">
-        <i class="fa fa-calendar-check-o" *ngIf="!dispLoading"></i>
-        <i class="fa fa-spinner fa-spin" *ngIf="dispLoading"></i>
-        Verificar disponibilidad
-      </button>
-      <div class="disp-result" *ngIf="disponibilidad">
-        <div class="disp-libre" *ngIf="disponibilidad.libre?.length">
-          <strong><i class="fa fa-check-circle"></i> Slots libres:</strong>
-          <span *ngFor="let sl of disponibilidad.libre">{{ sl.hora_inicio }} – {{ sl.hora_fin }}</span>
-        </div>
-        <div class="disp-ocupado" *ngIf="disponibilidad.ocupado?.length">
-          <strong><i class="fa fa-exclamation-triangle"></i> Ocupado:</strong>
-          <span *ngFor="let bl of disponibilidad.ocupado">{{ bl.hora_inicio }}–{{ bl.hora_fin }} · {{ bl.nombre }}</span>
-        </div>
-        <div class="disp-ok" *ngIf="!disponibilidad.ocupado.length">
-          <i class="fa fa-check-circle"></i> Sin conflictos para esa fecha
+          <input type="time" [(ngModel)]="rechazarForm.hora_fin" class="mform-input">
         </div>
       </div>
       <div class="mform-group" style="margin-top:12px">
-        <label>Motivo</label>
-        <textarea [(ngModel)]="reasignForm.motivo"
+        <label>Motivo *</label>
+        <textarea [(ngModel)]="rechazarForm.motivo"
                   placeholder="Ej: Pieza no cumple medidas requeridas"
                   class="mform-input" rows="2"></textarea>
       </div>
     </div>
     <div class="ev-modal__footer">
-      <button class="btn-cancel" (click)="closeReasignModal()">Cancelar</button>
-      <button class="btn-reasign-confirm" (click)="reasignar()"
-              [disabled]="!reasignForm.id_operario || !reasignForm.fecha_inicio || reasignSaving">
-        <i class="fa fa-refresh"></i>
-        {{ reasignSaving ? 'Reasignando...' : 'Confirmar reasignación' }}
+      <button class="btn-cancel" (click)="closeRechazarModal()">Cancelar</button>
+      <button class="btn-reasign-confirm" (click)="submitRechazar()"
+              [disabled]="!rechazarForm.fecha_inicio || !rechazarForm.motivo.trim() || rechazarSaving">
+        <i class="fa fa-undo"></i>
+        {{ rechazarSaving ? 'Rechazando...' : 'Confirmar rechazo' }}
       </button>
     </div>
   </div>

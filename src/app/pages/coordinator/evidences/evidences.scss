@@ -106,12 +106,22 @@ textarea.mform-input { resize: vertical; font-family: inherit; }
   &__status { font-size: 11px; color: #64748b; strong { color: #1e293b; } &--ok { color: #16a34a; } &--wait { color: #94a3b8; font-style: italic; } }
   &--pendiente { background: #fff8ec; border-color: #fcd34d; .pend-op__icon { color: #f59e0b; } }
   &--aprobado { background: #f0fdf4; border-color: #86efac; .pend-op__icon { color: #16a34a; } }
+  &--fantasma { background: #f0fdf4; border: 1.5px dashed #16a34a; .pend-op__icon { color: #16a34a; } }
 }
+
+.pend-op__actions { display: flex; gap: 8px; flex-shrink: 0; }
 
 .btn-aprobar {
   padding: 6px 14px; background: #00A859; color: white; border: none; border-radius: 7px;
   font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0;
   &:hover:not(:disabled) { background: #008c49; }
+  &:disabled { opacity: .6; cursor: not-allowed; }
+}
+
+.btn-rechazar {
+  padding: 6px 14px; background: #fff; color: #dc2626; border: 1.5px solid #dc2626; border-radius: 7px;
+  font-size: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; flex-shrink: 0;
+  &:hover:not(:disabled) { background: #fef2f2; }
   &:disabled { opacity: .6; cursor: not-allowed; }
 }
 

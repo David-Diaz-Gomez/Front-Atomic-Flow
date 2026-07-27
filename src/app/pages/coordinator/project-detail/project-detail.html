@@ -5,7 +5,7 @@
     <button class="btn-back" (click)="goBack()"><i class="fa fa-arrow-left"></i></button>
     <div class="header-info">
       <h1>{{ p.nombre }}</h1>
-      <span class="header-meta">{{ p.cliente }} &bull; {{ p.centro_costos }} &bull; {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}</span>
+      <span class="header-meta">{{ p.cliente?.razon_social }} &bull; {{ p.centro_costos }} &bull; {{ formatDate(p.fecha_inicio) }} — {{ formatDate(p.fecha_fin) }}</span>
     </div>
     <div class="header-actions">
       <button class="btn-outline" (click)="goToGantt()"><i class="fa fa-bar-chart"></i> Gantt</button>
@@ -86,12 +86,12 @@
                   <span class="achip achip-op" *ngFor="let op of t.operarios">
                     <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
                     <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeOperario(t, op.id)" *ngIf="t.estado !== 'completada'"><i class="fa fa-times"></i></button>
+                    <button class="achip-rm" (click)="removeOperario(t, op.id)" *ngIf="puedeQuitarOperario(t, op)"><i class="fa fa-times"></i></button>
                   </span>
                   <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
                     <i class="fa fa-cog"></i> {{ m.nombre }}
                     <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="t.estado !== 'completada'"><i class="fa fa-times"></i></button>
+                    <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="puedeQuitarRecursos(t)"><i class="fa fa-times"></i></button>
                   </span>
                   <span class="achip achip-ins" *ngFor="let iid of t.insumos_aplicados">
                     <i class="fa fa-cube"></i> {{ insumoNombre(iid) }}

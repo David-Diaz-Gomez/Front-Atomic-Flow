@@ -188,14 +188,14 @@ export class Api {
   completarTarea(tareaId: number, idOperario: number): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/superoperario/tareas/${tareaId}/completar`, { id_operario: idOperario }).pipe(
       tap(() => Swal.fire({ icon: 'success', title: '¡Completada!', text: 'Tarea marcada como completada.', timer: 1500, showConfirmButton: false })),
-      catchError(err => { this.notifyError('No se pudo actualizar la tarea.'); return throwError(() => err); })
+      catchError(err => { this.notifyError(err.error?.message ?? 'No se pudo actualizar la tarea.'); return throwError(() => err); })
     );
   }
 
   /** Operario completa su tarea sin subir evidencia (T4.5). */
   completarTareaDirecta(tareaId: number, idOperario: number): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/tareas/${tareaId}/completar`, { id_operario: idOperario }).pipe(
-      catchError(err => { this.notifyError('No se pudo completar la tarea.'); return throwError(() => err); })
+      catchError(err => { this.notifyError(err.error?.message ?? 'No se pudo completar la tarea.'); return throwError(() => err); })
     );
   }
 
@@ -221,7 +221,7 @@ export class Api {
   /** Marca el inicio real de una tarea por parte del operario. */
   iniciarTarea(tareaId: number, idOperario: number): Observable<any> {
     return this.http.patch<any>(`${this.baseUrl}/tareas/${tareaId}/iniciar`, { id_operario: idOperario }).pipe(
-      catchError(err => { this.notifyError('No se pudo iniciar la tarea.'); return throwError(() => err); })
+      catchError(err => { this.notifyError(err.error?.message ?? 'No se pudo iniciar la tarea.'); return throwError(() => err); })
     );
   }
 

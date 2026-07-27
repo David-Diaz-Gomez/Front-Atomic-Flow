@@ -138,6 +138,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
       operarios: (t.operarios ?? t.asignados ?? []).map((o: any) => ({
         id: o.id ?? o.id_usuario, nombre: o.nombre ?? '', apellido: o.apellido ?? '',
         hora_inicio: o.hora_inicio ?? '07:00', hora_fin: o.hora_fin ?? '18:00', fechas: o.fechas ?? [],
+        marcado_en: o.marcado_en ?? null, completado_en: o.completado_en ?? null,
       })),
       maquinarias: (t.maquinarias ?? t.maquinaria ?? []).map((m: any) => ({
         id: m.id ?? m.id_maquinaria, nombre: m.nombre ?? '',
@@ -1297,6 +1298,17 @@ export class ProjectDetail implements OnInit, OnDestroy {
     i === -1 ? this.assignTask.insumos_aplicados.push(id) : this.assignTask.insumos_aplicados.splice(i, 1);
   }
   isAssignInsumoSelected(id: number): boolean { return this.assignTask?.insumos_aplicados?.includes(id) ?? false; }
+
+  // Solo bloquea a nivel de tarea si ya es terminal (completada/inactiva) — para operarios
+  // además hay que revisar su propia fila de detalle_tarea (marcado_en/completado_en):
+  // si ya entregó su parte, no se puede desasignar aunque la tarea siga en_progreso por
+  // culpa de otro operario que sí marcó. Mismo criterio que el backend (removeOperatorFromTask).
+  puedeQuitarRecursos(t: any): boolean {
+    return !['completada', 'inactiva'].includes(t?.estado);
+  }
+  puedeQuitarOperario(t: any, op: any): boolean {
+    return this.puedeQuitarRecursos(t) && !op?.marcado_en && !op?.completado_en;
+  }
 
   removeOperario(task: any, opId: number): void {
     const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
