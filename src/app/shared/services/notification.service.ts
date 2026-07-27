@@ -9,7 +9,8 @@ export type NotifTipo =
   | 'fase_completada' | 'proyecto_completado' | 'reasignacion'
   | 'comentario' | 'recordatorio' | 'fase_delegada' | 'sistema'
   | 'dependencia_resuelta' | 'cambio_fechas'
-  | 'tarea_parte_pendiente' | 'tarea_parte_aprobada' | 'tarea_parte_rechazada';
+  | 'tarea_parte_pendiente' | 'tarea_parte_aprobada' | 'tarea_parte_rechazada'
+  | 'proyecto_rechazado';
 
 export interface AppNotif {
   id: number;

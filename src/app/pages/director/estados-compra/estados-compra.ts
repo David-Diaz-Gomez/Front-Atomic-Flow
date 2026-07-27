@@ -407,13 +407,18 @@ export class EstadosCompra implements OnInit {
 
   // ── Modal crear ───────────────────────────────────────────────────────────
 
+  private today(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
   openModal(preProyectoId?: number | null): void {
     this.submitted = false;
     this.sinProyecto = false;
     this.form = {
       id_proyecto: preProyectoId ?? null,
       proveedor: this._pendingRecurso?.nombre_proveedor ?? '',
-      fecha_solicitud: new Date().toISOString().split('T')[0],
+      fecha_solicitud: this.today(),
       fecha_requerida: '',
       detalle: '',
       items: [],
@@ -913,7 +918,7 @@ export class EstadosCompra implements OnInit {
     this.savingNuevoRecurso = true;
 
     // Primero guardamos el pedido como borrador para tener su id
-    const hoy = new Date().toISOString().split('T')[0];
+    const hoy = this.today();
     const pedidoBody: any = {
       fecha_solicitud: this.dateToInt(this.form.fecha_solicitud || hoy),
       fecha_requerida: this.form.fecha_requerida || hoy,

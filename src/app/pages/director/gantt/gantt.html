@@ -269,23 +269,12 @@
                   <span class="res-type-badge">{{ res.tipo === 'maquina' ? 'MÁQ' : 'OPE' }}</span>
                 </div>
                 <div class="sched-day-cell" *ngFor="let d of panelDays">
-                  <div class="day-occ-pct"
-                       [class.occ-high]="getResourceDayOccupancy(task, res.name, d) >= 75"
-                       [class.occ-full]="getResourceDayOccupancy(task, res.name, d) >= 100"
-                       *ngIf="getResourceDayOccupancy(task, res.name, d) > 0">
-                    {{ getResourceDayOccupancy(task, res.name, d) }}%
+                  <div class="hour-text-list" *ngIf="getBlocksForDay(task, res.name, d).length">
+                    <span class="hour-text-item" *ngFor="let block of getBlocksForDay(task, res.name, d)">
+                      {{ blockLabel(block) }}
+                    </span>
                   </div>
-                  <div class="hour-track">
-                    <div class="hour-label" *ngFor="let h of scheduleHours"
-                         [style.left.%]="((h - 7) / 11) * 100">{{ h }}</div>
-                    <div class="hour-block"
-                         *ngFor="let block of getBlocksForDay(task, res.name, d)"
-                         [ngStyle]="getBlockStyle(block)"
-                         [ngClass]="res.tipo === 'maquina' ? 'block-machine' : 'block-operator'"
-                         [title]="blockLabel(block)">
-                      <span>{{ blockLabel(block) }}</span>
-                    </div>
-                  </div>
+                  <span class="no-block-day" *ngIf="!getBlocksForDay(task, res.name, d).length">—</span>
                 </div>
               </ng-container>
             </div>
@@ -435,12 +424,6 @@
                       <span class="tdm-res-badge">{{ res.tipo === 'maquina' ? 'MÁQ' : 'OPE' }}</span>
                     </td>
                     <td class="tdm-day-cell" *ngFor="let d of modalDays">
-                      <div class="tdm-occ-pct"
-                           [class.occ-high]="getResourceDayOccupancy(mt, res.name, d) >= 75"
-                           [class.occ-full]="getResourceDayOccupancy(mt, res.name, d) >= 100"
-                           *ngIf="getResourceDayOccupancy(mt, res.name, d) > 0">
-                        {{ getResourceDayOccupancy(mt, res.name, d) }}%
-                      </div>
                       <div class="tdm-hour-track">
                         <div class="tdm-hour-tick" *ngFor="let h of scheduleHours"
                              [style.left.%]="((h - 7) / 11) * 100">
@@ -451,7 +434,6 @@
                              [ngStyle]="getBlockStyle(block)"
                              [ngClass]="res.tipo === 'maquina' ? 'tdm-block-maq' : 'tdm-block-ope'"
                              [title]="blockLabel(block)">
-                          <span class="tdm-block-label">{{ blockLabel(block) }}</span>
                         </div>
                         <div class="tdm-empty-day" *ngIf="!getBlocksForDay(mt, res.name, d).length">—</div>
                       </div>

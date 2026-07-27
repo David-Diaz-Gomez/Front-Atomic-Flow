@@ -235,6 +235,8 @@
 
           <input
             type="text"
+            inputmode="numeric"
+            maxlength="15"
             [(ngModel)]="editingUser.numero_documento">
         </div>
 
@@ -259,7 +261,11 @@
         <div class="input-group-atomo">
           <label>Teléfono</label>
 
-          <input [(ngModel)]="editingUser.telefono">
+          <input
+            type="text"
+            inputmode="numeric"
+            maxlength="10"
+            [(ngModel)]="editingUser.telefono">
         </div>
 
         <div class="input-group-atomo">
@@ -295,7 +301,7 @@
         <div class="input-group-atomo">
           <label>Valor hora (COP)</label>
 
-          <input type="number" min="0" step="0.01"
+          <input type="number" min="0" max="1000000" step="0.01"
             [(ngModel)]="editingUser.valor_hora"
             placeholder="0.00">
         </div>

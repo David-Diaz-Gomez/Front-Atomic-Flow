@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, Inject, PLATFORM_ID, ChangeDetectorRef } 
 import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import { interval, Subscription } from 'rxjs';
+import Swal from 'sweetalert2';
 import { NotificationService } from '../../../shared/services/notification.service';
 import { ProjectService } from '../../../shared/services/project.service';
 import { Api } from '../../../core/services/api';
@@ -99,20 +100,29 @@ export class Home implements OnInit, OnDestroy {
   goToEvidencias(): void       { this.router.navigate(['/dashboard/director/evidencias']); }
 
   inactivarProyecto(p: any): void {
-    if (!confirm(`¿Inactivar el proyecto "${p.nombre}"? Esta acción no se puede deshacer.`)) return;
-    this.inactivandoId = p.id;
-    this.projectSvc.inactivarProyecto(p.id).subscribe({
-      next: () => {
-        p.estado = 'inactiva';
-        this.applyFilters();
-        this.inactivandoId = null;
-        this.cdr.detectChanges();
-      },
-      error: (err: any) => {
-        alert(err?.error?.error?.message ?? 'No se pudo inactivar el proyecto.');
-        this.inactivandoId = null;
-        this.cdr.detectChanges();
-      }
+    void Swal.fire({
+      title: `¿Inactivar el proyecto "${p.nombre}"?`,
+      text: 'Esta acción no se puede deshacer.',
+      icon: 'warning', showCancelButton: true,
+      confirmButtonText: 'Sí, inactivar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      this.inactivandoId = p.id;
+      this.cdr.detectChanges();
+      this.projectSvc.inactivarProyecto(p.id).subscribe({
+        next: () => {
+          p.estado = 'inactiva';
+          this.applyFilters();
+          this.inactivandoId = null;
+          void Swal.fire({ icon: 'success', title: 'Proyecto inactivado', timer: 1500, showConfirmButton: false });
+          this.cdr.detectChanges();
+        },
+        error: (err: any) => {
+          void Swal.fire('Error', err?.error?.message ?? 'No se pudo inactivar el proyecto.', 'error');
+          this.inactivandoId = null;
+          this.cdr.detectChanges();
+        }
+      });
     });
   }
 

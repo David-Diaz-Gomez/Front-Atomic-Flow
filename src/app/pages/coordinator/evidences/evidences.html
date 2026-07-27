@@ -100,7 +100,7 @@
             <div class="pend-op__icon"><i class="fa fa-check-circle"></i></div>
             <div class="pend-op__info">
               <span class="pend-op__nombre">Todas las partes fueron aprobadas</span>
-              <span class="pend-op__status pend-op__status--ok">Lista para completar</span>
+              <span class="pend-op__status pend-op__status--ok">Lista para verificación</span>
             </div>
             <div class="pend-op__actions">
               <button class="btn-aprobar"
@@ -108,7 +108,7 @@
                       (click)="completarTareaAprobada(t)">
                 <i class="fa fa-spinner fa-spin" *ngIf="completandoId === t.id"></i>
                 <i class="fa fa-check-circle" *ngIf="completandoId !== t.id"></i>
-                {{ completandoId === t.id ? 'Completando...' : 'Completar tarea' }}
+                {{ completandoId === t.id ? 'Procesando...' : 'Pasar a verificación' }}
               </button>
             </div>
           </div>

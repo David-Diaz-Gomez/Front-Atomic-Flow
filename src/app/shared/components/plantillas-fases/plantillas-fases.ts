@@ -53,6 +53,14 @@ function addDays(dateStr: string, days: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function diffDays(fromStr: string, toStr: string): number {
+  const [ay, am, ad] = fromStr.substring(0, 10).split('-').map(Number);
+  const [by, bm, bd] = toStr.substring(0, 10).split('-').map(Number);
+  const a = new Date(ay, (am ?? 1) - 1, ad ?? 1);
+  const b = new Date(by, (bm ?? 1) - 1, bd ?? 1);
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
 const TIPOS_FALLBACK = ['Carpintería','Impresiones','Diseño','Montaje','Logística','Revisión','Instalación','Pintura','Eléctrico','Otro'];
 
 @Component({
@@ -93,7 +101,10 @@ export class PlantillasFases implements OnInit {
     this.loadTiposTarea();
   }
 
-  private today(): string { return new Date().toISOString().substring(0, 10); }
+  private today(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 
   loadTiposTarea(): void {
     this.catalogSvc.getTiposTarea().subscribe({
@@ -129,36 +140,44 @@ export class PlantillasFases implements OnInit {
     this.cdr.detectChanges();
   }
 
+  // Las duraciones de la plantilla son relativas (ej. 5/7/3 días); si el proyecto dura
+  // meses, usarlas tal cual dejaba las fases apretadas al inicio y nunca llegaban a
+  // fecha_fin del proyecto. Por eso se escalan proporcionalmente para que la primera
+  // fase empiece en fecha_inicio y la última termine exactamente en fecha_fin.
   buildFasesFromPlantilla(p: Plantilla): void {
-    const clamp = (d: string) => {
-      if (this.proyectoFechaFin && d > this.proyectoFechaFin) return this.proyectoFechaFin;
-      if (this.proyectoFechaInicio && d < this.proyectoFechaInicio) return this.proyectoFechaInicio;
-      return d;
-    };
-    let cursor = this.proyectoFechaInicio;
-    this.fases = p.fases.map((f) => {
-      const faseInicio = clamp(cursor);
-      const faseFin    = clamp(addDays(cursor, f.duracion_dias - 1));
-      let tareasCursor = faseInicio;
+    const totalDiasPlantilla = p.fases.reduce((s, f) => s + f.duracion_dias, 0) || 1;
+    const totalDiasProyecto = this.proyectoFechaFin
+      ? diffDays(this.proyectoFechaInicio, this.proyectoFechaFin) + 1
+      : totalDiasPlantilla;
 
+    let cumFase = 0;
+    this.fases = p.fases.map((f) => {
+      const faseStartDay = Math.round((cumFase / totalDiasPlantilla) * totalDiasProyecto);
+      cumFase += f.duracion_dias;
+      const faseEndDay = Math.max(faseStartDay, Math.round((cumFase / totalDiasPlantilla) * totalDiasProyecto) - 1);
+      const faseInicio = addDays(this.proyectoFechaInicio, faseStartDay);
+      const faseFin    = addDays(this.proyectoFechaInicio, faseEndDay);
+      const diasFaseReal = faseEndDay - faseStartDay + 1;
+
+      const totalDiasTareas = f.tareas.reduce((s, t) => s + t.duracion_dias, 0) || 1;
+      let cumTarea = 0;
       const tareas: TareaEditable[] = f.tareas.map((t, idx) => {
-        const tFin = clamp(addDays(tareasCursor, t.duracion_dias - 1));
-        const tInicio = clamp(tareasCursor);
+        const tStartDay = Math.round((cumTarea / totalDiasTareas) * diasFaseReal);
+        cumTarea += t.duracion_dias;
+        const tEndDay = Math.max(tStartDay, Math.round((cumTarea / totalDiasTareas) * diasFaseReal) - 1);
         const tarea: TareaEditable = {
           nombre:         t.nombre,
           descripcion:    t.descripcion ?? '',
           tipo_tarea:     t.tipo_tarea.replace(/\[|\]/g, '').trim(),
-          fecha_inicio:   tInicio,
-          fecha_fin:      tFin,
+          fecha_inicio:   addDays(faseInicio, tStartDay),
+          fecha_fin:      addDays(faseInicio, tEndDay),
           hora_inicio:    t.hora_inicio,
           hora_fin:       t.hora_fin,
           depende_de_idx: idx > 0 ? idx - 1 : null,
         };
-        tareasCursor = addDays(addDays(tareasCursor, t.duracion_dias - 1), 1);
         return tarea;
       });
 
-      cursor = addDays(addDays(cursor, f.duracion_dias - 1), 1);
       return { nombre: f.nombre, descripcion: f.descripcion ?? '', fecha_inicio: faseInicio, fecha_fin: faseFin, tareas, expanded: true };
     });
   }

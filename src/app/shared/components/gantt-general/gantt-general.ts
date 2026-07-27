@@ -65,6 +65,14 @@ export class GanttGeneral implements OnInit {
 
   ngOnInit(): void { this.loadProjects(); }
 
+  // new Date("YYYY-MM-DD") parsea como medianoche UTC; en timezones detrás de UTC (Bogotá,
+  // -5) eso cae en el día ANTERIOR en hora local — con fechas cerca de fin de mes, el eje de
+  // meses podía arrancar un mes antes de lo debido. Este parser arma la fecha en local directo.
+  private parseLocalDate(dateStr: string): Date {
+    const [y, m, d] = (dateStr ?? '').slice(0, 10).split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1);
+  }
+
   loadProjects(): void {
     this.loading = true;
     this.api.getVistaGeneralProyectos().subscribe({
@@ -96,8 +104,8 @@ export class GanttGeneral implements OnInit {
 
   buildGanttAxis(): void {
     if (!this.projects.length) return;
-    const starts = this.projects.map(p => new Date(p.fecha_inicio).getTime()).filter(Boolean);
-    const ends   = this.projects.map(p => new Date(p.fecha_fin).getTime()).filter(Boolean);
+    const starts = this.projects.map(p => this.parseLocalDate(p.fecha_inicio).getTime()).filter(Boolean);
+    const ends   = this.projects.map(p => this.parseLocalDate(p.fecha_fin).getTime()).filter(Boolean);
     if (!starts.length) return;
 
     this.ganttStart = new Date(Math.min(...starts));
@@ -164,8 +172,8 @@ export class GanttGeneral implements OnInit {
   }
 
   getBarStyle(fecha_inicio: string, fecha_fin: string): Record<string, string> {
-    const start  = new Date(fecha_inicio).getTime();
-    const end    = new Date(fecha_fin).getTime();
+    const start  = this.parseLocalDate(fecha_inicio).getTime();
+    const end    = this.parseLocalDate(fecha_fin).getTime();
     const gsTime = this.ganttStart.getTime();
     const left   = Math.max(0, Math.round((start - gsTime) / 86400000)) * PX_PER_DAY;
     const width  = Math.max(4, Math.round((end - start) / 86400000) + 1) * PX_PER_DAY;
@@ -192,7 +200,7 @@ export class GanttGeneral implements OnInit {
 
   dateLeft(dateStr: string): number {
     if (!dateStr) return -1;
-    const t = new Date(dateStr).getTime();
+    const t = this.parseLocalDate(dateStr).getTime();
     const gs = this.ganttStart.getTime();
     return Math.round((t - gs) / 86400000) * PX_PER_DAY;
   }

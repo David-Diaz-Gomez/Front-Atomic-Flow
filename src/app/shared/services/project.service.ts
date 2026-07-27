@@ -77,6 +77,12 @@ export class ProjectService {
     );
   }
 
+  rejectProject(id: number): Observable<any> {
+    return this.http.patch<any>(`${this.base}/proyectos/${id}/rechazar`, {}).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
   changeProjectStatus(id: number, estado: string): Observable<any> {
     return this.http.patch<any>(`${this.base}/proyectos/${id}/estado`, { estado }).pipe(
       map(r => r?.data ?? r)
@@ -91,6 +97,12 @@ export class ProjectService {
 
   validateProjectDates(id: number, body: { fecha_inicio: string; fecha_fin: string }): Observable<any> {
     return this.http.post<any>(`${this.base}/proyectos/${id}/validar-fechas`, body).pipe(
+      map(r => r?.data ?? r)
+    );
+  }
+
+  validateNewProjectDates(body: { fecha_inicio: string; fecha_fin: string }): Observable<any> {
+    return this.http.post<any>(`${this.base}/proyectos/validar-fechas`, body).pipe(
       map(r => r?.data ?? r)
     );
   }

@@ -15,7 +15,6 @@ interface ReviewProject {
   centro_costos: string; estado: string;
   fecha_inicio: string; fecha_fin: string;
   cliente: any; coordinador: any; director_asignado: any; director_revision: any;
-  observaciones_rechazo: string | null;
   budget: Budget;
   budgetLoaded: boolean;
   budgetLoading: boolean;
@@ -40,9 +39,6 @@ export class Approvals implements OnInit {
   loading = true;
   error = '';
 
-  showRejectModal = false;
-  rejectingProject: ReviewProject | null = null;
-  rejectObservaciones = '';
   expandedBudget: number | null = null;
   activeBudgetSection = 'materia_prima';
 
@@ -117,7 +113,6 @@ export class Approvals implements OnInit {
           coordinador:          p.coordinador ?? {},
           director_asignado:    p.director_asignado ?? {},
           director_revision:    p.director_revision ?? {},
-          observaciones_rechazo: null,
           budget:               EMPTY_BUDGET(),
           budgetLoaded:         false,
           budgetLoading:        false,
@@ -256,31 +251,25 @@ export class Approvals implements OnInit {
     });
   }
 
-  openRejectModal(project: ReviewProject): void {
-    this.rejectingProject = project;
-    this.rejectObservaciones = '';
-    this.showRejectModal = true;
-  }
-
-  closeRejectModal(): void { this.showRejectModal = false; this.rejectingProject = null; }
-
-  confirmReject(): void {
-    if (!this.rejectObservaciones.trim()) {
-      void Swal.fire('Atención', 'Debes escribir las observaciones de rechazo', 'warning'); return;
-    }
-    if (!this.rejectingProject) return;
-
-    // Usa PATCH /estado con 'rechazado' (no hay endpoint dedicado en el back)
-    this.projectSvc.changeProjectStatus(this.rejectingProject.id, 'rechazado').subscribe({
-      next: () => {
-        if (this.rejectingProject) {
-          this.projects = this.projects.filter(p => p.id !== this.rejectingProject!.id);
-        }
-        void Swal.fire({ icon: 'info', title: 'Rechazado', text: 'El proyecto fue devuelto con observaciones.', timer: 2000 });
-        this.closeRejectModal();
-        this.cdr.detectChanges();
-      },
-      error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo rechazar el proyecto', 'error')
+  // El rechazo casi siempre es por presupuesto — no amerita pedir un motivo escrito. El
+  // proyecto se queda/normaliza en 'en_revision' (no existe un estado 'rechazado' en el
+  // ENUM) y se notifica al director asignado para que ajuste el presupuesto y reenvíe.
+  reject(project: ReviewProject): void {
+    void Swal.fire({
+      title: `¿Rechazar "${project.nombre}"?`,
+      text: 'Se notificará al director asignado para que ajuste el presupuesto y lo reenvíe a revisión.',
+      icon: 'warning', showCancelButton: true,
+      confirmButtonText: 'Sí, rechazar', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626'
+    }).then(result => {
+      if (!result.isConfirmed) return;
+      this.projectSvc.rejectProject(project.id).subscribe({
+        next: () => {
+          this.projects = this.projects.filter(p => p.id !== project.id);
+          void Swal.fire({ icon: 'info', title: 'Rechazado', text: 'Se notificó al director asignado.', timer: 2000 });
+          this.cdr.detectChanges();
+        },
+        error: err => void Swal.fire('Error', err.error?.message ?? 'No se pudo rechazar el proyecto', 'error')
+      });
     });
   }
 

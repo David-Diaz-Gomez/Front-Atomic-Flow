@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
 import { Api } from '../../../core/services/api';
+import { ViewRoleService } from '../../../core/services/view-role.service';
 
 // ── Mueble (local hasta guardar) ────────────────────────────────────────────
 export interface Mueble {
@@ -72,7 +73,7 @@ export interface Budget {
 
 export interface MachineOcc {
   nombre: string; porcentaje: number;
-  proyectos: string[]; estado: 'ok' | 'alta' | 'saturada';
+  proyectos: string[]; estado: 'ok' | 'alta' | 'saturada' | 'inactiva'; nota?: string | null;
 }
 export interface ConflictSugg {
   fecha_inicio: string; fecha_fin: string;
@@ -138,6 +139,9 @@ export class ProjectForm implements OnInit {
   directors: any[] = [];
   loadingCatalogs = false;
   currentUserName = '';
+  // El director asignado queda fijo tanto en creación como en edición — no se reasigna
+  // desde este formulario. Este label es lo único que se muestra (chip, no <select>).
+  assignedDirectorName = '';
 
   // tipo_recurso IDs keyed by normalized name — loaded from GET /tipos-recurso
   tipoIds: Record<string, number> = {};
@@ -178,6 +182,7 @@ export class ProjectForm implements OnInit {
     private projectSvc: ProjectService,
     private catalogSvc: CatalogService,
     private apiSvc: Api,
+    private viewRoleSvc: ViewRoleService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: object
   ) {}
@@ -209,12 +214,17 @@ export class ProjectForm implements OnInit {
         this.coordinators = coordinators;
         this.directors    = directors;
         this.buildTipoIds(tipos);
-        // Solo se autoselecciona si el usuario logueado es efectivamente un Director
-        // (aparece en el catálogo). Si no (p. ej. un Administrador creando el proyecto
-        // desde la vista Director), queda sin asignar y debe elegirse manualmente.
+        // El backend ya acepta Administrador como id_director_asignado (además de Director
+        // real) — si quien crea el proyecto es Admin y no aparece en el catálogo de
+        // Directores, se agrega él mismo como opción seleccionable y se autoselecciona, en
+        // vez de obligarlo a elegir un Director real de mentira.
         const me = this.apiSvc.getCurrentUser();
         if (me) {
           this.currentUserName = me.name;
+          if (!this.isEdit) this.assignedDirectorName = me.name;
+          if (!this.directors.some(d => d.id === me.id) && this.viewRoleSvc.isRealAdmin()) {
+            this.directors = [{ id: me.id, nombre: me.name, apellido: '' }, ...this.directors];
+          }
           if (this.directors.some(d => d.id === me.id)) {
             this.form.id_director_asignado = me.id;
           }
@@ -252,6 +262,14 @@ export class ProjectForm implements OnInit {
 
         // 2. Setear valores del form DESPUÉS de que las opciones existen
         if (project) {
+          // El director asignado guardado puede ser un Administrador (el backend ya lo
+          // acepta) — si no aparece en el catálogo de Directores reales, se agrega para que
+          // el <select> lo pueda mostrar seleccionado en vez de quedar en blanco.
+          const dirAsig = project.director_asignado;
+          if (dirAsig?.id && !this.directors.some((d: any) => d.id === dirAsig.id)) {
+            this.directors = [{ id: dirAsig.id, nombre: dirAsig.nombre, apellido: dirAsig.apellido ?? '' }, ...this.directors];
+          }
+          this.assignedDirectorName = dirAsig ? `${dirAsig.nombre ?? ''} ${dirAsig.apellido ?? ''}`.trim() : '';
           this.form = {
             nombre:               project.nombre       ?? '',
             codigo:               project.codigo       ?? '',
@@ -409,6 +427,10 @@ export class ProjectForm implements OnInit {
     if (!this.newMuebleForm.nombre || !this.newMuebleForm.fecha_fin) {
       void Swal.fire('Atención', 'Nombre y fecha fin del mueble son obligatorios', 'warning'); return;
     }
+    if (this.form.fecha_inicio && this.form.fecha_fin &&
+        (this.newMuebleForm.fecha_fin < this.form.fecha_inicio || this.newMuebleForm.fecha_fin > this.form.fecha_fin)) {
+      void Swal.fire('Atención', `La fecha de entrega debe estar dentro del rango del proyecto (${this.form.fecha_inicio} → ${this.form.fecha_fin}).`, 'warning'); return;
+    }
     if (this.editingMuebleTempId !== null) {
       const m = this.muebles.find(x => x.tempId === this.editingMuebleTempId);
       if (m) { m.nombre = this.newMuebleForm.nombre; m.fecha_fin = this.newMuebleForm.fecha_fin; }
@@ -500,57 +522,32 @@ export class ProjectForm implements OnInit {
     }
     this.checkingConflicts = true; this.conflictResult = null;
 
-    if (this.isEdit && this.editId) {
-      // For existing project use the validar-fechas endpoint
-      this.projectSvc.validateProjectDates(this.editId, {
-        fecha_inicio: this.form.fecha_inicio, fecha_fin: this.form.fecha_fin
-      }).subscribe({
-        next: data => {
-          this.conflictResult = {
-            viable: data.viable ?? true, ocupacion_maxima: 0,
-            maquinas: (data.maquinas ?? []).map((m: any) => ({
-              nombre: m.nombre, porcentaje: m.porcentaje, proyectos: m.proyectos ?? [],
-              estado: m.estado === 'saturada' ? 'saturada' : m.estado === 'alta' ? 'alta' : 'ok'
-            })),
-            conflictos: data.conflictos ?? [],
-            sugerencias: [],
-          };
-          this.checkingConflicts = false;
-          this.cdr.detectChanges();
-        },
-        error: () => { this.checkingConflicts = false; this.cdr.detectChanges(); }
-      });
-    } else {
-      // For new project — no project ID yet, show mock conflict data as before
-      setTimeout(() => {
-        const start = new Date(this.form.fecha_inicio);
-        const end   = new Date(this.form.fecha_fin);
-        const overlapsMay = start <= new Date('2026-05-20') && end >= new Date('2026-05-05');
-        if (overlapsMay) {
-          this.conflictResult = {
-            viable: false, ocupacion_maxima: 100,
-            maquinas: [
-              { nombre: 'CNC', porcentaje: 100, proyectos: ['Proyectos existentes'], estado: 'saturada' },
-              { nombre: 'Laminadora', porcentaje: 85, proyectos: ['Proyectos existentes'], estado: 'alta' },
-            ],
-            conflictos: [], sugerencias: [
-              { fecha_inicio: '2026-05-26', fecha_fin: this.addDays(this.form.fecha_fin, 21), ocupacion_max: 25, viabilidad: 'optima' }
-            ]
-          };
-        } else {
-          this.conflictResult = {
-            viable: true, ocupacion_maxima: 25,
-            maquinas: [
-              { nombre: 'CNC', porcentaje: 20, proyectos: [], estado: 'ok' },
-              { nombre: 'Laminadora', porcentaje: 15, proyectos: [], estado: 'ok' },
-            ],
-            conflictos: [], sugerencias: []
-          };
-        }
+    const request$ = (this.isEdit && this.editId)
+      ? this.projectSvc.validateProjectDates(this.editId, {
+          fecha_inicio: this.form.fecha_inicio, fecha_fin: this.form.fecha_fin
+        })
+      : this.projectSvc.validateNewProjectDates({
+          fecha_inicio: this.form.fecha_inicio, fecha_fin: this.form.fecha_fin
+        });
+
+    request$.subscribe({
+      next: data => {
+        const maquinas = (data.maquinas ?? []).map((m: any) => ({
+          nombre: m.nombre, porcentaje: m.porcentaje, proyectos: m.proyectos ?? [], nota: m.nota ?? null,
+          estado: m.estado === 'saturada' ? 'saturada' : m.estado === 'alta' ? 'alta' : m.estado === 'inactiva' ? 'inactiva' : 'ok'
+        }));
+        this.conflictResult = {
+          viable: data.viable ?? true,
+          ocupacion_maxima: maquinas.length ? Math.max(...maquinas.map((m: any) => m.porcentaje)) : 0,
+          maquinas,
+          conflictos: data.conflictos ?? [],
+          sugerencias: [],
+        };
         this.checkingConflicts = false;
         this.cdr.detectChanges();
-      }, 700);
-    }
+      },
+      error: () => { this.checkingConflicts = false; this.cdr.detectChanges(); }
+    });
   }
 
   applySuggestion(s: ConflictSugg): void {
@@ -560,13 +557,6 @@ export class ProjectForm implements OnInit {
     this.conflictResult = null;
     this.cdr.detectChanges();
     this.checkConflicts();
-  }
-
-  private addDays(dateStr: string, days: number): string {
-    if (!dateStr) return '';
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0] ?? '';
   }
 
   // ── Client modal ──────────────────────────────────────────────────────────
@@ -938,6 +928,17 @@ export class ProjectForm implements OnInit {
   }
   occ_class(occ: MachineOcc): string {
     return occ.estado === 'saturada' ? 'occ-saturada' : occ.estado === 'alta' ? 'occ-alta' : 'occ-ok';
+  }
+  // Con varias máquinas, mostrarle a cada una su propia barra ocupa mucho espacio aunque esté
+  // en 0% — las que no tienen ningún uso ni están inactivas se resumen en un solo texto.
+  get maquinasConUso(): MachineOcc[] {
+    return (this.conflictResult?.maquinas ?? []).filter(m => m.estado !== 'inactiva' && m.porcentaje > 0);
+  }
+  get maquinasLibres(): MachineOcc[] {
+    return (this.conflictResult?.maquinas ?? []).filter(m => m.estado !== 'inactiva' && m.porcentaje === 0);
+  }
+  get maquinasNoDisponibles(): MachineOcc[] {
+    return (this.conflictResult?.maquinas ?? []).filter(m => m.estado === 'inactiva');
   }
   viab_class(s: ConflictSugg): string {
     return s.viabilidad === 'optima' ? 'sugg-optima' : s.viabilidad === 'alta' ? 'sugg-alta' : 'sugg-media';

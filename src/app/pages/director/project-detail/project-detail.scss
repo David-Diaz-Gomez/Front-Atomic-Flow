@@ -963,6 +963,10 @@
 .achip {
   font-size: .7rem; padding: 3px 8px; border-radius: 20px; display: flex; align-items: center; gap: 4px;
   .achip-hours { opacity: .7; font-size: .65rem; }
+  .achip-pair {
+    display: flex; align-items: center; gap: 3px; font-size: .62rem; opacity: .85;
+    padding: 1px 6px; border-radius: 10px; background: rgba(0,0,0,.08);
+  }
   .achip-rm { background: none; border: none; cursor: pointer; color: inherit; opacity: .5; padding: 0; margin-left: 2px; font-size: .65rem; &:hover { opacity: 1; } }
   &.achip-op { background: rgba(59,130,246,.1); color: #3b82f6; }
   &.achip-maq { background: rgba(141,198,63,.1); color: var(--atomo-green-dark); }

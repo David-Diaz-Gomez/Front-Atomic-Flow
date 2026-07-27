@@ -63,19 +63,13 @@
           </div>
         </div>
 
-        <!-- Director Asignado -->
+        <!-- Director Asignado — fijo tanto en creación como en edición, no se reasigna desde aquí -->
         <div class="form-group">
           <label>Director Asignado *</label>
-          <!-- En modo creación: bloqueado al usuario actual -->
-          <div *ngIf="!isEdit" class="director-self-chip">
-            <i class="fa fa-user-circle"></i> {{ currentUserName || 'Tú' }}
-            <span class="director-self-badge">Tú</span>
+          <div class="director-self-chip">
+            <i class="fa fa-user-circle"></i> {{ assignedDirectorName || currentUserName || 'Tú' }}
+            <span class="director-self-badge" *ngIf="!isEdit">Tú</span>
           </div>
-          <!-- En modo edición: dropdown completo -->
-          <select *ngIf="isEdit" [(ngModel)]="form.id_director_asignado">
-            <option [ngValue]="null" disabled>Seleccionar director...</option>
-            <option *ngFor="let d of directors" [ngValue]="d.id">{{ d.nombre }} {{ d.apellido }}</option>
-          </select>
         </div>
 
         <!-- Director de Revisión -->
@@ -146,13 +140,21 @@
       <!-- OK -->
       <div class="conflict-ok" *ngIf="conflictResult?.viable">
         <div class="conflict-header"><i class="fa fa-check-circle"></i> Fechas disponibles</div>
-        <div class="occ-bars">
-          <div class="occ-bar-row" *ngFor="let m of conflictResult!.maquinas">
-            <span class="occ-name">{{ m.nombre }}</span>
+        <div class="occ-bars" *ngIf="maquinasConUso.length">
+          <div class="occ-bar-row" *ngFor="let m of maquinasConUso">
+            <span class="occ-name">{{ m.nombre }}<small class="occ-nota" *ngIf="m.nota">{{ m.nota }}</small></span>
             <div class="occ-track"><div class="occ-fill" [ngClass]="occ_class(m)" [style.width.%]="m.porcentaje"></div></div>
             <span class="occ-pct">{{ m.porcentaje }}%</span>
           </div>
         </div>
+        <p class="occ-summary" *ngIf="maquinasLibres.length">
+          <i class="fa fa-check"></i> Las siguientes maquinarias están totalmente libres:
+          {{ maquinasLibres.map(m => m.nombre).join(', ') }}
+        </p>
+        <p class="occ-summary occ-summary--muted" *ngIf="maquinasNoDisponibles.length">
+          <i class="fa fa-ban"></i> No disponibles para asignar:
+          {{ maquinasNoDisponibles.map(m => m.nombre + ' (' + m.nota + ')').join(', ') }}
+        </p>
       </div>
 
       <!-- Conflict -->
@@ -161,9 +163,9 @@
           <i class="fa fa-exclamation-triangle"></i>
           Ocupación demasiado alta — {{ conflictResult.ocupacion_maxima }}% en algunas máquinas
         </div>
-        <div class="occ-bars">
-          <div class="occ-bar-row" *ngFor="let m of conflictResult.maquinas">
-            <span class="occ-name">{{ m.nombre }}</span>
+        <div class="occ-bars" *ngIf="maquinasConUso.length">
+          <div class="occ-bar-row" *ngFor="let m of maquinasConUso">
+            <span class="occ-name">{{ m.nombre }}<small class="occ-nota" *ngIf="m.nota">{{ m.nota }}</small></span>
             <div class="occ-track">
               <div class="occ-fill" [ngClass]="occ_class(m)" [style.width.%]="m.porcentaje"></div>
             </div>
@@ -172,6 +174,14 @@
             </span>
           </div>
         </div>
+        <p class="occ-summary" *ngIf="maquinasLibres.length">
+          <i class="fa fa-check"></i> Las siguientes maquinarias están totalmente libres:
+          {{ maquinasLibres.map(m => m.nombre).join(', ') }}
+        </p>
+        <p class="occ-summary occ-summary--muted" *ngIf="maquinasNoDisponibles.length">
+          <i class="fa fa-ban"></i> No disponibles para asignar:
+          {{ maquinasNoDisponibles.map(m => m.nombre + ' (' + m.nota + ')').join(', ') }}
+        </p>
 
         <div class="conflict-items">
           <p class="conflict-sub">Conflictos detectados:</p>

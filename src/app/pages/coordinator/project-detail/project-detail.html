@@ -65,6 +65,10 @@
                 <button class="btn-edit-task" (click)="openEditTask(t, fase); $event.stopPropagation()" *ngIf="t.estado !== 'completada'">
                   <i class="fa fa-pencil"></i>
                 </button>
+                <button class="btn-edit-task btn-delete-task" (click)="inactivarTarea(fase.id, t); $event.stopPropagation()"
+                        *ngIf="isAdmin && (t.estado === 'pendiente' || t.estado === 'asignada')" title="Inactivar tarea">
+                  <i class="fa fa-times"></i>
+                </button>
                 <button class="btn-assign" (click)="openAssign(t, fase)"
                         *ngIf="t.estado !== 'completada'" [disabled]="t.bloqueada_por_movimiento"
                         [title]="t.bloqueada_por_movimiento ? 'Reprograma las fechas de esta tarea antes de asignar recursos' : ''">
@@ -86,13 +90,20 @@
                   <span class="achip achip-op" *ngFor="let op of t.operarios">
                     <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
                     <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
+                    <span class="achip-pair" *ngIf="op.id_maquinaria" [title]="'Opera: ' + op.nombre_maquinaria">
+                      <i class="fa fa-cog"></i> {{ op.nombre_maquinaria }}
+                    </span>
                     <button class="achip-rm" (click)="removeOperario(t, op.id)" *ngIf="puedeQuitarOperario(t, op)"><i class="fa fa-times"></i></button>
                   </span>
-                  <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
-                    <i class="fa fa-cog"></i> {{ m.nombre }}
-                    <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="puedeQuitarRecursos(t)"><i class="fa fa-times"></i></button>
-                  </span>
+                  <!-- Las máquinas emparejadas con un operario ya se muestran dentro del chip
+                       del operario (arriba) — mostrarlas también aquí duplicaba la badge. -->
+                  <ng-container *ngFor="let m of t.maquinarias">
+                    <span class="achip achip-maq" *ngIf="!m.id_operario">
+                      <i class="fa fa-cog"></i> {{ m.nombre }}
+                      <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
+                      <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="puedeQuitarRecursos(t)"><i class="fa fa-times"></i></button>
+                    </span>
+                  </ng-container>
                   <span class="achip achip-ins" *ngFor="let iid of t.insumos_aplicados">
                     <i class="fa fa-cube"></i> {{ insumoNombre(iid) }}
                   </span>
@@ -361,7 +372,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let maq of maquinas"
+                <tr *ngFor="let maq of maquinas" [hidden]="!maq.activo"
                     [class.row-selected]="maqForm.maquinaria_id === maq.id">
                   <td class="avail-op-cell">
                     <div class="op-select-row">
@@ -415,7 +426,7 @@
               <label>Maquinaria *</label>
               <select [(ngModel)]="maqForm.maquinaria_id">
                 <option [ngValue]="null" disabled>Seleccionar...</option>
-                <option *ngFor="let m of maquinas" [ngValue]="m.id">{{ m.nombre }}</option>
+                <option *ngFor="let m of maquinas" [hidden]="!m.activo" [ngValue]="m.id">{{ m.nombre }}</option>
               </select>
             </div>
             <div class="form-field">

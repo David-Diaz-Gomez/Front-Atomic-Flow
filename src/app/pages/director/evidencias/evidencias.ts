@@ -9,6 +9,14 @@ interface EvidenciaItem {
   fecha_subida: string;
 }
 
+interface OperarioMarcado {
+  id_usuario: number;
+  nombre: string;
+  marcado_en: string;
+  completado_en: string | null;
+  horario_fin_programado: string | null;
+}
+
 interface TareaEvidencia {
   tarea_id: number;
   tarea: string;
@@ -18,10 +26,7 @@ interface TareaEvidencia {
   fase: string;
   proyecto: string;
   proyecto_id: number;
-  operario: string;
-  id_operario: number;
-  completado_en: string;
-  horario_fin_programado: string;
+  operarios: OperarioMarcado[];
   verificador: string;
   id_verificador: number;
   verificado_en: string;
@@ -56,7 +61,7 @@ export class DirectorEvidencias implements OnInit {
     this.http.get<any>(`${this.api.baseUrl}/director/evidencias`, { params }).subscribe({
       next: (r: any) => {
         const raw = r?.data?.rows ?? r?.data ?? r?.rows ?? r ?? [];
-        this.tareas = raw.map((t: any) => ({ ...t, expanded: false }));
+        this.tareas = raw.map((t: any) => ({ ...t, operarios: t.operarios ?? [], expanded: false }));
         this.loading = false;
         this.cdr.detectChanges();
       },
@@ -80,19 +85,11 @@ export class DirectorEvidencias implements OnInit {
     return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} · ${hora}`;
   }
 
-  minutosEntre(a: string, b: string): string {
-    if (!a || !b) return '';
-    const diff = Math.round((new Date(b).getTime() - new Date(a).getTime()) / 60000);
-    if (diff < 60)  return `${diff} min`;
-    if (diff < 1440) return `${Math.round(diff / 60)} h`;
-    return `${Math.round(diff / 1440)} días`;
-  }
-
-  /** Compara completado_en con el último bloque de horario programado del operario */
-  vsHorario(t: TareaEvidencia): { label: string; tipo: 'early' | 'late' | 'ok' } | null {
-    if (!t.horario_fin_programado || !t.completado_en) return null;
-    const programado = new Date(t.horario_fin_programado).getTime();
-    const real       = new Date(t.completado_en).getTime();
+  /** Compara el marcado_en de UN operario con el último bloque de horario programado suyo */
+  vsHorario(op: OperarioMarcado): { label: string; tipo: 'early' | 'late' | 'ok' } | null {
+    if (!op.horario_fin_programado || !op.marcado_en) return null;
+    const programado = new Date(op.horario_fin_programado).getTime();
+    const real       = new Date(op.marcado_en).getTime();
     const diffMin    = Math.round((real - programado) / 60000);
     if (Math.abs(diffMin) < 5) return { label: 'A tiempo', tipo: 'ok' };
     if (diffMin < 0) {
@@ -102,13 +99,5 @@ export class DirectorEvidencias implements OnInit {
     }
     const txt = diffMin < 60 ? `${diffMin} min tarde` : `${Math.round(diffMin / 60)} h tarde`;
     return { label: txt, tipo: 'late' };
-  }
-
-  /** Cuánto tardó el coordinador en aprobar: desde que el operario marcó hasta verificado_en */
-  tiempoAprobacion(t: TareaEvidencia): string {
-    const desde = t.completado_en;
-    const hasta = t.verificado_en;
-    if (!desde || !hasta) return '';
-    return this.minutosEntre(desde, hasta);
   }
 }

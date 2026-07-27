@@ -158,8 +158,19 @@ export class Users implements OnInit {
       return;
     }
 
-    if (this.editingUser.valor_hora !== null && Number(this.editingUser.valor_hora) < 0) {
-      Swal.fire('Atención', 'El valor por hora no puede ser negativo.', 'warning');
+    if (this.editingUser.valor_hora !== null && this.editingUser.valor_hora !== '' &&
+        (Number(this.editingUser.valor_hora) < 0 || Number(this.editingUser.valor_hora) > 1000000)) {
+      Swal.fire('Atención', 'El valor por hora debe estar entre 0 y 1.000.000.', 'warning');
+      return;
+    }
+
+    if (this.editingUser.numero_documento && !/^\d{6,15}$/.test(String(this.editingUser.numero_documento))) {
+      Swal.fire('Atención', 'El documento debe tener entre 6 y 15 dígitos y no puede ser negativo.', 'warning');
+      return;
+    }
+
+    if (this.editingUser.telefono && !/^\d{7,10}$/.test(String(this.editingUser.telefono))) {
+      Swal.fire('Atención', 'El teléfono debe tener entre 7 y 10 dígitos y no puede ser negativo.', 'warning');
       return;
     }
 

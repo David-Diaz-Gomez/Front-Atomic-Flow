@@ -49,7 +49,7 @@ export class NotifBellComponent {
     }
 
     if (role === 2) {
-      if (['evidencia_subida', 'evidencia', 'tarea_completada', 'tarea_en_revision'].includes(n.tipo)) {
+      if (['evidencia_subida', 'evidencia', 'tarea_completada', 'tarea_en_revision', 'proyecto_rechazado'].includes(n.tipo)) {
         void this.router.navigateByUrl(pid ? `/dashboard/director/project/${pid}` : '/dashboard/director/evidencias');
       } else if (n.tipo === 'fase_completada') {
         void this.router.navigateByUrl(pid ? `/dashboard/director/project/${pid}` : '/dashboard/director/home');
@@ -95,6 +95,7 @@ export class NotifBellComponent {
       tarea_parte_pendiente: 'fa-hourglass-half',
       tarea_parte_aprobada:  'fa-check-circle',
       tarea_parte_rechazada: 'fa-undo',
+      proyecto_rechazado:    'fa-times-circle',
     };
     return map[tipo] ?? 'fa-bell-o';
   }

@@ -109,11 +109,15 @@
   &--op      { background: #f0fdf4; border: 1px solid #86efac; }
   &--coord   { background: #eff6ff; border: 1px solid #93c5fd; }
   &--pending { background: #faf5ff; border: 1px solid #d8b4fe; }
+  &--empty   { background: #f8fafc; border: 1px dashed #cbd5e1; }
 
   .tc-icon { font-size: 14px; }
   &--op      .tc-icon { color: #16a34a; }
   &--coord   .tc-icon { color: #0052cc; }
   &--pending .tc-icon { color: #7c3aed; }
+  &--empty   .tc-icon { color: #94a3b8; }
+
+  .tc-approved { margin-left: 4px; color: #16a34a; font-size: 13px; }
 
   .tc-body {
     display: flex;

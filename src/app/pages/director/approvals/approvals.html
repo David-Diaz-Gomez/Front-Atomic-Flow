@@ -81,12 +81,6 @@
 
         <p class="project-desc">{{ p.descripcion }}</p>
 
-        <!-- Rejection note -->
-        <div class="rejection-note" *ngIf="p.observaciones_rechazo">
-          <i class="fa fa-comment"></i>
-          <div><strong>Observaciones:</strong> {{ p.observaciones_rechazo }}</div>
-        </div>
-
         <!-- Budget toggle -->
         <button class="btn-toggle-budget" (click)="toggleBudget(p)">
           <i class="fa" [ngClass]="expandedBudget === p.id ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
@@ -228,31 +222,12 @@
         <!-- Actions -->
         <div class="card-actions">
           <button class="btn-approve" (click)="approve(p)"><i class="fa fa-check"></i> Aprobar</button>
-          <button class="btn-reject" (click)="openRejectModal(p)"><i class="fa fa-times"></i> Rechazar</button>
+          <button class="btn-reject" (click)="reject(p)"><i class="fa fa-times"></i> Rechazar</button>
         </div>
 
       </div>
     </div>
   </div>
 
-  <!-- Reject Modal -->
-  <div class="modal-overlay" *ngIf="showRejectModal" (click)="closeRejectModal()">
-    <div class="modal-box" (click)="$event.stopPropagation()">
-      <div class="modal-header">
-        <h3><i class="fa fa-times-circle"></i> Rechazar Proyecto</h3>
-        <button class="modal-close" (click)="closeRejectModal()"><i class="fa fa-times"></i></button>
-      </div>
-      <div class="modal-body">
-        <p>Proyecto: <strong>{{ rejectingProject?.nombre }}</strong></p>
-        <label>Observaciones de rechazo *</label>
-        <textarea [(ngModel)]="rejectObservaciones" rows="4"
-                  placeholder="Explica el motivo del rechazo y los cambios necesarios en el presupuesto..."></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-cancel-modal" (click)="closeRejectModal()">Cancelar</button>
-        <button class="btn-confirm-reject" (click)="confirmReject()"><i class="fa fa-paper-plane"></i> Enviar Rechazo</button>
-      </div>
-    </div>
-  </div>
 
 </div>

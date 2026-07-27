@@ -139,10 +139,12 @@ export class ProjectDetail implements OnInit, OnDestroy {
         id: o.id ?? o.id_usuario, nombre: o.nombre ?? '', apellido: o.apellido ?? '',
         hora_inicio: o.hora_inicio ?? '07:00', hora_fin: o.hora_fin ?? '18:00', fechas: o.fechas ?? [],
         marcado_en: o.marcado_en ?? null, completado_en: o.completado_en ?? null,
+        id_maquinaria: o.id_maquinaria ?? null, nombre_maquinaria: o.nombre_maquinaria ?? null,
       })),
       maquinarias: (t.maquinarias ?? t.maquinaria ?? []).map((m: any) => ({
         id: m.id ?? m.id_maquinaria, nombre: m.nombre ?? '',
         hora_inicio: m.hora_inicio ?? '07:00', hora_fin: m.hora_fin ?? '18:00', fechas: m.fechas ?? [],
+        id_operario: m.id_operario ?? null, nombre_operario: m.nombre_operario ?? null,
       })),
       insumos_aplicados: (t.insumos_aplicados ?? (t.insumos ?? []).map((i: any) => i.id ?? i)),
     };
@@ -579,7 +581,7 @@ export class ProjectDetail implements OnInit, OnDestroy {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Recursos');
 
-        const fileName = `Recursos_${(this.project.nombre ?? 'proyecto').replace(/\s+/g, '_')}_${new Date().toISOString().substring(0, 10)}.xlsx`;
+        const fileName = `Recursos_${(this.project.nombre ?? 'proyecto').replace(/\s+/g, '_')}_${this.todayStr()}.xlsx`;
         XLSX.writeFile(wb, fileName);
       },
       error: () => void Swal.fire('Error', 'No se pudieron exportar los recursos', 'error'),
@@ -657,8 +659,8 @@ export class ProjectDetail implements OnInit, OnDestroy {
   phaseConflictMsg = '';
   phaseMachineOcc: PhaseMachineOcc[] = [];
 
-  get phaseDateMin(): string { return this.project?.fecha_inicio ?? ''; }
-  get phaseDateMax(): string { return this.project?.fecha_fin    ?? ''; }
+  get phaseDateMin(): string { return (this.project?.fecha_inicio ?? '').substring(0, 10); }
+  get phaseDateMax(): string { return (this.project?.fecha_fin    ?? '').substring(0, 10); }
 
   openNewPhase(): void {
     this.editingPhaseId = null;
@@ -736,8 +738,12 @@ export class ProjectDetail implements OnInit, OnDestroy {
     if (fi > ff) {
       void Swal.fire('Atención', 'La fecha de inicio no puede ser posterior a la de fin.', 'warning'); return;
     }
-    // Advertencia (no bloqueo) si está fuera del rango del proyecto
-    const outOfRange = fi < this.project.fecha_inicio || ff > this.project.fecha_fin;
+    // Advertencia (no bloqueo) si está fuera del rango del proyecto.
+    // project.fecha_inicio/fecha_fin llegan como ISO datetime completo; comparar el string
+    // tal cual contra la fecha-only del form daba falsos positivos incluso en fechas iguales.
+    const projInicio = (this.project.fecha_inicio ?? '').substring(0, 10);
+    const projFin     = (this.project.fecha_fin    ?? '').substring(0, 10);
+    const outOfRange = fi < projInicio || ff > projFin;
     if (outOfRange) {
       void Swal.fire({
         icon: 'warning', title: 'Fuera del rango del proyecto',
@@ -866,16 +872,6 @@ export class ProjectDetail implements OnInit, OnDestroy {
     if (ti > tf) {
       void Swal.fire('Atención', 'La fecha de inicio no puede ser posterior a la de fin.', 'warning'); return;
     }
-    if (this.taskFase && (ti < this.taskFase.fecha_inicio.substring(0, 10) || tf > this.taskFase.fecha_fin.substring(0, 10))) {
-      void Swal.fire({
-        icon: 'warning', title: 'Fuera del rango de la fase',
-        html: `Las fechas están fuera de la fase <b>"${this.taskFaseName}"</b> (${this.formatDate(this.taskFase.fecha_inicio)} → ${this.formatDate(this.taskFase.fecha_fin)}).<br>¿Continuar de todas formas?`,
-        showCancelButton: true, confirmButtonText: 'Sí, continuar', cancelButtonText: 'Revisar',
-        confirmButtonColor: '#00A859',
-      }).then(r => { if (r.isConfirmed) this.doSaveTask(); });
-      return;
-    }
-
     this.doSaveTask();
   }
 
@@ -1223,7 +1219,12 @@ export class ProjectDetail implements OnInit, OnDestroy {
         }).subscribe({
           next: () => {
             if (op && done === 0) {
-              this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+              const existente = this.assignTask!.operarios.find((o: any) => o.id === op.id);
+              if (existente) {
+                existente.hora_inicio = slot.hora_inicio; existente.hora_fin = slot.hora_fin; existente.fechas = slot.fechas;
+              } else {
+                this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+              }
               if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
             }
             done++;
@@ -1262,11 +1263,22 @@ export class ProjectDetail implements OnInit, OnDestroy {
         next: () => {
           const maq = this.maquinas.find(m => m.id === this.maqForm.maquinaria_id);
           if (maq && done === 0) {
-            this.assignTask!.maquinarias.push({ id: maq.id, nombre: maq.nombre, hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
-            if (this.maqForm.operario_id) {
-              const op = this.operarios.find(o => o.id === this.maqForm.operario_id);
-              if (op && !this.assignTask!.operarios.some((o: any) => o.id === op.id))
-                this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+            const op = this.maqForm.operario_id ? this.operarios.find(o => o.id === this.maqForm.operario_id) : null;
+            this.assignTask!.maquinarias.push({
+              id: maq.id, nombre: maq.nombre, hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas,
+              id_operario: op?.id ?? null, nombre_operario: op ? `${op.nombre} ${op.apellido ?? ''}`.trim() : null,
+            });
+            if (op) {
+              const existente = this.assignTask!.operarios.find((o: any) => o.id === op.id);
+              if (existente) {
+                existente.id_maquinaria = maq.id;
+                existente.nombre_maquinaria = maq.nombre;
+              } else {
+                this.assignTask!.operarios.push({
+                  id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas,
+                  id_maquinaria: maq.id, nombre_maquinaria: maq.nombre,
+                });
+              }
             }
             if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
           }
@@ -1311,19 +1323,49 @@ export class ProjectDetail implements OnInit, OnDestroy {
   }
 
   removeOperario(task: any, opId: number): void {
-    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
-    if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
-    task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
-    if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
-    this.cdr.detectChanges();
+    const op = (task.operarios ?? []).find((o: any) => o.id === opId);
+    const doRemove = () => {
+      const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+      if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
+      task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
+      // El backend desasigna también la máquina emparejada — se refleja igual en el front
+      // para no dejar el chip de la máquina mostrando un operario que ya no está.
+      if (op?.id_maquinaria) task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== op.id_maquinaria);
+      if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+      this.reloadOccupancy();
+      this.cdr.detectChanges();
+    };
+    if (op?.id_maquinaria) {
+      void Swal.fire({
+        icon: 'warning', title: 'Operario emparejado con maquinaria',
+        html: `<b>${op.nombre} ${op.apellido}</b> opera <b>${op.nombre_maquinaria}</b>. Al desasignarlo, también se desasignará la máquina.`,
+        showCancelButton: true, confirmButtonText: 'Desasignar ambos', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      }).then(r => { if (r.isConfirmed) doRemove(); });
+    } else {
+      doRemove();
+    }
   }
 
   removeMaquina(task: any, maqId: number): void {
-    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
-    if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
-    task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
-    if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
-    this.cdr.detectChanges();
+    const maq = (task.maquinarias ?? []).find((m: any) => m.id === maqId);
+    const doRemove = () => {
+      const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+      if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
+      task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
+      if (maq?.id_operario) task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== maq.id_operario);
+      if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+      this.reloadOccupancy();
+      this.cdr.detectChanges();
+    };
+    if (maq?.id_operario) {
+      void Swal.fire({
+        icon: 'warning', title: 'Máquina emparejada con operario',
+        html: `<b>${maq.nombre}</b> es operada por <b>${maq.nombre_operario}</b>. Al desasignarla, también se desasignará el operario.`,
+        showCancelButton: true, confirmButtonText: 'Desasignar ambos', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      }).then(r => { if (r.isConfirmed) doRemove(); });
+    } else {
+      doRemove();
+    }
   }
 
   toggleOpDate(d: string): void {

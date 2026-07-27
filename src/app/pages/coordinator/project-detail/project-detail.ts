@@ -8,6 +8,7 @@ import { ProjectService } from '../../../shared/services/project.service';
 import { CatalogService } from '../../../shared/services/catalog.service';
 import { NotificationService } from '../../../shared/services/notification.service';
 import { Api } from '../../../core/services/api';
+import { ViewRoleService } from '../../../core/services/view-role.service';
 
 const HOURS = [7,8,9,10,11,12,13,14,15,16,17,18];
 const DAY_START = 7; const DAY_H = 11;
@@ -64,9 +65,12 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
     private catalogSvc: CatalogService,
     private notifSvc:   NotificationService,
     private api:        Api,
+    private viewRoleService: ViewRoleService,
     private cdr:        ChangeDetectorRef,
     @Inject(PLATFORM_ID) private pid: object,
   ) {}
+
+  get isAdmin(): boolean { return this.viewRoleService.isRealAdmin(); }
 
   get isMobile(): boolean {
     return isPlatformBrowser(this.pid) && window.innerWidth <= 768;
@@ -156,10 +160,12 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
         id: o.id ?? o.id_usuario, nombre: o.nombre ?? '', apellido: o.apellido ?? '',
         hora_inicio: o.hora_inicio ?? '07:00', hora_fin: o.hora_fin ?? '18:00', fechas: o.fechas ?? [],
         marcado_en: o.marcado_en ?? null, completado_en: o.completado_en ?? null,
+        id_maquinaria: o.id_maquinaria ?? null, nombre_maquinaria: o.nombre_maquinaria ?? null,
       })),
       maquinarias: (t.maquinarias ?? t.maquinaria ?? []).map((m: any) => ({
         id: m.id ?? m.id_maquinaria, nombre: m.nombre ?? '',
         hora_inicio: m.hora_inicio ?? '07:00', hora_fin: m.hora_fin ?? '18:00', fechas: m.fechas ?? [],
+        id_operario: m.id_operario ?? null, nombre_operario: m.nombre_operario ?? null,
       })),
       insumos_aplicados:     (t.insumos_aplicados ?? (t.insumos ?? []).map((i: any) => i.id ?? i)),
       evidencias_pendientes: t.evidencias_pendientes ?? 0,
@@ -382,7 +388,12 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
         }).subscribe({
           next: () => {
             if (op && done === 0) {
-              this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+              const existente = this.assignTask!.operarios.find((o: any) => o.id === op.id);
+              if (existente) {
+                existente.hora_inicio = slot.hora_inicio; existente.hora_fin = slot.hora_fin; existente.fechas = slot.fechas;
+              } else {
+                this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+              }
               if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
             }
             done++;
@@ -421,11 +432,22 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
         next: () => {
           const maq = this.maquinas.find(m => m.id === this.maqForm.maquinaria_id);
           if (maq && done === 0) {
-            this.assignTask!.maquinarias.push({ id: maq.id, nombre: maq.nombre, hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
-            if (this.maqForm.operario_id) {
-              const op = this.operarios.find(o => o.id === this.maqForm.operario_id);
-              if (op && !this.assignTask!.operarios.some((o: any) => o.id === op.id))
-                this.assignTask!.operarios.push({ id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas });
+            const op = this.maqForm.operario_id ? this.operarios.find(o => o.id === this.maqForm.operario_id) : null;
+            this.assignTask!.maquinarias.push({
+              id: maq.id, nombre: maq.nombre, hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas,
+              id_operario: op?.id ?? null, nombre_operario: op ? `${op.nombre} ${op.apellido ?? ''}`.trim() : null,
+            });
+            if (op) {
+              const existente = this.assignTask!.operarios.find((o: any) => o.id === op.id);
+              if (existente) {
+                existente.id_maquinaria = maq.id;
+                existente.nombre_maquinaria = maq.nombre;
+              } else {
+                this.assignTask!.operarios.push({
+                  id: op.id, nombre: op.nombre, apellido: op.apellido ?? '', hora_inicio: slot.hora_inicio, hora_fin: slot.hora_fin, fechas: slot.fechas,
+                  id_maquinaria: maq.id, nombre_maquinaria: maq.nombre,
+                });
+              }
             }
             if (this.assignTask!.estado === 'pendiente') this.assignTask!.estado = 'asignada';
           }
@@ -460,22 +482,51 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
 
   removeOperario(task: any, opId: number): void {
     if (task.estado === 'completada') return;
-    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
-    if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
-    task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
-    // El backend nunca cambia el estado al quitar un recurso; si la tarea está bloqueada
-    // (por dependencia o por movimiento), debe seguir bloqueada sin importar sus recursos.
-    if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
-    this.cdr.detectChanges();
+    const op = (task.operarios ?? []).find((o: any) => o.id === opId);
+    const doRemove = () => {
+      const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+      if (faseId) this.projectSvc.removeOperario(faseId, task.id, opId).subscribe({ error: () => {} });
+      task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== opId);
+      // El backend desasigna también la máquina emparejada — se refleja igual en el front.
+      if (op?.id_maquinaria) task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== op.id_maquinaria);
+      // El backend nunca cambia el estado al quitar un recurso; si la tarea está bloqueada
+      // (por dependencia o por movimiento), debe seguir bloqueada sin importar sus recursos.
+      if (!task.operarios.length && !task.maquinarias?.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+      this.reloadOccupancy();
+      this.cdr.detectChanges();
+    };
+    if (op?.id_maquinaria) {
+      void Swal.fire({
+        icon: 'warning', title: 'Operario emparejado con maquinaria',
+        html: `<b>${op.nombre} ${op.apellido}</b> opera <b>${op.nombre_maquinaria}</b>. Al desasignarlo, también se desasignará la máquina.`,
+        showCancelButton: true, confirmButtonText: 'Desasignar ambos', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      }).then(r => { if (r.isConfirmed) doRemove(); });
+    } else {
+      doRemove();
+    }
   }
 
   removeMaquina(task: any, maqId: number): void {
     if (task.estado === 'completada') return;
-    const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
-    if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
-    task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
-    if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
-    this.cdr.detectChanges();
+    const maq = (task.maquinarias ?? []).find((m: any) => m.id === maqId);
+    const doRemove = () => {
+      const faseId = this.project?.fases?.find((f: any) => f.tareas?.some((t: any) => t.id === task.id))?.id;
+      if (faseId) this.projectSvc.removeMaquina(faseId, task.id, maqId).subscribe({ error: () => {} });
+      task.maquinarias = (task.maquinarias ?? []).filter((m: any) => m.id !== maqId);
+      if (maq?.id_operario) task.operarios = (task.operarios ?? []).filter((o: any) => o.id !== maq.id_operario);
+      if (!task.operarios?.length && !task.maquinarias.length && task.estado !== 'bloqueada') task.estado = 'pendiente';
+      this.reloadOccupancy();
+      this.cdr.detectChanges();
+    };
+    if (maq?.id_operario) {
+      void Swal.fire({
+        icon: 'warning', title: 'Máquina emparejada con operario',
+        html: `<b>${maq.nombre}</b> es operada por <b>${maq.nombre_operario}</b>. Al desasignarla, también se desasignará el operario.`,
+        showCancelButton: true, confirmButtonText: 'Desasignar ambos', cancelButtonText: 'Cancelar', confirmButtonColor: '#dc2626',
+      }).then(r => { if (r.isConfirmed) doRemove(); });
+    } else {
+      doRemove();
+    }
   }
 
   completarTarea(task: any, fase: any): void {
@@ -579,6 +630,38 @@ export class CoordProjectDetail implements OnInit, OnDestroy {
   editTaskFase: any = null;
   editForm = { nombre: '', descripcion: '', id_tipo_tarea: null as number | null, fecha_inicio: '', fecha_fin: '', depende_de: null as number | null };
   editSaving = false;
+
+  // Solo visible cuando isAdmin (ver getter) — un coordinador real no puede inactivar tareas,
+  // pero un administrador viendo esta pantalla "como coordinador" sí conserva ese poder.
+  inactivarTarea(faseId: number, tarea: any): void {
+    this.projectSvc.inactivarTarea(faseId, tarea.id, false).subscribe({
+      next: (res) => {
+        if (res.requiere_confirmacion) {
+          const hijasHtml = (res.hijas as any[])
+            .map((h: any) => `<li>${h.nombre}</li>`)
+            .join('');
+          void Swal.fire({
+            title: `¿Inactivar "${tarea.nombre}"?`,
+            icon: 'warning',
+            html: `<p>Las siguientes tareas dependen de ella y perderán su vínculo:</p><ul style="text-align:left;margin-top:8px">${hijasHtml}</ul>`,
+            showCancelButton: true,
+            confirmButtonText: 'Inactivar de todas formas',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc2626'
+          }).then(r => {
+            if (!r.isConfirmed) return;
+            this.projectSvc.inactivarTarea(faseId, tarea.id, true).subscribe({
+              next: () => this.loadAll(this.project.id),
+              error: (err: any) => void Swal.fire('Error', err.error?.message ?? 'No se pudo inactivar la tarea', 'error'),
+            });
+          });
+        } else {
+          this.loadAll(this.project.id);
+        }
+      },
+      error: (err: any) => void Swal.fire('No permitido', err.error?.message ?? 'No se pudo inactivar la tarea', 'warning'),
+    });
+  }
 
   openEditTask(task: any, fase: any): void {
     this.editTask = task;

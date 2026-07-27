@@ -154,15 +154,15 @@ export class CoordGantt implements OnInit {
   buildGanttDays(): void {
     const p = this.selectedProject; if (!p?.fecha_inicio) return;
     this.ganttDays = [];
-    const cur = new Date(p.fecha_inicio), end = new Date(p.fecha_fin);
+    const cur = new Date(p.fecha_inicio + 'T00:00:00'), end = new Date(p.fecha_fin + 'T00:00:00');
     while (cur <= end) { this.ganttDays.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
   }
 
   getBarStyle(row: { fecha_inicio: string; fecha_fin: string }): Record<string, string> {
     const p = this.selectedProject;
     if (!p || !this.ganttDays.length) return { display: 'none' };
-    const ps = new Date(p.fecha_inicio).getTime();
-    const rs = new Date(row.fecha_inicio).getTime(), re = new Date(row.fecha_fin).getTime();
+    const ps = new Date(p.fecha_inicio + 'T00:00:00').getTime();
+    const rs = new Date(row.fecha_inicio + 'T00:00:00').getTime(), re = new Date(row.fecha_fin + 'T00:00:00').getTime();
     const off = Math.round((rs - ps) / 86400000), w = Math.round((re - rs) / 86400000) + 1;
     if (off < 0 || w <= 0) return { display: 'none' };
     return { left: `${off * this.cellWidth}px`, width: `${w * this.cellWidth - 4}px` };

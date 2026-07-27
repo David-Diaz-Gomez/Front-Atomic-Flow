@@ -176,31 +176,30 @@
                   {{ getTaskTipoStr(t) }} &bull; {{ formatDate(t.fecha_inicio) }} — {{ formatDate(t.fecha_fin) }}
                 </span>
                 <div class="task-assign-tags">
-                  <span class="assign-tag tag-operarios" *ngIf="t.operarios?.length">
-                    <i class="fa fa-users"></i> {{ getTaskOperariosStr(t) }}
-                  </span>
-                  <span class="assign-tag tag-machines" *ngIf="t.maquinarias?.length">
-                    <i class="fa fa-cog"></i> {{ getTaskMaquinariasStr(t) }}
-                  </span>
                   <span class="assign-tag tag-pending" *ngIf="!t.operarios?.length && !t.maquinarias?.length">
                     <i class="fa fa-clock-o"></i> Pendiente de asignación por coordinador
                   </span>
-                  <span class="assign-tag tag-auto" *ngIf="!t.operarios?.length && t.maquinarias?.length">
-                    <i class="fa fa-cog"></i> Automático
-                  </span>
                 </div>
-                <!-- Chips removibles: solo admin, para poder quitar sin abrir el panel -->
-                <div class="assign-chips" *ngIf="isAdmin && (t.operarios?.length || t.maquinarias?.length)">
+                <!-- Chips individuales con nombre + horario; el botón "x" para quitar ya se
+                     autolimita por estado/aprobación vía puedeQuitarOperario/puedeQuitarRecursos -->
+                <div class="assign-chips" *ngIf="t.operarios?.length || t.maquinarias?.length">
                   <span class="achip achip-op" *ngFor="let op of t.operarios">
                     <i class="fa fa-user"></i> {{ op.nombre }} {{ op.apellido }}
                     <span class="achip-hours">{{ op.hora_inicio }}–{{ op.hora_fin }}</span>
+                    <span class="achip-pair" *ngIf="op.id_maquinaria" [title]="'Opera: ' + op.nombre_maquinaria">
+                      <i class="fa fa-cog"></i> {{ op.nombre_maquinaria }}
+                    </span>
                     <button class="achip-rm" (click)="removeOperario(t, op.id)" *ngIf="puedeQuitarOperario(t, op)"><i class="fa fa-times"></i></button>
                   </span>
-                  <span class="achip achip-maq" *ngFor="let m of t.maquinarias">
-                    <i class="fa fa-cog"></i> {{ m.nombre }}
-                    <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
-                    <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="puedeQuitarRecursos(t)"><i class="fa fa-times"></i></button>
-                  </span>
+                  <!-- Las máquinas emparejadas con un operario ya se muestran dentro del chip
+                       del operario (arriba) — mostrarlas también aquí duplicaba la badge. -->
+                  <ng-container *ngFor="let m of t.maquinarias">
+                    <span class="achip achip-maq" *ngIf="!m.id_operario">
+                      <i class="fa fa-cog"></i> {{ m.nombre }}
+                      <span class="achip-hours">{{ m.hora_inicio }}–{{ m.hora_fin }}</span>
+                      <button class="achip-rm" (click)="removeMaquina(t, m.id)" *ngIf="puedeQuitarRecursos(t)"><i class="fa fa-times"></i></button>
+                    </span>
+                  </ng-container>
                 </div>
               </div>
               <span class="task-badge" [ngClass]="getTareaBadgeClass(t)" [title]="getTareaTooltip(t)">{{ getTareaBadgeLabel(t) }}</span>
@@ -820,7 +819,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let maq of maquinas" [class.row-selected]="maqForm.maquinaria_id === maq.id">
+                <tr *ngFor="let maq of maquinas" [hidden]="!maq.activo" [class.row-selected]="maqForm.maquinaria_id === maq.id">
                   <td class="avail-op-cell">
                     <div class="op-select-row">
                       <span class="op-name">{{ maq.nombre }}</span>
@@ -869,7 +868,7 @@
               <label>Maquinaria *</label>
               <select [(ngModel)]="maqForm.maquinaria_id">
                 <option [ngValue]="null" disabled>Seleccionar...</option>
-                <option *ngFor="let m of maquinas" [ngValue]="m.id">{{ m.nombre }}</option>
+                <option *ngFor="let m of maquinas" [hidden]="!m.activo" [ngValue]="m.id">{{ m.nombre }}</option>
               </select>
             </div>
             <div class="form-field">

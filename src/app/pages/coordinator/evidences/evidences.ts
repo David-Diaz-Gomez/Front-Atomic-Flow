@@ -98,10 +98,10 @@ export class CoordEvidences implements OnInit {
         tarea.aprobados = res.aprobados ?? (tarea.aprobados + 1);
         tarea.porcentaje = res.porcentaje ?? tarea.porcentaje;
 
-        if (res.completada) {
-          // Remover de pendientes, ya completada
+        if (res.en_revision) {
+          // Todas las partes aprobadas — pasa a Evidencias/verificación, no se completa sola.
           this.tareasPendientes = this.tareasPendientes.filter((t: any) => t.id !== tarea.id);
-          void Swal.fire({ icon: 'success', title: `¡Tarea completada! (${tarea.nombre})`, timer: 2000, showConfirmButton: false });
+          void Swal.fire({ icon: 'success', title: `¡Todas las partes aprobadas! (${tarea.nombre})`, text: 'Pasó a la pestaña Evidencias/verificación para su verificación final.', timer: 2500, showConfirmButton: false });
           this.loadAll();
         } else {
           void Swal.fire({ icon: 'success', title: 'Parte aprobada', text: `Progreso: ${res.porcentaje}%`, timer: 1400, showConfirmButton: false });
@@ -121,10 +121,10 @@ export class CoordEvidences implements OnInit {
   // automático de aprobarParteOperario, así que se ofrece confirmarlo manualmente.
   completarTareaAprobada(tarea: any): void {
     void Swal.fire({
-      title: '¿Completar tarea?',
-      html: `Todas las partes de <b>${tarea.nombre}</b> ya están aprobadas.`,
+      title: '¿Pasar a verificación?',
+      html: `Todas las partes de <b>${tarea.nombre}</b> ya están aprobadas. Pasará a Evidencias/verificación para su verificación final.`,
       icon: 'question', showCancelButton: true,
-      confirmButtonText: 'Sí, completar', cancelButtonText: 'Cancelar',
+      confirmButtonText: 'Sí, continuar', cancelButtonText: 'Cancelar',
       confirmButtonColor: '#00A859',
     }).then(r => {
       if (!r.isConfirmed) return;
@@ -134,7 +134,8 @@ export class CoordEvidences implements OnInit {
         next: () => {
           this.completandoId = null;
           this.tareasPendientes = this.tareasPendientes.filter((t: any) => t.id !== tarea.id);
-          void Swal.fire({ icon: 'success', title: `¡Tarea completada! (${tarea.nombre})`, timer: 2000, showConfirmButton: false });
+          void Swal.fire({ icon: 'success', title: `¡Todas las partes aprobadas! (${tarea.nombre})`, text: 'Pasó a la pestaña Evidencias/verificación para su verificación final.', timer: 2500, showConfirmButton: false });
+          this.loadAll();
           this.cdr.detectChanges();
         },
         error: (err: any) => {
@@ -356,7 +357,10 @@ export class CoordEvidences implements OnInit {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private today(): string { return new Date().toISOString().substring(0, 10); }
+  private today(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
 
   formatDateTime(iso: string): string {
     if (!iso) return '';

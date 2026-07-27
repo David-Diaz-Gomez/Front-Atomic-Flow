@@ -270,8 +270,15 @@ export class Gantt implements OnInit {
       estado:       t.estado ?? 'pendiente',
       fecha_inicio: (t.fecha_inicio ?? '').substring(0, 10),
       fecha_fin:    (t.fecha_fin    ?? '').substring(0, 10),
-      operarios:    (t.operarios ?? t.asignados ?? []).map((o: any) =>
-                      typeof o === 'string' ? o : (o.nombre ?? o.nombre_completo ?? `${o.nombre ?? ''} ${o.apellido ?? ''}`.trim())),
+      // Si trae apellido, SIEMPRE arma el nombre completo (para que coincida con el
+      // "resource" que devuelve getTaskSchedule, que concatena nombre+apellido) — antes,
+      // como o.nombre ya viene con valor (el nombre de pila crudo), el ?? nunca llegaba a
+      // usar el apellido y el horario nunca encontraba coincidencia por nombre.
+      operarios:    (t.operarios ?? t.asignados ?? []).map((o: any) => {
+                      if (typeof o === 'string') return o;
+                      if (o.apellido) return `${o.nombre ?? ''} ${o.apellido}`.trim();
+                      return o.nombre_completo ?? o.nombre ?? '';
+                    }),
       maquinarias:  (t.maquinarias ?? t.equipos ?? []).map((m: any) =>
                       typeof m === 'string' ? m : (m.nombre ?? '')),
       tipo:         t.tipo ?? t.tipo_tarea ?? '',
@@ -332,7 +339,7 @@ export class Gantt implements OnInit {
   buildGanttDays(): void {
     const p = this.selectedProject;
     if (!p || !p.fecha_inicio) return;
-    const start = new Date(p.fecha_inicio), end = new Date(p.fecha_fin);
+    const start = this.parseLocalDate(p.fecha_inicio), end = this.parseLocalDate(p.fecha_fin);
     this.ganttDays = [];
     const cur = new Date(start);
     while (cur <= end) { this.ganttDays.push(new Date(cur)); cur.setDate(cur.getDate() + 1); }
@@ -578,7 +585,7 @@ export class Gantt implements OnInit {
 
   private buildPanelDays(task: Tarea): void {
     this.panelDays = [];
-    const start = new Date(task.fecha_inicio), end = new Date(task.fecha_fin);
+    const start = this.parseLocalDate(task.fecha_inicio), end = this.parseLocalDate(task.fecha_fin);
     const cur = new Date(start);
     while (cur <= end && this.panelDays.length < 14) {
       this.panelDays.push(new Date(cur)); cur.setDate(cur.getDate() + 1);
@@ -594,7 +601,7 @@ export class Gantt implements OnInit {
         this.globalOcc = this.computeGlobalOcc();
         this.cdr.detectChanges();
       },
-      error: () => { task.horarioLoading = false; this.cdr.detectChanges(); }
+      error: (err) => { console.error('[Gantt] Error loadTareaHorario', err); task.horarioLoading = false; this.cdr.detectChanges(); }
     });
   }
 
@@ -620,7 +627,7 @@ export class Gantt implements OnInit {
     this.modalTask     = task;
     this.modalFaseName = fase.nombre;
     this.modalDays     = [];
-    const start = new Date(task.fecha_inicio), end = new Date(task.fecha_fin);
+    const start = this.parseLocalDate(task.fecha_inicio), end = this.parseLocalDate(task.fecha_fin);
     const cur   = new Date(start);
     while (cur <= end && this.modalDays.length < 14) {
       this.modalDays.push(new Date(cur)); cur.setDate(cur.getDate() + 1);
@@ -655,7 +662,12 @@ export class Gantt implements OnInit {
     return { left: `${left}%`, width: `${width}%` };
   }
 
-  blockLabel(block: HorarioBlock): string { return `${block.hora_inicio}:00–${block.hora_fin}:00`; }
+  private fmtHora(h: number): string {
+    const hh = Math.floor(h);
+    const mm = Math.round((h - hh) * 60);
+    return `${hh}:${String(mm).padStart(2, '0')}`;
+  }
+  blockLabel(block: HorarioBlock): string { return `${this.fmtHora(block.hora_inicio)}–${this.fmtHora(block.hora_fin)}`; }
 
   hasAnySchedule(task: Tarea): boolean {
     return task.operarios.length > 0 || task.maquinarias.length > 0;
@@ -820,8 +832,8 @@ export class Gantt implements OnInit {
   markerLeft(fecha_fin: string): number | null {
     const p = this.selectedProject;
     if (!p) return null;
-    const ps  = new Date(p.fecha_inicio).getTime();
-    const mft = new Date(fecha_fin).getTime();
+    const ps  = this.parseLocalDate(p.fecha_inicio).getTime();
+    const mft = this.parseLocalDate(fecha_fin).getTime();
     const off = Math.round((mft - ps) / 86400000);
     if (off < 0 || off >= this.ganttDays.length) return null;
     return off * this.cellWidth + this.cellWidth / 2;
@@ -831,9 +843,9 @@ export class Gantt implements OnInit {
   getGanttBarStyle(row: { fecha_inicio: string; fecha_fin: string }): Record<string,string> {
     const p = this.selectedProject;
     if (!p || !this.ganttDays.length) return { display: 'none' };
-    const ps = new Date(p.fecha_inicio).getTime();
-    const rs = new Date(row.fecha_inicio).getTime();
-    const re = new Date(row.fecha_fin).getTime();
+    const ps = this.parseLocalDate(p.fecha_inicio).getTime();
+    const rs = this.parseLocalDate(row.fecha_inicio).getTime();
+    const re = this.parseLocalDate(row.fecha_fin).getTime();
     const off = Math.round((rs - ps) / 86400000);
     const w   = Math.round((re - rs) / 86400000) + 1;
     if (off < 0 || w <= 0) return { display: 'none' };
@@ -899,6 +911,14 @@ export class Gantt implements OnInit {
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${y}-${m}-${dd}`;
+  }
+  // new Date("YYYY-MM-DD") parsea como medianoche UTC; en timezones detrás de UTC (Bogotá,
+  // -5) eso corresponde al día ANTERIOR en hora local — toDateStr() (que sí usa componentes
+  // locales) devolvería entonces una fecha corrida un día respecto a la real. Este parser
+  // arma la fecha directamente en local, sin pasar por UTC.
+  private parseLocalDate(dateStr: string): Date {
+    const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+    return new Date(y, m - 1, d);
   }
   dayLabel(d: Date): string    { return String(d.getDate()); }
   monthLabel(d: Date): string  { return ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][d.getMonth()] ?? ''; }

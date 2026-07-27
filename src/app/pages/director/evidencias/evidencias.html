@@ -42,16 +42,27 @@
           </div>
         </div>
 
-        <!-- Timeline -->
+        <!-- Timeline: un chip por cada operario que marcó su parte -->
         <div class="dv-card__timeline">
-          <!-- Operario marcó -->
-          <div class="timeline-chip timeline-chip--op">
+          <div class="timeline-chip timeline-chip--op" *ngFor="let op of t.operarios">
             <div class="tc-icon"><i class="fa fa-user"></i></div>
             <div class="tc-body">
               <span class="tc-label">Marcó lista</span>
-              <strong class="tc-name">{{ t.operario || '—' }}</strong>
-              <span class="tc-time">{{ fmt(t.completado_en) }}</span>
+              <strong class="tc-name">{{ op.nombre }}</strong>
+              <span class="tc-time">{{ fmt(op.marcado_en) }}</span>
             </div>
+            <div class="tc-delta"
+                 *ngIf="vsHorario(op)"
+                 [ngClass]="vsHorario(op)?.tipo === 'late' ? 'tc-delta--late' : vsHorario(op)?.tipo === 'early' ? 'tc-delta--early' : 'tc-delta--ok'">
+              <i class="fa" [ngClass]="vsHorario(op)?.tipo === 'late' ? 'fa-exclamation-circle' : 'fa-clock-o'"></i>
+              {{ vsHorario(op)?.label }}
+            </div>
+            <span class="tc-approved" *ngIf="op.completado_en" title="Parte aprobada"><i class="fa fa-check-circle"></i></span>
+          </div>
+
+          <div class="timeline-chip timeline-chip--empty" *ngIf="!t.operarios.length">
+            <div class="tc-icon"><i class="fa fa-user-o"></i></div>
+            <div class="tc-body"><span class="tc-label">Nadie ha marcado su parte aún</span></div>
           </div>
 
           <div class="timeline-arrow"><i class="fa fa-long-arrow-right"></i></div>
@@ -67,19 +78,6 @@
               <span class="tc-time">{{ t.verificado_en ? fmt(t.verificado_en) : (t.estado === 'completada' ? 'Verificado' : '') }}</span>
             </div>
           </div>
-
-          <!-- Delta 1: operario vs su horario programado -->
-          <div class="tc-delta"
-               *ngIf="vsHorario(t)"
-               [ngClass]="vsHorario(t)?.tipo === 'late' ? 'tc-delta--late' : vsHorario(t)?.tipo === 'early' ? 'tc-delta--early' : 'tc-delta--ok'">
-            <i class="fa" [ngClass]="vsHorario(t)?.tipo === 'late' ? 'fa-exclamation-circle' : 'fa-clock-o'"></i>
-            {{ vsHorario(t)?.label }}
-          </div>
-
-          <!-- Delta 2: cuánto tardó el coordinador en aprobar (completado_en → verificado_en) -->
-          <div class="tc-delta tc-delta--coord" *ngIf="tiempoAprobacion(t)">
-            <i class="fa fa-check"></i> aprobó en {{ tiempoAprobacion(t) }}
-          </div>
         </div>
       </div>
 
@@ -88,14 +86,15 @@
 
         <!-- Resumen texto -->
         <div class="gallery-info">
-          <div class="gallery-info__row">
+          <div class="gallery-info__row" *ngFor="let op of t.operarios">
             <i class="fa fa-user"></i>
             <span>
-              <strong>{{ t.operario || 'Operario desconocido' }}</strong>
-              marcó la tarea como lista el <strong>{{ fmt(t.completado_en) }}</strong>
-              <ng-container *ngIf="vsHorario(t)">
-                — <strong>{{ vsHorario(t)?.label }}</strong> respecto a su horario programado
+              <strong>{{ op.nombre }}</strong>
+              marcó la tarea como lista el <strong>{{ fmt(op.marcado_en) }}</strong>
+              <ng-container *ngIf="vsHorario(op)">
+                — <strong>{{ vsHorario(op)?.label }}</strong> respecto a su horario programado
               </ng-container>
+              <ng-container *ngIf="op.completado_en"> — <strong>parte aprobada</strong></ng-container>
             </span>
           </div>
           <div class="gallery-info__row" *ngIf="t.estado === 'completada'">
@@ -103,9 +102,7 @@
             <span>
               <strong>{{ t.verificador || t.coordinador || 'Coordinador' }}</strong>
               verificó y completó
-              <ng-container *ngIf="t.verificado_en"> el <strong>{{ fmt(t.verificado_en) }}</strong>
-                <ng-container *ngIf="tiempoAprobacion(t)"> — aprobó <strong>{{ tiempoAprobacion(t) }}</strong> después de que el operario la marcó</ng-container>
-              </ng-container>
+              <ng-container *ngIf="t.verificado_en"> el <strong>{{ fmt(t.verificado_en) }}</strong></ng-container>
             </span>
           </div>
           <div class="gallery-info__row gallery-info__row--warn" *ngIf="t.estado === 'en_revision'">

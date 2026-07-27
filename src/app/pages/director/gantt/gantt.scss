@@ -331,29 +331,17 @@ $panel-w: 400px;
     }
     .sched-day-cell {
       background: #fff; position: relative; min-height: 46px; min-width: 110px;
+      display: flex; align-items: center; justify-content: center;
 
-      .day-occ-pct {
-        position: absolute; top: 2px; right: 3px; font-size: 0.58rem; font-weight: bold;
-        color: var(--atomo-green-dark); z-index: 1; background: rgba(255,255,255,0.85);
-        border-radius: 4px; padding: 0 3px; line-height: 1.4;
-        &.occ-high { color: #d97706; }
-        &.occ-full { color: #dc2626; }
+      .hour-text-list {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+        padding: 6px; font-size: 0.82rem; font-weight: 600; color: #1e293b;
+        text-align: center;
       }
-      .hour-track { position: absolute; inset: 18px 4px 4px; }
-      .hour-label {
-        position: absolute; bottom: -14px; font-size: 0.52rem; color: #ccc;
-        transform: translateX(-50%); white-space: nowrap;
-        &:first-child { left: 0 !important; transform: none; }
-      }
-      .hour-block {
-        position: absolute; top: 0; height: 24px; border-radius: 4px;
-        display: flex; align-items: center; overflow: hidden; font-size: 0.58rem;
-        font-weight: bold; padding: 0 4px; white-space: nowrap;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.15); cursor: default; transition: filter 0.15s;
-        &:hover { filter: brightness(1.08); }
-        span { overflow: hidden; text-overflow: ellipsis; }
-        &.block-machine  { background: var(--atomo-gradient); color: #000; }
-        &.block-operator { background: linear-gradient(90deg,#3b82f6,#1d4ed8); color: #fff; }
+      .hour-text-item { white-space: nowrap; }
+      .no-block-day {
+        display: block; text-align: center;
+        font-size: 0.85rem; color: #cbd5e1;
       }
     }
   }
@@ -557,12 +545,6 @@ $panel-w: 400px;
       .tdm-day-cell {
         padding: 8px 8px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f4f4f4;
         vertical-align: top; min-width: 110px;
-        .tdm-occ-pct {
-          font-size: 0.68rem; font-weight: bold; color: var(--atomo-green-dark);
-          margin-bottom: 4px; text-align: center;
-          &.occ-high { color: #d97706; }
-          &.occ-full { color: #dc2626; }
-        }
         .tdm-hour-track {
           position: relative; height: 28px; background: #f8fafa; border-radius: 5px; overflow: hidden;
         }
