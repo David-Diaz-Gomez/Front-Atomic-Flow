@@ -356,7 +356,7 @@
   &--done { opacity: .6; }
   .planner-color { width: 4px; height: 44px; border-radius: 4px; flex-shrink: 0; }
   .planner-time { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 60px; .time-start { font-size: 14px; font-weight: 700; color: #1e293b; } .time-sep { font-size: 10px; color: #cbd5e1; } .time-end { font-size: 12px; color: #64748b; } }
-  .planner-info { flex: 1; .planner-name { display: block; font-size: 15px; font-weight: 600; color: #1e293b; } .planner-sub { display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; } }
+  .planner-info { flex: 1; .planner-name { display: block; font-size: 15px; font-weight: 600; color: #1e293b; .planner-maquina-icon { color: #d97706; margin-left: 6px; font-size: 13px; } } .planner-sub { display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; } }
   .planner-op { font-size: 13px; color: #475569; min-width: 130px; }
   .planner-status { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; .completada-hora { font-size: 11px; color: #94a3b8; } }
   .planner-done-icon { font-size: 20px; color: #16a34a; }
@@ -376,7 +376,7 @@
   background: white; border-radius: 16px; padding: 32px; max-width: 520px; width: 90%; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.2);
   .modal-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; border: none; background: #f1f5f9; border-radius: 50%; cursor: pointer; font-size: 14px; color: #64748b; display: flex; align-items: center; justify-content: center; &:hover { background: #e2e8f0; } }
   &__header { margin-bottom: 20px; h2 { font-size: 20px; font-weight: 700; color: #1e293b; margin: 8px 0 0; } }
-  &__meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 10px; .meta-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #475569; i { width: 16px; color: #0052cc; } } }
+  &__meta { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 10px; .meta-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #475569; i { width: 16px; color: #0052cc; } } .meta-item--maquina { font-weight: 700; color: #b45309; i { color: #d97706; } } }
   &__body { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; .task-section { label { display: block; font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; } p { font-size: 14px; color: #374151; margin: 0; line-height: 1.5; } } }
   &__footer {
     .btn-completar { width: 100%; padding: 14px; background: #0052cc; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; &:hover:not(:disabled) { background: #003d99; } &:disabled { opacity: .6; cursor: not-allowed; } }

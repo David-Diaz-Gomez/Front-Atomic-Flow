@@ -14,6 +14,7 @@ interface TareaKiosko {
   yo_complete: boolean;
   total_operarios: number;
   operarios_completados: number;
+  maquinaria?: { id: number; nombre: string }[];
 }
 
 interface LayoutItem { task: TareaKiosko; col: number; cols: number; }

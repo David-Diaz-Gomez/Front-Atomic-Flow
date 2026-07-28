@@ -236,7 +236,10 @@
           <span class="time-end">{{ t.hora_fin }}</span>
         </div>
         <div class="planner-info">
-          <span class="planner-name">{{ t.nombre }}</span>
+          <span class="planner-name">
+            {{ t.nombre }}
+            <i class="fa fa-cog planner-maquina-icon" *ngIf="t.maquinaria?.length" [title]="t.maquinaria!.map(m => m.nombre).join(', ')"></i>
+          </span>
           <span class="planner-sub">{{ t.proyecto }} · {{ t.fase }}</span>
         </div>
         <div class="planner-op" *ngIf="!isFiltered"><span>{{ t.operario }}</span></div>
@@ -262,6 +265,9 @@
         <div class="meta-item"><i class="fa fa-briefcase"></i><span>{{ selectedTarea?.proyecto }}</span></div>
         <div class="meta-item"><i class="fa fa-sitemap"></i><span>{{ selectedTarea?.fase }}</span></div>
         <div class="meta-item"><i class="fa fa-clock-o"></i><span>{{ selectedTarea?.hora_inicio }} – {{ selectedTarea?.hora_fin }}</span></div>
+        <div class="meta-item meta-item--maquina" *ngIf="selectedTarea?.maquinaria?.length">
+          <i class="fa fa-cog"></i><span>{{ selectedTarea!.maquinaria!.map(m => m.nombre).join(', ') }}</span>
+        </div>
       </div>
       <div class="task-modal__body">
         <div class="task-section" *ngIf="selectedTarea?.descripcion">
